@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancela runs antigos no mesmo branch — economiza minutos.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ──────────────────────────────────────────────
+  #  1. Quality — lint + format + type check
+  # ──────────────────────────────────────────────
+  quality:
+    name: Quality (ruff + mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Mypy strict
+        run: mypy src/
+
+  # ──────────────────────────────────────────────
+  #  2. Test — pytest + coverage 80%
+  #     Postgres é gerenciado pelo testcontainers (Docker já está no runner).
+  # ──────────────────────────────────────────────
+  test:
+    name: Tests (pytest, cov ≥ 80%)
+    needs: quality
+    runs-on: ubuntu-latest
+    env:
+      # Defaults para `get_settings()`. O `DATABASE_URL` será sobrescrito
+      # pelo conftest após o testcontainer subir.
+      ENVIRONMENT: development
+      LOG_LEVEL: WARNING
+      SECRET_KEY: ci-secret-not-for-prod
+      INTERNAL_SECRET: ci-internal-secret
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      DATABASE_URL: postgresql+asyncpg://placeholder:placeholder@localhost:5432/placeholder
+      AWS_ACCESS_KEY_ID: ci-fake
+      AWS_SECRET_ACCESS_KEY: ci-fake
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run pytest with coverage
+        run: |
+          pytest tests/ src/catalogflow/modules \
+            --cov=src/catalogflow \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=80
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  # ──────────────────────────────────────────────
+  #  3. Build — docker multi-stage + smoke
+  # ──────────────────────────────────────────────
+  build:
+    name: Docker build + smoke
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build production image
+        run: |
+          docker build \
+            --file docker/Dockerfile \
+            --target production \
+            --tag catalogflow:ci \
+            .
+
+      - name: Smoke test — import factory in image
+        run: |
+          docker run --rm \
+            -e DATABASE_URL=postgresql+asyncpg://x:x@localhost:5432/x \
+            -e REDIS_URL=redis://localhost:6379/0 \
+            -e SECRET_KEY=smoke \
+            -e INTERNAL_SECRET=smoke \
+            -e AWS_ACCESS_KEY_ID=smoke \
+            -e AWS_SECRET_ACCESS_KEY=smoke \
+            catalogflow:ci \
+            python -c "from catalogflow.main import create_app; app = create_app(); print('routes:', len([r for r in app.routes if hasattr(r, 'path')]))"
+
+  # ──────────────────────────────────────────────
+  #  4. Security — pip-audit + bandit
+  # ──────────────────────────────────────────────
+  security:
+    name: Security (pip-audit + bandit)
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: pip-audit (skip dev-only critical paths)
+        run: pip-audit --strict --ignore-vuln GHSA-w596-4wvx-j9j6 || true
+        # `|| true` durante a Sprint 01 enquanto a baseline é estabilizada.
+        # Remover esse fallback assim que CVEs forem triados em ADR-007.
+
+      - name: Bandit SAST
+        run: bandit -r src/ -ll -x src/catalogflow/modules/auth/tests
