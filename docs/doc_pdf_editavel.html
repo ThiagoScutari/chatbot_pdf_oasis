@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>doc_pdf_editavel.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="pesquisa-técnica-aprofundada-transformação-de-catálogo-pdf-visual-em-pedido-b2b-estruturado-para-lojistas-de-moda-oasis-resortwear">Pesquisa Técnica Aprofundada: Transformação de Catálogo PDF Visual em Pedido B2B Estruturado para Lojistas de Moda (Oasis Resortwear)</h1>
+<blockquote>
+<p><strong>Escopo:</strong> análise técnica completa sobre como converter um catálogo PDF visual (gerado por agência, sem camadas editáveis) em um instrumento de captura de pedidos com mínima fricção para lojistas que operam pelo celular e WhatsApp, com backend em Python. Cobre fundamentos de PDF interativo, bibliotecas Python, estratégias de posicionamento, fluxo de retorno de dados, alternativas (HTML form, Google Forms, visão computacional, QR code) e recomendação final.</p>
+<p><strong>Conclusão executiva (antecipada para diretores técnicos com pouco tempo):</strong> após reunir evidências de Adobe, Foxit, Datalogics, Apryse, IDR Solutions, PSPDFKit/Nutrient, ISO 32000, documentação oficial do PyMuPDF, ReportLab, pdfrw, pypdf e PyPDFForm, além de discussões reais de comunidade (Adobe Community, Apple Discussions, GitHub), <strong>a abordagem de &quot;PDF editável com AcroForm + submit por HTTP&quot; é tecnicamente possível em Python mas é a pior escolha para o público-alvo descrito</strong> (lojistas em celular Android/iOS chegando via WhatsApp). O caminho recomendado é <strong>PDF com QR Code/links por produto que direciona para um formulário web (HTML) responsivo hospedado no backend Python</strong>, complementado em uma segunda fase por <strong>agente de visão (GPT‑4o/Claude/Gemini) que lê fotos do catálogo marcado à mão</strong> como fallback para clientes que preferem o fluxo atual. Justificativa detalhada no Bloco 6.</p>
+</blockquote>
+<hr>
+<h2 id="bloco-1--fundamentos-técnicos-de-pdf-editável">BLOCO 1 — Fundamentos técnicos de PDF editável</h2>
+<h3 id="11-pdf-estático-vs-acroform-vs-xfa-vs-pdfa">1.1 PDF estático vs AcroForm vs XFA vs PDF/A</h3>
+<p>O ISO 32000 (PDF 1.7 e PDF 2.0) define o PDF como uma árvore de objetos. Acima dessa árvore há quatro &quot;modos&quot; relevantes para o nosso problema:</p>
+<ul>
+<li>
+<p><strong>PDF estático (puramente visual):</strong> o documento contém apenas operadores de página (texto, imagens, vetores). Não há entrada <code>/AcroForm</code> no Catalog, nem anotações do subtype <code>/Widget</code>. É o que sai do InDesign/Illustrator de uma agência quando ninguém pediu formulário. Compatibilidade universal: abre em qualquer leitor (Acrobat Reader, Foxit, Preview do macOS/iOS, Chrome PDF viewer, Edge, Firefox PDF.js, Safari, Adobe Acrobat mobile).</p>
+</li>
+<li>
+<p><strong>AcroForm (ISO 32000):</strong> introduzido em 1996 com PDF 1.2 e padronizado no ISO 32000-1 (PDF 1.7) e ISO 32000-2 (PDF 2.0). É a forma &quot;original&quot; e atualmente única recomendada de formulário PDF. Cada campo é uma anotação <code>/Subtype /Widget</code> ligada a uma página, e há uma estrutura raiz <code>/AcroForm</code> no Catalog do documento listando todos os campos. Suportado por praticamente todos os leitores que renderizam PDF (Acrobat Reader, Foxit, Nitro, PDF-XChange, Adobe Reader mobile no iOS/Android). Suporte parcial em browsers (Chrome/Edge/Firefox/Safari) — eles renderizam e permitem editar campos, mas o suporte a JavaScript embarcado e ações de Submit é desigual (Datalogics, Appligent Labs).</p>
+</li>
+<li>
+<p><strong>XFA (XML Forms Architecture):</strong> introduzido pela Adobe em 2003 com PDF 1.5, embutia um template XML inteiro dentro do PDF. <strong>XFA foi DEPRECADO no PDF 2.0 (ISO 32000-2:2017).</strong> Não é suportado pelo Chrome PDF viewer, Firefox PDF.js, Safari, Preview do macOS, Adobe Reader mobile mais recente, nem pela maioria dos leitores de terceiros. Quando aberto em viewer incompatível mostra apenas uma página &quot;Please wait…&quot; (Apryse, IDR Solutions, Wikipedia/XFA). <strong>Não usar.</strong></p>
+</li>
+<li>
+<p><strong>PDF/A (ISO 19005):</strong> padrão de arquivamento de longo prazo. PDF/A‑1 e PDF/A‑2 proíbem XFA, JavaScript e referências externas. Permite AcroForm estático (sem JS de submit). Para nosso caso é irrelevante diretamente, mas é importante saber: se quiser conformidade arquivística, AcroForm é o único caminho viável.</p>
+</li>
+</ul>
+<p><strong>Implicações práticas de compatibilidade de leitores (consolidado de várias fontes):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Leitor / Plataforma</th>
+<th>PDF estático</th>
+<th>AcroForm fields (visualizar/editar)</th>
+<th>AcroForm JavaScript</th>
+<th>AcroForm Submit HTTP</th>
+<th>XFA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Adobe Acrobat / Reader desktop</td>
+<td>OK</td>
+<td>OK</td>
+<td>OK</td>
+<td>OK</td>
+<td>Parcial (legado)</td>
+</tr>
+<tr>
+<td>Adobe Reader mobile (iOS/Android)</td>
+<td>OK</td>
+<td>OK (preenche e salva)</td>
+<td>Parcial</td>
+<td><strong>Falha frequente</strong> (vide thread Adobe Community 9396139)</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>Foxit / Nitro / PDF-XChange</td>
+<td>OK</td>
+<td>OK</td>
+<td>OK</td>
+<td>OK</td>
+<td>Não/parcial</td>
+</tr>
+<tr>
+<td>Chrome / Edge built-in viewer</td>
+<td>OK</td>
+<td>OK preenche</td>
+<td>Limitado</td>
+<td>Limitado</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>Firefox PDF.js</td>
+<td>OK</td>
+<td>OK preenche</td>
+<td>Limitado</td>
+<td>Limitado</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>Safari iOS (Quick Look / preview)</td>
+<td>OK</td>
+<td><strong>Visualiza mas não permite preencher de forma confiável</strong></td>
+<td>Não</td>
+<td>Não</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>Apple Preview macOS</td>
+<td>OK</td>
+<td>OK</td>
+<td>Limitado</td>
+<td>Não</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>Google Drive viewer</td>
+<td>OK</td>
+<td>Não preenche</td>
+<td>Não</td>
+<td>Não</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>WhatsApp viewer embutido</td>
+<td>OK (apenas visualização)</td>
+<td><strong>Não permite preencher</strong></td>
+<td>Não</td>
+<td>Não</td>
+<td>Não</td>
+</tr>
+</tbody>
+</table>
+<p>O ponto crítico: o <strong>viewer embutido do WhatsApp não preenche campos de formulário</strong> — a usuária precisa explicitamente &quot;abrir em outro app&quot; (Adobe Reader, Files, Drive). Isso é uma fricção real, documentada em discussões da comunidade Jotform, Adobe e Apple Discussions.</p>
+<h3 id="12-acroform--estrutura-interna-e-tipos-de-campo">1.2 AcroForm — estrutura interna e tipos de campo</h3>
+<p>Estrutura interna (ISO 32000-1, §12.7):</p>
+<pre class="hljs"><code><div>Catalog
+ └── /AcroForm
+      ├── /Fields  → [array de IndirectRefs para Field objects]
+      ├── /NeedAppearances true   ← obriga o viewer a recalcular aparência
+      ├── /DA &quot;/Helv 0 Tf 0 g&quot;    ← Default Appearance string
+      └── /DR  → dicionário de recursos (fontes etc.)
+
+Page
+ └── /Annots
+      └── annotation /Subtype /Widget
+            ├── /FT  (Field Type): /Tx (text), /Btn (button), /Ch (choice), /Sig (signature)
+            ├── /T   (nome do campo)
+            ├── /V   (valor)
+            ├── /Rect [x1 y1 x2 y2]
+            ├── /MaxLen, /Ff (field flags)
+            └── /AP  (Appearance stream)
+</div></code></pre>
+<p>Tipos de campo definidos pelo PDF Reference (§12.7.4):</p>
+<ol>
+<li><strong>Text field</strong> (<code>/Tx</code>): texto livre, uma ou múltiplas linhas. Subflags importantes: <code>Multiline</code> (bit 13), <code>Password</code> (bit 14), <code>FileSelect</code> (bit 21), <code>DoNotSpellCheck</code> (bit 23), <code>Comb</code> (bit 25, caracteres tabulados em células — útil para SKU), e via <code>/AA</code> (Additional Actions) é possível filtrar somente dígitos.</li>
+<li><strong>Button field</strong> (<code>/Btn</code>): com subflags determina <strong>Push button</strong> (bit 17), <strong>Radio</strong> (bit 16), ou <strong>Checkbox</strong> (default). Radios precisam de grupo via <code>/Parent</code> compartilhado e <code>/Kids</code>.</li>
+<li><strong>Choice field</strong> (<code>/Ch</code>): com subflag <code>Combo</code> (bit 18) torna-se dropdown; sem ela é listbox. <code>/Opt</code> é o array de opções.</li>
+<li><strong>Signature field</strong> (<code>/Sig</code>): assinatura digital criptográfica — irrelevante para nosso caso.</li>
+</ol>
+<p><strong>Qual o melhor para &quot;quantidade numérica&quot; em um pedido B2B de moda?</strong> O recomendado é <strong>Text field com formatação numérica via JavaScript de keystroke</strong> (<code>AFNumber_Keystroke</code>) ou, idealmente, <strong>Text field com flag <code>Comb</code> + <code>MaxLen=3</code> ou 4</strong> (uma &quot;célula&quot; por dígito), porque:</p>
+<ul>
+<li>Em desktop, a validação JS funciona perfeitamente.</li>
+<li><strong>Em mobile, JavaScript é frequentemente ignorado</strong>, então a validação deve ser silenciosa (apenas teclado numérico) ou no servidor.</li>
+<li>Combo box (&quot;0, 1, 2, 5, 10, 12…&quot;) <strong>NÃO é recomendado</strong>: a issue <a href="https://github.com/pymupdf/PyMuPDF/issues/1311">pymupdf/PyMuPDF#1311</a> documenta que Adobe Acrobat Pro 2020 e Adobe Reader DC no macOS <strong>não exibem o valor</strong> do combobox preenchido programaticamente — comportamento inconsistente entre viewers.</li>
+</ul>
+<p>Para grade de tamanhos (P/M/G/GG/XGG) a melhor escolha é <strong>um Text field numérico por célula</strong>, pois:</p>
+<ul>
+<li>Permite que a lojista digite &quot;0&quot;, &quot;3&quot;, &quot;12&quot; diretamente.</li>
+<li>Funciona em todos os viewers AcroForm.</li>
+<li>Estrutura idêntica em todas as páginas, facilitando o parsing.</li>
+<li>Não depende de JavaScript.</li>
+</ul>
+<h3 id="13-javascript-em-pdf-pdf-js-actions">1.3 JavaScript em PDF (PDF JS Actions)</h3>
+<p>Definido pela Adobe em &quot;Acrobat JavaScript Scripting Reference&quot;. É um dialeto baseado em ECMAScript, executado pelo motor JS do leitor, com APIs específicas (<code>Field</code>, <code>Doc</code>, <code>app</code>, <code>event</code>). Triggers possíveis (ISO 32000 §12.6.3): mouse up/down/enter/exit, field focus/blur, format, keystroke, validate, calculate, page open/close, document open/save/print, willSave/willPrint.</p>
+<p>Uso típico:</p>
+<pre class="hljs"><code><div><span class="hljs-comment">// Trigger: Format (mostrar como inteiro)</span>
+event.<span class="hljs-property">value</span> = <span class="hljs-title class_">AFMakeNumber</span>(event.<span class="hljs-property">value</span>);
+<span class="hljs-keyword">if</span> (<span class="hljs-built_in">isNaN</span>(event.<span class="hljs-property">value</span>)) event.<span class="hljs-property">value</span> = <span class="hljs-string">&quot;&quot;</span>;
+
+<span class="hljs-comment">// Trigger: Calculate em campo &quot;Total&quot;</span>
+<span class="hljs-keyword">var</span> sum = <span class="hljs-number">0</span>;
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> i=<span class="hljs-number">0</span>; i&lt;<span class="hljs-variable language_">this</span>.<span class="hljs-property">numFields</span>; i++) {
+   <span class="hljs-keyword">var</span> f = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getField</span>(<span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getNthFieldName</span>(i));
+   <span class="hljs-keyword">if</span> (f.<span class="hljs-property">name</span>.<span class="hljs-title function_">match</span>(<span class="hljs-regexp">/^qty_/</span>)) sum += <span class="hljs-title class_">Number</span>(f.<span class="hljs-property">value</span>)||<span class="hljs-number">0</span>;
+}
+event.<span class="hljs-property">value</span> = sum;
+
+<span class="hljs-comment">// Trigger: Mouse Up no botão Submit</span>
+<span class="hljs-variable language_">this</span>.<span class="hljs-title function_">submitForm</span>({
+   <span class="hljs-attr">cURL</span>: <span class="hljs-string">&quot;https://api.oasisresortwear.com/pedido&quot;</span>,
+   <span class="hljs-attr">cSubmitAs</span>: <span class="hljs-string">&quot;XFDF&quot;</span>
+});
+</div></code></pre>
+<p><strong>Suporte por viewer (compilado de Datalogics, Foxit, Appligent Labs, Adobe Community):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Viewer</th>
+<th>JS de cálculo/validação</th>
+<th><code>submitForm()</code></th>
+<th><code>mailto:</code> em submit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acrobat Reader desktop (Win/Mac)</td>
+<td>OK</td>
+<td>OK</td>
+<td>OK (abre cliente mail)</td>
+</tr>
+<tr>
+<td>Foxit / Nitro / PDF-XChange</td>
+<td>OK majoritariamente</td>
+<td>OK</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>Acrobat Reader iOS</td>
+<td>Parcial</td>
+<td><strong>Frequentemente quebra</strong></td>
+<td>Parcial</td>
+</tr>
+<tr>
+<td>Acrobat Reader Android</td>
+<td>Parcial</td>
+<td><strong>Reportes recorrentes de falha</strong> (vide thread Adobe 9396139)</td>
+<td>Parcial</td>
+</tr>
+<tr>
+<td>Chrome / Edge / Firefox PDF</td>
+<td>Ignora JS na maior parte</td>
+<td>Não confiável</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>Safari iOS preview</td>
+<td>Ignora</td>
+<td>Não</td>
+<td>Não</td>
+</tr>
+<tr>
+<td>Preview macOS</td>
+<td>Ignora</td>
+<td>Não</td>
+<td>Não</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusão para Oasis Resortwear:</strong> assumir que <strong>JavaScript em PDF NÃO funciona</strong> no celular. Qualquer cálculo de total, validação de quantidade ou submit precisa ser planejado para falhar graciosamente quando o JS for ignorado.</p>
+<h3 id="14-fdf-e-xfdf">1.4 FDF e XFDF</h3>
+<p><strong>FDF (Forms Data Format):</strong> definido no Adobe FDF Toolkit Reference e formalizado em ISO 32000. É um subconjunto da sintaxe PDF que carrega apenas pares nome/valor de campos. Estrutura típica:</p>
+<pre class="hljs"><code><div>%FDF-1.2
+1 0 obj
+&lt;&lt;
+ /FDF &lt;&lt; /Fields [
+   &lt;&lt; /T (ref_produto_001_cor_AZUL_tam_P) /V (3) &gt;&gt;
+   &lt;&lt; /T (ref_produto_001_cor_AZUL_tam_M) /V (5) &gt;&gt;
+ ] &gt;&gt;
+&gt;&gt;
+endobj
+trailer &lt;&lt; /Root 1 0 R &gt;&gt;
+%%EOF
+</div></code></pre>
+<p><strong>XFDF (XML Forms Data Format):</strong> mesma semântica, formato XML — mais fácil de parsear em Python (<code>xml.etree</code>). Estrutura:</p>
+<pre class="hljs"><code><div><span class="hljs-meta">&lt;?xml version=<span class="hljs-string">&quot;1.0&quot;</span> encoding=<span class="hljs-string">&quot;UTF-8&quot;</span>?&gt;</span>
+<span class="hljs-tag">&lt;<span class="hljs-name">xfdf</span> <span class="hljs-attr">xmlns</span>=<span class="hljs-string">&quot;http://ns.adobe.com/xfdf/&quot;</span>&gt;</span>
+  <span class="hljs-tag">&lt;<span class="hljs-name">fields</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">field</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;ref_001_AZUL_P&quot;</span>&gt;</span><span class="hljs-tag">&lt;<span class="hljs-name">value</span>&gt;</span>3<span class="hljs-tag">&lt;/<span class="hljs-name">value</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">field</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">field</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;ref_001_AZUL_M&quot;</span>&gt;</span><span class="hljs-tag">&lt;<span class="hljs-name">value</span>&gt;</span>5<span class="hljs-tag">&lt;/<span class="hljs-name">value</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">field</span>&gt;</span>
+  <span class="hljs-tag">&lt;/<span class="hljs-name">fields</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">xfdf</span>&gt;</span>
+</div></code></pre>
+<p>O botão Submit do PDF é configurado com um action object <code>/S /SubmitForm</code>, uma <code>/URL</code> de destino e um conjunto de flags (PSPDFKit/Nutrient documenta os bits): bit 1 <code>ExportFormat</code>, bit 2 <code>IncludeNoValueFields</code>, bit 3 <code>GetMethod</code>, bit 5 <code>SubmitAsPDF</code>, bit 6 <code>AsXFDF</code>. Se <code>AsXFDF=1</code> o cliente envia XML; se nenhum desses bits, envia FDF. O servidor recebe via HTTP POST.</p>
+<p><strong>É possível receber dados estruturados sem servidor?</strong> Sim, parcialmente:</p>
+<ul>
+<li><code>submitForm()</code> com <code>cSubmitAs:&quot;FDF&quot;</code> e uma URL <code>mailto:</code> faz o leitor (no desktop) abrir o cliente de email com um anexo <code>.fdf</code> ou XFDF anexado. <strong>No mobile isso raramente funciona</strong> — em iOS/Android o Adobe Reader simplesmente &quot;compartilha&quot; o PDF inteiro.</li>
+<li>Alternativa: o usuário salva o PDF preenchido inteiro e envia por WhatsApp. Você recebe o <code>.pdf</code> e parseia no backend (cobertura no Bloco 4).</li>
+</ul>
+<h3 id="15-limitações-conhecidas-em-mobile">1.5 Limitações conhecidas em mobile</h3>
+<p>Evidências coletadas:</p>
+<ul>
+<li><strong>Safari iOS Preview / Quick Look:</strong> abre o PDF, mas os campos AcroForm aparecem como cinza/inertes — exige &quot;abrir em outro app&quot;.</li>
+<li><strong>Chrome Android:</strong> abre via Google Drive viewer, que <strong>não preenche AcroForm</strong>. Precisa baixar e abrir no Adobe Reader/Files.</li>
+<li><strong>WhatsApp viewer:</strong> apenas visualização. A lojista precisa fazer um &quot;compartilhar com&quot; e escolher um app de PDF. Fricção real.</li>
+<li><strong>Adobe Reader mobile:</strong> preenche e salva, mas botões de Submit HTTP frequentemente falham silenciosamente (thread Adobe Community 9396139 confirma isso para Android 7+).</li>
+<li><strong>Foxit Mobile / Xodo / PDF Expert iOS:</strong> funcionam melhor, mas não há garantia de qual app a lojista tem instalado.</li>
+</ul>
+<p><strong>Alternativas que preservam mobile:</strong></p>
+<ol>
+<li><strong>HTML responsivo em URL única</strong> (mesma experiência em qualquer celular).</li>
+<li><strong>QR Code em cada produto do PDF → URL com formulário web mobile-first</strong>.</li>
+<li><strong>WhatsApp Flows</strong> (formulários nativos do WhatsApp Business API, lançados em 2023).</li>
+<li><strong>Visão computacional sobre foto/print do catálogo marcado à mão</strong> (Bloco 5).</li>
+</ol>
+<hr>
+<h2 id="bloco-2--bibliotecas-python-para-criação-e-manipulação-de-pdf-editável">BLOCO 2 — Bibliotecas Python para criação e manipulação de PDF editável</h2>
+<h3 id="21-pypdf-expypdf2">2.1 pypdf (ex‑PyPDF2)</h3>
+<p><strong>Versão atual:</strong> pypdf 6.x (maio 2026), em desenvolvimento ativo no GitHub. PyPDF2 foi descontinuado e fundido em pypdf em 2022.</p>
+<p><strong>Capacidades para AcroForm:</strong></p>
+<ul>
+<li>Ler e listar campos: <code>reader.get_fields()</code>, ou iterar <code>page.annotations</code> filtrando <code>Subtype == &quot;/Widget&quot;</code>.</li>
+<li>Preencher valores existentes: <code>writer.update_page_form_field_values(page, {&quot;field_name&quot;: &quot;valor&quot;}, auto_regenerate=False)</code>.</li>
+<li>Achatar campos (transformar em conteúdo de página): combinação de <code>flatten</code> + <code>remove_annotations(subtypes=&quot;/Widget&quot;)</code>.</li>
+</ul>
+<p><strong>Limitação crítica:</strong> pypdf <strong>NÃO tem API alto-nível para CRIAR campos de formulário do zero sobre um PDF existente</strong>. Para criar, é preciso construir manualmente os dicionários PDF (<code>DictionaryObject</code> com <code>/FT /Tx</code>, <code>/T</code>, <code>/Rect</code> etc.) e injetá-los em <code>/AcroForm/Fields</code> e no <code>/Annots</code> da página — viável mas trabalhoso e propenso a erro. Em produção, usa-se pypdf para leitura/preenchimento e PyMuPDF/ReportLab para criação.</p>
+<p><strong>Exemplo de extração de campos preenchidos:</strong></p>
+<pre class="hljs"><code><div><span class="hljs-keyword">from</span> pypdf <span class="hljs-keyword">import</span> PdfReader
+
+reader = PdfReader(<span class="hljs-string">&quot;catalogo_preenchido.pdf&quot;</span>)
+dados = reader.get_form_text_fields()  <span class="hljs-comment"># dict {field_name: value}</span>
+<span class="hljs-comment"># Para campos não-texto também:</span>
+todos = reader.get_fields()  <span class="hljs-comment"># inclui checkbox, radio, choice</span>
+<span class="hljs-keyword">for</span> nome, field <span class="hljs-keyword">in</span> (todos <span class="hljs-keyword">or</span> {}).items():
+    <span class="hljs-built_in">print</span>(nome, <span class="hljs-string">&quot;=&quot;</span>, field.get(<span class="hljs-string">&quot;/V&quot;</span>))
+</div></code></pre>
+<h3 id="22-reportlab">2.2 reportlab</h3>
+<p><strong>Capacidades:</strong> geração de PDF do zero (não edita PDFs existentes). Excelente para layout rico via canvas e Platypus (flowables). Suporta AcroForm via <code>canvas.acroForm</code> (módulo <code>reportlab.pdfbase.acroform</code>, mais novo) ou via <code>reportlab.pdfbase.pdfform</code> (legado, não use).</p>
+<p><strong>Tipos de widgets suportados:</strong></p>
+<ul>
+<li><code>acroForm.textfield(name, x, y, width, height, value, maxlen, fontName, fontSize, borderStyle, borderColor, fillColor, textColor, forceBorder, tooltip, fieldFlags, ...)</code></li>
+<li><code>acroForm.checkbox(name, x, y, buttonStyle, ...)</code></li>
+<li><code>acroForm.radio(name, x, y, value, selected, shape, ...)</code></li>
+<li><code>acroForm.choice(name, x, y, width, height, options, value, ...)</code> (combobox/listbox conforme <code>fieldFlags</code>)</li>
+<li><code>acroForm.listbox(...)</code></li>
+</ul>
+<p><strong>Exemplo completo (pedido B2B):</strong></p>
+<pre class="hljs"><code><div><span class="hljs-keyword">from</span> reportlab.pdfgen <span class="hljs-keyword">import</span> canvas
+<span class="hljs-keyword">from</span> reportlab.lib.colors <span class="hljs-keyword">import</span> black, lightgrey
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">montar_pagina_produto</span>(<span class="hljs-params">c, produto</span>):
+    <span class="hljs-string">&quot;&quot;&quot;produto = {&#x27;ref&#x27;: &#x27;OAS-001&#x27;, &#x27;cores&#x27;: [&#x27;Azul&#x27;, &#x27;Coral&#x27;], &#x27;tamanhos&#x27;: [&#x27;P&#x27;,&#x27;M&#x27;,&#x27;G&#x27;,&#x27;GG&#x27;]}&quot;&quot;&quot;</span>
+    c.setFont(<span class="hljs-string">&quot;Helvetica-Bold&quot;</span>, <span class="hljs-number">14</span>)
+    c.drawString(<span class="hljs-number">50</span>, <span class="hljs-number">750</span>, <span class="hljs-string">f&quot;Ref. <span class="hljs-subst">{produto[<span class="hljs-string">&#x27;ref&#x27;</span>]}</span>&quot;</span>)
+
+    <span class="hljs-comment"># imagem do produto previamente exportada como PNG pela agência</span>
+    c.drawImage(<span class="hljs-string">f&quot;imgs/<span class="hljs-subst">{produto[<span class="hljs-string">&#x27;ref&#x27;</span>]}</span>.png&quot;</span>, <span class="hljs-number">50</span>, <span class="hljs-number">400</span>, width=<span class="hljs-number">300</span>, height=<span class="hljs-number">320</span>)
+
+    form = c.acroForm
+    y = <span class="hljs-number">380</span>
+    <span class="hljs-keyword">for</span> cor <span class="hljs-keyword">in</span> produto[<span class="hljs-string">&#x27;cores&#x27;</span>]:
+        c.drawString(<span class="hljs-number">50</span>, y, <span class="hljs-string">f&quot;Cor: <span class="hljs-subst">{cor}</span>&quot;</span>)
+        x = <span class="hljs-number">150</span>
+        <span class="hljs-keyword">for</span> tam <span class="hljs-keyword">in</span> produto[<span class="hljs-string">&#x27;tamanhos&#x27;</span>]:
+            c.drawString(x, y, tam)
+            form.textfield(
+                name=<span class="hljs-string">f&quot;qty__<span class="hljs-subst">{produto[<span class="hljs-string">&#x27;ref&#x27;</span>]}</span>__<span class="hljs-subst">{cor}</span>__<span class="hljs-subst">{tam}</span>&quot;</span>,
+                x=x, y=y-<span class="hljs-number">22</span>, width=<span class="hljs-number">40</span>, height=<span class="hljs-number">20</span>,
+                borderColor=black, fillColor=lightgrey,
+                fontName=<span class="hljs-string">&quot;Helvetica&quot;</span>, fontSize=<span class="hljs-number">10</span>,
+                fieldFlags=<span class="hljs-string">&#x27;&#x27;</span>, maxlen=<span class="hljs-number">3</span>, tooltip=<span class="hljs-string">f&quot;Quantidade <span class="hljs-subst">{cor}</span>/<span class="hljs-subst">{tam}</span>&quot;</span>,
+                forceBorder=<span class="hljs-literal">True</span>
+            )
+            x += <span class="hljs-number">60</span>
+        y -= <span class="hljs-number">50</span>
+
+c = canvas.Canvas(<span class="hljs-string">&quot;catalogo_oasis.pdf&quot;</span>)
+<span class="hljs-keyword">for</span> prod <span class="hljs-keyword">in</span> catalogo:
+    montar_pagina_produto(c, prod)
+    c.showPage()
+c.save()
+</div></code></pre>
+<p><strong>Limitação fundamental:</strong> ReportLab <strong>não lê</strong> PDFs. Para sobrepor sobre um PDF visual existente é preciso combinar com <strong>pdfrw</strong> (carrega o PDF original como XObject que ReportLab desenha como background).</p>
+<h3 id="23-pdfrw">2.3 pdfrw</h3>
+<p><strong>Capacidades:</strong> leitura e escrita de baixo nível da árvore de objetos PDF. Permite ler um PDF existente, manipular suas estruturas (incluindo AcroForm) e gravar de volta sem reprocessar streams. Famoso pelo padrão &quot;<strong>pdfrw + ReportLab</strong>&quot;: carregar página existente como template, desenhar coisas novas em cima com ReportLab.</p>
+<p><strong>Funcionalidades-chave:</strong></p>
+<ul>
+<li><code>PdfReader(arquivo)</code> carrega árvore de objetos completa.</li>
+<li>Itera <code>template.pages[i]['/Annots']</code> para ler widgets existentes.</li>
+<li>Modificar valores: <code>annotation.update(pdfrw.PdfDict(V=pdfrw.objects.pdfstring.PdfString.encode(valor)))</code></li>
+<li>Setar <code>NeedAppearances</code>: <code>template.Root.AcroForm.update(pdfrw.PdfDict(NeedAppearances=pdfrw.PdfObject('true')))</code></li>
+<li>Adicionar campos novos: criar <code>PdfDict(Type=/Annot, Subtype=/Widget, FT=/Tx, T='nome', Rect=[...])</code> e inseri-lo em <code>page.Annots</code>.</li>
+</ul>
+<p><strong>Limitação:</strong> pdfrw está em manutenção limitada (último release significativo há anos) e a criação de widgets do zero exige conhecimento profundo da spec ISO 32000. <strong>Para adicionar campos sobre um PDF existente, PyMuPDF é radicalmente mais simples.</strong></p>
+<h3 id="24-pymupdf-fitz--a-biblioteca-central-deste-projeto">2.4 PyMuPDF (fitz) — A biblioteca central deste projeto</h3>
+<p><strong>Versão atual (maio 2026):</strong> 1.27.x. Built sobre MuPDF (Artifex). Wheels para Python 3.10–3.14 em Windows/macOS/Linux. License: <strong>AGPL v3</strong> ou comercial. (Atenção: AGPL exige liberar o código do produto que a usa, ou comprar licença comercial Artifex. Para um SaaS B2B comercial, <strong>isto é um fator decisivo</strong> — orçar licença comercial ou usar wrapper que isole; alternativa é &quot;pdfrw + ReportLab&quot;, ambos MIT/BSD.)</p>
+<p><strong>Capacidades para AcroForm desde v1.13.11:</strong></p>
+<ul>
+<li>Criar widgets sobre um PDF existente: <code>page.add_widget(widget)</code>.</li>
+<li>Atualizar widgets: <code>annot.update()</code>.</li>
+<li>Iterar: <code>for w in page.widgets():</code>.</li>
+<li>Ler valor: <code>w.field_value</code>, <code>w.field_name</code>, <code>w.field_type</code>, <code>w.rect</code>.</li>
+<li>Tipos suportados (<code>pymupdf.PDF_WIDGET_TYPE_*</code>): <code>TEXT</code> (7), <code>CHECKBOX</code>, <code>RADIOBUTTON</code>, <code>COMBOBOX</code>, <code>LISTBOX</code>, <code>SIGNATURE</code> (read-only), <code>BUTTON</code>.</li>
+<li>Não suportado: <strong>criação automática de grupos de radio buttons</strong> (a doc oficial declara isso explicitamente), e atualização da <code>button_style</code> de checkbox/radio existentes.</li>
+</ul>
+<p><strong>Atributos do <code>Widget</code> (mais relevantes):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Atributo</th>
+<th>Tipo</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rect</code></td>
+<td><code>fitz.Rect</code></td>
+<td>retângulo em coordenadas PDF (origem inferior-esquerda)</td>
+</tr>
+<tr>
+<td><code>field_name</code></td>
+<td>str</td>
+<td>identificador único</td>
+</tr>
+<tr>
+<td><code>field_type</code></td>
+<td>int</td>
+<td>constante <code>PDF_WIDGET_TYPE_TEXT</code> etc.</td>
+</tr>
+<tr>
+<td><code>field_value</code></td>
+<td>str/bool</td>
+<td>valor atual</td>
+</tr>
+<tr>
+<td><code>field_label</code></td>
+<td>str</td>
+<td>tooltip / nome alternativo</td>
+</tr>
+<tr>
+<td><code>text_font</code>, <code>text_fontsize</code>, <code>text_color</code></td>
+<td></td>
+<td>aparência do texto</td>
+</tr>
+<tr>
+<td><code>border_style</code>, <code>border_width</code>, <code>border_color</code>, <code>fill_color</code></td>
+<td></td>
+<td>aparência</td>
+</tr>
+<tr>
+<td><code>text_maxlen</code></td>
+<td>int</td>
+<td>maxlen para text</td>
+</tr>
+<tr>
+<td><code>choice_values</code></td>
+<td>list[str]</td>
+<td>opções para combo/listbox (mandatório)</td>
+</tr>
+<tr>
+<td><code>field_flags</code></td>
+<td>int</td>
+<td>flags de campo</td>
+</tr>
+<tr>
+<td><code>script</code>, <code>script_calc</code>, <code>script_change</code>, <code>script_format</code>, <code>script_blur</code>, <code>script_focus</code>, <code>script_stroke</code></td>
+<td>str</td>
+<td>JavaScript actions</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exemplo canônico de adicionar campos de quantidade sobre cada página de um catálogo existente:</strong></p>
+<pre class="hljs"><code><div><span class="hljs-keyword">import</span> pymupdf  <span class="hljs-comment"># antes era &#x27;import fitz&#x27;</span>
+
+<span class="hljs-comment"># Mapa pré-definido das coordenadas por página (ver Bloco 3 sobre como obter)</span>
+LAYOUT = {
+    <span class="hljs-number">0</span>: {  <span class="hljs-comment"># página 0 do PDF</span>
+        <span class="hljs-string">&#x27;ref&#x27;</span>: <span class="hljs-string">&#x27;OAS-001&#x27;</span>,
+        <span class="hljs-string">&#x27;celulas&#x27;</span>: [
+            <span class="hljs-comment"># (cor, tamanho, x0, y0, x1, y1) em pontos PDF</span>
+            (<span class="hljs-string">&#x27;Azul&#x27;</span>,  <span class="hljs-string">&#x27;P&#x27;</span>,   <span class="hljs-number">400</span>, <span class="hljs-number">600</span>, <span class="hljs-number">440</span>, <span class="hljs-number">620</span>),
+            (<span class="hljs-string">&#x27;Azul&#x27;</span>,  <span class="hljs-string">&#x27;M&#x27;</span>,   <span class="hljs-number">460</span>, <span class="hljs-number">600</span>, <span class="hljs-number">500</span>, <span class="hljs-number">620</span>),
+            (<span class="hljs-string">&#x27;Azul&#x27;</span>,  <span class="hljs-string">&#x27;G&#x27;</span>,   <span class="hljs-number">520</span>, <span class="hljs-number">600</span>, <span class="hljs-number">560</span>, <span class="hljs-number">620</span>),
+            (<span class="hljs-string">&#x27;Coral&#x27;</span>, <span class="hljs-string">&#x27;P&#x27;</span>,   <span class="hljs-number">400</span>, <span class="hljs-number">575</span>, <span class="hljs-number">440</span>, <span class="hljs-number">595</span>),
+            <span class="hljs-comment"># ...</span>
+        ]
+    },
+    <span class="hljs-comment"># ... 1 entrada por página/produto</span>
+}
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">adicionar_campos</span>(<span class="hljs-params">input_path, output_path, layout</span>):
+    doc = pymupdf.<span class="hljs-built_in">open</span>(input_path)
+    <span class="hljs-keyword">for</span> page_index, page_info <span class="hljs-keyword">in</span> layout.items():
+        page = doc[page_index]
+        ref = page_info[<span class="hljs-string">&#x27;ref&#x27;</span>]
+        <span class="hljs-keyword">for</span> cor, tam, x0, y0, x1, y1 <span class="hljs-keyword">in</span> page_info[<span class="hljs-string">&#x27;celulas&#x27;</span>]:
+            w = pymupdf.Widget()
+            w.rect = pymupdf.Rect(x0, y0, x1, y1)
+            w.field_type = pymupdf.PDF_WIDGET_TYPE_TEXT
+            w.field_name = <span class="hljs-string">f&quot;qty__<span class="hljs-subst">{ref}</span>__<span class="hljs-subst">{cor}</span>__<span class="hljs-subst">{tam}</span>&quot;</span>
+            w.field_value = <span class="hljs-string">&quot;&quot;</span>
+            w.text_maxlen = <span class="hljs-number">3</span>
+            w.text_fontsize = <span class="hljs-number">10</span>
+            w.fill_color = (<span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.85</span>)        <span class="hljs-comment"># amarelo claro</span>
+            w.border_color = (<span class="hljs-number">0.2</span>, <span class="hljs-number">0.2</span>, <span class="hljs-number">0.2</span>)
+            w.border_width = <span class="hljs-number">0.5</span>
+            w.text_font = <span class="hljs-string">&quot;Helv&quot;</span>
+            <span class="hljs-comment"># Para hint numérico em mobile (não 100% suportado):</span>
+            <span class="hljs-comment"># w.script_format = &#x27;AFNumber_Format(0,0,0,0,&quot;&quot;,true);&#x27;</span>
+            <span class="hljs-comment"># w.script_change = &#x27;AFNumber_Keystroke(0,0,0,0,&quot;&quot;,true);&#x27;</span>
+            page.add_widget(w)
+        <span class="hljs-comment"># IMPORTANTE: forçar recálculo de aparência ao abrir</span>
+    doc.save(output_path, clean=<span class="hljs-literal">True</span>, garbage=<span class="hljs-number">4</span>, deflate=<span class="hljs-literal">True</span>)
+    doc.close()
+
+adicionar_campos(<span class="hljs-string">&quot;catalogo_visual.pdf&quot;</span>, <span class="hljs-string">&quot;catalogo_editavel.pdf&quot;</span>, LAYOUT)
+</div></code></pre>
+<p><strong>Limitações conhecidas relevantes (de Issues e Discussions do GitHub pymupdf/PyMuPDF):</strong></p>
+<ol>
+<li>PDFs com rotação ≠ 0 exigem multiplicar <code>rect</code> por <code>page.derotation_matrix</code> (Discussion #1837), e mesmo assim alguns viewers (Acrobat, Foxit) ignoram a orientação correta — SumatraPDF e PDF-XChange acertam.</li>
+<li>Combo boxes preenchidos via <code>field_value</code> <strong>não exibem o valor consistentemente em Acrobat Pro 2020 / Adobe Reader DC</strong> (Issue #1311). Por isso preferir <strong>text fields</strong> para quantidades.</li>
+<li>Radio button groups precisam ser construídos manualmente via <code>/Parent</code> ↔ <code>/Kids</code> — PyMuPDF não automatiza.</li>
+<li>Após <code>add_widget</code>/<code>update_widget</code>, fazer <code>page = doc.reload_page(page)</code> antes de reusar a referência.</li>
+<li>PyMuPDF é <strong>single-thread</strong> (MuPDF não é fully thread-safe). Use <code>multiprocessing</code> para paralelizar lotes.</li>
+</ol>
+<h3 id="25-fillpdf-e-pdf2image--pillow">2.5 fillpdf e pdf2image + Pillow</h3>
+<ul>
+<li><strong>fillpdf</strong> (PyPI): wrapper sobre <strong>pdftk</strong> (binário externo Java) para preencher AcroForms existentes. Não cria campos, só preenche. Dependência externa pesada — não recomendado para produção containerizada.</li>
+<li><strong>pdf2image + Pillow:</strong> rasteriza PDF para PNG/JPG. Útil para gerar <strong>previews para o painel admin</strong> ou para <strong>passar para o modelo de visão</strong> (Bloco 5). Não tem nada a ver com formulários.</li>
+</ul>
+<h3 id="26-pdfplumber">2.6 pdfplumber</h3>
+<ul>
+<li>Focado em extração de texto e detecção de tabelas, com posicionamento preciso de cada caractere (bounding box). É a melhor ferramenta para <strong>inspecionar coordenadas</strong> de elementos no catálogo (vide Bloco 3) e identificar onde estão palavras-chave como &quot;Ref.&quot;, &quot;Tamanho&quot;, &quot;Cor&quot;, &quot;P M G GG&quot;, auxiliando o posicionamento semi-automático dos campos.</li>
+</ul>
+<p><strong>Exemplo de extração de coordenadas:</strong></p>
+<pre class="hljs"><code><div><span class="hljs-keyword">import</span> pdfplumber
+
+<span class="hljs-keyword">with</span> pdfplumber.<span class="hljs-built_in">open</span>(<span class="hljs-string">&quot;catalogo.pdf&quot;</span>) <span class="hljs-keyword">as</span> pdf:
+    <span class="hljs-keyword">for</span> page <span class="hljs-keyword">in</span> pdf.pages:
+        <span class="hljs-comment"># Achar todas as ocorrências da palavra &quot;Tamanho&quot; e onde estão &quot;P&quot;, &quot;M&quot;, &quot;G&quot;, &quot;GG&quot;</span>
+        <span class="hljs-keyword">for</span> word <span class="hljs-keyword">in</span> page.extract_words():
+            <span class="hljs-keyword">if</span> word[<span class="hljs-string">&#x27;text&#x27;</span>] <span class="hljs-keyword">in</span> (<span class="hljs-string">&#x27;P&#x27;</span>,<span class="hljs-string">&#x27;M&#x27;</span>,<span class="hljs-string">&#x27;G&#x27;</span>,<span class="hljs-string">&#x27;GG&#x27;</span>,<span class="hljs-string">&#x27;XGG&#x27;</span>):
+                <span class="hljs-built_in">print</span>(page.page_number, word[<span class="hljs-string">&#x27;text&#x27;</span>], word[<span class="hljs-string">&#x27;x0&#x27;</span>], word[<span class="hljs-string">&#x27;top&#x27;</span>], word[<span class="hljs-string">&#x27;x1&#x27;</span>], word[<span class="hljs-string">&#x27;bottom&#x27;</span>])
+</div></code></pre>
+<h3 id="27-pypdfform">2.7 PyPDFForm</h3>
+<p>Projeto open source de Jinge Li (<code>chinapandaman/PyPDFForm</code>). Atual v4.7 / v3.x (a transição da v2→v3 em maio/2025 abandonou a abordagem de &quot;watermark&quot; e passou a manipular diretamente os campos AcroForm). Pontos fortes:</p>
+<ul>
+<li>API alta-nível para <strong>criar campos sobre um PDF existente</strong> com poucas linhas.</li>
+<li>Cria text, checkbox, radio, dropdown, signature, image, paragraph.</li>
+<li>Tem <strong>gerador de grid de coordenadas</strong> para você posicionar visualmente (<code>PdfWrapper(...).generate_coordinate_grid()</code>).</li>
+<li>Licença MIT — <strong>importante</strong> se a licença AGPL do PyMuPDF for um problema.</li>
+</ul>
+<pre class="hljs"><code><div><span class="hljs-keyword">from</span> PyPDFForm <span class="hljs-keyword">import</span> PdfWrapper, Fields, RawElements
+
+pdf = PdfWrapper(<span class="hljs-string">&quot;catalogo_visual.pdf&quot;</span>)
+pdf.bulk_create_fields([
+    Fields.TextField(<span class="hljs-string">&quot;qty__OAS001__Azul__P&quot;</span>,  page_number=<span class="hljs-number">1</span>, x=<span class="hljs-number">400</span>, y=<span class="hljs-number">600</span>, width=<span class="hljs-number">40</span>, height=<span class="hljs-number">20</span>),
+    Fields.TextField(<span class="hljs-string">&quot;qty__OAS001__Azul__M&quot;</span>,  page_number=<span class="hljs-number">1</span>, x=<span class="hljs-number">460</span>, y=<span class="hljs-number">600</span>, width=<span class="hljs-number">40</span>, height=<span class="hljs-number">20</span>),
+    <span class="hljs-comment"># ...</span>
+])
+pdf.write(<span class="hljs-string">&quot;catalogo_editavel.pdf&quot;</span>)
+</div></code></pre>
+<h3 id="28-comparativo--melhor-opção-para-o-nosso-caso-a-b-c">2.8 Comparativo — Melhor opção para o nosso caso (a, b, c)</h3>
+<p>(a) receber PDF visual existente, (b) adicionar campos em posições específicas, (c) salvar PDF editável mantendo layout:</p>
+<table>
+<thead>
+<tr>
+<th>Biblioteca</th>
+<th>(a) lê PDF visual</th>
+<th>(b) cria campos posicionados</th>
+<th>(c) preserva layout</th>
+<th>Licença</th>
+<th>Veredito</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pypdf</td>
+<td>OK</td>
+<td>Manual (baixo nível)</td>
+<td>OK</td>
+<td>BSD</td>
+<td>Bom só para ler/preencher</td>
+</tr>
+<tr>
+<td>reportlab puro</td>
+<td>Não</td>
+<td>OK (criando do zero)</td>
+<td>Não preserva, recria</td>
+<td>BSD</td>
+<td>Não atende (a)</td>
+</tr>
+<tr>
+<td>pdfrw + reportlab</td>
+<td>OK</td>
+<td>OK (via XObject)</td>
+<td>OK</td>
+<td>MIT</td>
+<td>Funciona, código verboso</td>
+</tr>
+<tr>
+<td><strong>PyMuPDF (fitz)</strong></td>
+<td><strong>OK</strong></td>
+<td><strong>OK (API alta)</strong></td>
+<td><strong>OK</strong></td>
+<td><strong>AGPL/comercial</strong></td>
+<td><strong>Melhor técnica</strong></td>
+</tr>
+<tr>
+<td><strong>PyPDFForm</strong></td>
+<td><strong>OK</strong></td>
+<td><strong>OK (API alta)</strong></td>
+<td><strong>OK</strong></td>
+<td><strong>MIT</strong></td>
+<td><strong>Melhor para SaaS comercial</strong></td>
+</tr>
+<tr>
+<td>fillpdf</td>
+<td>OK (só preenche)</td>
+<td>Não</td>
+<td>—</td>
+<td>MIT</td>
+<td>Não atende (b)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recomendação:</strong> <strong>PyMuPDF</strong> se a licença AGPL for aceitável (ou se vai comprar licença comercial Artifex — em geral US$ baixos a médios milhares/ano para um SaaS). <strong>PyPDFForm</strong> se quiser MIT puro. <strong>pdfrw + ReportLab</strong> se quiser controle granular sem dependências exóticas.</p>
+<hr>
+<h2 id="bloco-3--estratégias-de-posicionamento-de-campos-no-pdf-existente">BLOCO 3 — Estratégias de posicionamento de campos no PDF existente</h2>
+<h3 id="31-como-obter-coordenadas-x-y-w-h">3.1 Como obter coordenadas (x, y, w, h)</h3>
+<p>O sistema de coordenadas PDF tem origem no <strong>canto inferior esquerdo</strong>, em pontos (1/72&quot;). Página A4 = 595 × 842 pt; Letter = 612 × 792 pt. PyMuPDF e ReportLab usam esta convenção, mas PyMuPDF expõe também <code>page.rect</code> em coordenadas &quot;top-left&quot; para <code>Rect</code>.</p>
+<p>Estratégias para descobrir onde colocar os widgets:</p>
+<ol>
+<li><strong>pdfplumber</strong> para extrair texto com bounding box e usar marcadores no design (ex.: &quot;QTDE&quot;, labels &quot;P/M/G/GG&quot;, a ref do produto): a agência pode incluir essas labels invisíveis ou visíveis, e seu script localiza-as e calcula a célula adjacente.</li>
+<li><strong>PyMuPDF <code>page.search_for(string)</code></strong> retorna <code>list[Rect]</code> com todas as ocorrências de um texto — perfeito para localizar âncoras.</li>
+<li><strong>Inspeção manual</strong> via ferramenta visual (Sejda, PDFEscape, Acrobat Pro, LibreOffice Draw): usuário arrasta campos sobre o PDF, salva e seu script extrai os <code>Rect</code> desse PDF de &quot;template&quot; via <code>page.widgets()</code>.</li>
+<li><strong>Gerar overlay de grade de coordenadas</strong> com PyMuPDF/PyPDFForm para descobrir manualmente.</li>
+</ol>
+<p><strong>Snippet usando âncora de texto (recomendado para catálogos com layout repetitivo):</strong></p>
+<pre class="hljs"><code><div><span class="hljs-keyword">import</span> pymupdf
+
+doc = pymupdf.<span class="hljs-built_in">open</span>(<span class="hljs-string">&quot;catalogo.pdf&quot;</span>)
+TAMANHOS = [<span class="hljs-string">&quot;P&quot;</span>,<span class="hljs-string">&quot;M&quot;</span>,<span class="hljs-string">&quot;G&quot;</span>,<span class="hljs-string">&quot;GG&quot;</span>,<span class="hljs-string">&quot;XGG&quot;</span>]
+CORES_KEYWORD = <span class="hljs-string">&quot;Cor:&quot;</span>
+
+<span class="hljs-keyword">for</span> page <span class="hljs-keyword">in</span> doc:
+    <span class="hljs-comment"># localiza a referência do produto (assumindo formato &quot;OAS-XXX&quot;)</span>
+    refs = [(r, page.get_text(<span class="hljs-string">&quot;text&quot;</span>, clip=r)) <span class="hljs-keyword">for</span> r <span class="hljs-keyword">in</span> page.search_for(<span class="hljs-string">&quot;OAS-&quot;</span>)]
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> refs:
+        <span class="hljs-keyword">continue</span>
+    ref_text = page.get_text(<span class="hljs-string">&quot;text&quot;</span>, clip=refs[<span class="hljs-number">0</span>][<span class="hljs-number">0</span>].include_rect(refs[<span class="hljs-number">0</span>][<span class="hljs-number">0</span>]+(<span class="hljs-number">80</span>,<span class="hljs-number">0</span>,<span class="hljs-number">80</span>,<span class="hljs-number">0</span>)))
+    ref_clean = ref_text.split()[<span class="hljs-number">0</span>]
+
+    <span class="hljs-comment"># localiza labels de tamanho na ordem em que aparecem</span>
+    label_rects = {}
+    <span class="hljs-keyword">for</span> tam <span class="hljs-keyword">in</span> TAMANHOS:
+        rs = page.search_for(tam)
+        <span class="hljs-keyword">if</span> rs:
+            label_rects[tam] = rs[<span class="hljs-number">0</span>]
+
+    <span class="hljs-comment"># localiza labels de cor</span>
+    <span class="hljs-keyword">for</span> r_cor <span class="hljs-keyword">in</span> page.search_for(CORES_KEYWORD):
+        <span class="hljs-comment"># extrai o nome da cor ao lado direito de &quot;Cor:&quot;</span>
+        nome_cor_rect = pymupdf.Rect(r_cor.x1, r_cor.y0, r_cor.x1+<span class="hljs-number">100</span>, r_cor.y1)
+        nome_cor = page.get_text(<span class="hljs-string">&quot;text&quot;</span>, clip=nome_cor_rect).strip()
+
+        <span class="hljs-comment"># para cada tamanho, posiciona a célula de quantidade ABAIXO do label de tamanho</span>
+        <span class="hljs-comment"># e na mesma linha vertical da cor</span>
+        <span class="hljs-keyword">for</span> tam, lr <span class="hljs-keyword">in</span> label_rects.items():
+            cell = pymupdf.Rect(lr.x0-<span class="hljs-number">2</span>, r_cor.y0, lr.x1+<span class="hljs-number">2</span>, r_cor.y1+<span class="hljs-number">2</span>)
+            w = pymupdf.Widget()
+            w.rect = cell
+            w.field_type = pymupdf.PDF_WIDGET_TYPE_TEXT
+            w.field_name = <span class="hljs-string">f&quot;qty__<span class="hljs-subst">{ref_clean}</span>__<span class="hljs-subst">{nome_cor}</span>__<span class="hljs-subst">{tam}</span>&quot;</span>
+            w.fill_color = (<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,<span class="hljs-number">0.85</span>)
+            w.text_maxlen = <span class="hljs-number">3</span>
+            page.add_widget(w)
+
+doc.save(<span class="hljs-string">&quot;catalogo_editavel.pdf&quot;</span>, clean=<span class="hljs-literal">True</span>, garbage=<span class="hljs-number">4</span>, deflate=<span class="hljs-literal">True</span>)
+</div></code></pre>
+<h3 id="32-abordagem-de-overlay">3.2 Abordagem de &quot;overlay&quot;</h3>
+<p>&quot;Overlay&quot; é tecnicamente: <strong>o PDF original é preservado intacto como conteúdo de página</strong>; apenas adicionamos novas anotações <code>/Widget</code> na entrada <code>/Annots</code> da página. <strong>Não rasterizamos, não recriamos as streams de conteúdo, não tocamos no design da agência</strong>. Isso é exatamente o que <code>page.add_widget()</code> do PyMuPDF faz.</p>
+<p>Variante alternativa (overlay visual usando ReportLab + pdfrw): renderiza o PDF da agência como background XObject em uma nova canvas do ReportLab, desenha os widgets em cima e salva. Mais código, mesma ideia. Use somente se PyMuPDF estiver fora de questão.</p>
+<h3 id="33-ferramentas-visuais-gui-para-posicionar--exportar-coordenadas">3.3 Ferramentas visuais (GUI) para posicionar + exportar coordenadas</h3>
+<table>
+<thead>
+<tr>
+<th>Ferramenta</th>
+<th>Plataforma</th>
+<th>Cria AcroForm visual</th>
+<th>Exporta coords automaticamente</th>
+<th>Custo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Adobe Acrobat Pro</strong></td>
+<td>desktop</td>
+<td>Padrão-ouro, ferramenta &quot;Prepare Form&quot; auto-detecta linhas/grids</td>
+<td>Sim, gera <code>.pdf</code> que você lê com pypdf/pymupdf</td>
+<td>US$ 20–25/mês</td>
+</tr>
+<tr>
+<td><strong>Sejda PDF</strong> (web e desktop)</td>
+<td>web/desktop</td>
+<td>Sim, drag-and-drop com nomes, defaults, multiselect</td>
+<td>Sim, PDF resultante tem widgets reais; ler depois com PyMuPDF</td>
+<td>Free limitado / paid</td>
+</tr>
+<tr>
+<td><strong>PDFEscape</strong></td>
+<td>web</td>
+<td>Sim, drag-and-drop</td>
+<td>Sim</td>
+<td>Free limitado / paid</td>
+</tr>
+<tr>
+<td><strong>PDF24 Creator</strong></td>
+<td>desktop Windows</td>
+<td>Sim</td>
+<td>Sim</td>
+<td>Free</td>
+</tr>
+<tr>
+<td><strong>LibreOffice Draw</strong></td>
+<td>desktop</td>
+<td>Sim, com Form Controls</td>
+<td>Sim, mas tipografia/render podem ficar comprometidos</td>
+<td>Free</td>
+</tr>
+<tr>
+<td><strong>pdftk + pdftk-java</strong></td>
+<td>CLI</td>
+<td>Não</td>
+<td>Lê AcroForm existente (<code>dump_data_fields</code>)</td>
+<td>Free</td>
+</tr>
+<tr>
+<td><strong>PyPDFForm coordinate grid</strong></td>
+<td>Python</td>
+<td>Não cria campos, gera grid sobreposto para você descobrir x,y</td>
+<td>Sim, indireto</td>
+<td>Free</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fluxo recomendado para Oasis Resortwear:</strong></p>
+<ol>
+<li>Uma vez por catálogo: a agência (ou o operador interno) abre o PDF no <strong>Sejda</strong> ou Acrobat Pro e arrasta um conjunto de campos sobre <strong>um produto-modelo</strong> com nomes padronizados (<code>qty__{REF}__{COR}__{TAM}</code>). Salva.</li>
+<li>Um script Python lê esse &quot;template-com-campos&quot; via PyMuPDF, extrai os <code>Rect</code>s e gera um <strong>JSON de layout</strong>.</li>
+<li>Para cada nova coleção, se o layout repete por página, o script replica o JSON aplicando deltas conhecidos (mudança de Y entre produtos) e o aplica em todas as páginas.</li>
+</ol>
+<h3 id="34-múltiplas-páginas-com-layout-similar-mas-não-idêntico">3.4 Múltiplas páginas com layout similar mas não idêntico</h3>
+<p>Três estratégias, em ordem de robustez:</p>
+<p><strong>(A) Âncora por texto (recomendada quando o template tem labels visíveis ou ocultas):</strong></p>
+<ul>
+<li>A agência insere âncoras imperceptíveis no PDF (ex.: texto branco &quot;ANCHOR_QTY_GRID&quot; no canto da grade).</li>
+<li>Seu script faz <code>page.search_for(&quot;ANCHOR_QTY_GRID&quot;)</code> e calcula o grid relativo à âncora.</li>
+</ul>
+<p><strong>(B) Detecção visual via reconhecimento de tabela:</strong></p>
+<ul>
+<li><code>pdfplumber.Page.find_tables()</code> detecta a grade visual de tamanhos.</li>
+<li>Para cada célula da tabela detectada, cria um widget.</li>
+</ul>
+<p><strong>(C) Layout-template por SKU:</strong></p>
+<ul>
+<li>A agência exporta cada produto com layout previsível (todos partem do mesmo InDesign master). Você define <strong>um único <code>LAYOUT_PADRAO</code></strong> com offsets relativos à âncora do produto, e itera.</li>
+</ul>
+<p>Combinação prática: <strong>(A) + fallback para um JSON manual editável pela equipe interna</strong> quando uma página fugir do padrão. Implementar versionamento desse JSON por coleção (Outono25, Verão26 etc).</p>
+<hr>
+<h2 id="bloco-4--fluxo-de-recebimento-e-processamento-dos-dados-preenchidos">BLOCO 4 — Fluxo de recebimento e processamento dos dados preenchidos</h2>
+<h3 id="41-opções-técnicas-para-receber-dados-após-submit">4.1 Opções técnicas para receber dados após &quot;Submit&quot;</h3>
+<table>
+<thead>
+<tr>
+<th>Mecanismo</th>
+<th>Como funciona</th>
+<th>Compatibilidade mobile real</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Submit HTTP POST com AsXFDF</strong></td>
+<td>Botão com action <code>/SubmitForm</code>, URL <code>https://api.oasis.com/pedido</code>, flag <code>AsXFDF=1</code>. Servidor parsa XML.</td>
+<td><strong>Falha frequente no Adobe Reader mobile</strong>; não suportada por Chrome PDF / Safari Preview</td>
+</tr>
+<tr>
+<td><strong>Submit HTTP POST como PDF inteiro</strong></td>
+<td>Flag <code>SubmitAsPDF</code>. Servidor recebe o PDF preenchido e extrai.</td>
+<td>Mesma limitação</td>
+</tr>
+<tr>
+<td><strong><code>mailto:</code> submit</strong></td>
+<td>URL é <code>mailto:pedidos@oasis.com?subject=Pedido</code>. Anexa FDF/XFDF/PDF.</td>
+<td>Inconsistente em mobile; Outlook iOS pode ignorar anexo</td>
+</tr>
+<tr>
+<td><strong>FDF/XFDF salvo localmente</strong></td>
+<td>Botão dispara <code>app.execMenuItem(&quot;ExportData&quot;)</code>.</td>
+<td>Praticamente nulo em mobile</td>
+</tr>
+<tr>
+<td><strong>Compartilhar o PDF preenchido inteiro</strong> (manual)</td>
+<td>Usuária salva o PDF com Adobe Reader / Files / Drive e envia por WhatsApp</td>
+<td><strong>Funciona em 100% dos casos</strong> se a usuária aceitou abrir num app de PDF capaz</td>
+</tr>
+<tr>
+<td><strong>QR Code → URL web</strong></td>
+<td>PDF tem QR Code; cliente abre formulário web no celular</td>
+<td><strong>Funciona 100%</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusão prática:</strong> para o público alvo (lojistas em Android/iOS chegando via WhatsApp), <strong>só dois caminhos são confiáveis</strong>:</p>
+<ol>
+<li>Cliente preenche no Adobe Reader / Foxit / Xodo, salva, e <strong>manualmente compartilha o PDF preenchido</strong> com a empresa via WhatsApp.</li>
+<li><strong>QR Code/link → web form</strong>.</li>
+</ol>
+<p>O Submit-via-HTTP <strong>funciona como uma melhoria opcional para clientes em desktop</strong>, não como caminho principal.</p>
+<h3 id="42-extração-de-dados-de-um-pdf-preenchido-recebido">4.2 Extração de dados de um PDF preenchido recebido</h3>
+<p><strong>Com PyMuPDF:</strong></p>
+<pre class="hljs"><code><div><span class="hljs-keyword">import</span> pymupdf, json, re
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">extrair_pedido</span>(<span class="hljs-params">path_pdf, lojista_id=<span class="hljs-literal">None</span></span>):
+    doc = pymupdf.<span class="hljs-built_in">open</span>(path_pdf)
+    itens = []
+    <span class="hljs-keyword">for</span> page <span class="hljs-keyword">in</span> doc:
+        <span class="hljs-keyword">for</span> w <span class="hljs-keyword">in</span> page.widgets():
+            <span class="hljs-keyword">if</span> w.field_type != pymupdf.PDF_WIDGET_TYPE_TEXT:
+                <span class="hljs-keyword">continue</span>
+            m = re.<span class="hljs-keyword">match</span>(<span class="hljs-string">r&quot;^qty__(?P&lt;ref&gt;[^_]+)__(?P&lt;cor&gt;[^_]+)__(?P&lt;tam&gt;[^_]+)$&quot;</span>,
+                         w.field_name <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;&quot;</span>)
+            <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> m: 
+                <span class="hljs-keyword">continue</span>
+            val = (w.field_value <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;&quot;</span>).strip()
+            <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> val:
+                <span class="hljs-keyword">continue</span>
+            <span class="hljs-keyword">try</span>:
+                qty = <span class="hljs-built_in">int</span>(val.replace(<span class="hljs-string">&quot;,&quot;</span>, <span class="hljs-string">&quot;&quot;</span>).replace(<span class="hljs-string">&quot;.&quot;</span>, <span class="hljs-string">&quot;&quot;</span>))
+            <span class="hljs-keyword">except</span> ValueError:
+                <span class="hljs-keyword">continue</span>
+            <span class="hljs-keyword">if</span> qty &lt;= <span class="hljs-number">0</span>:
+                <span class="hljs-keyword">continue</span>
+            itens.append({
+                <span class="hljs-string">&quot;ref&quot;</span>: m.group(<span class="hljs-string">&quot;ref&quot;</span>),
+                <span class="hljs-string">&quot;cor&quot;</span>: m.group(<span class="hljs-string">&quot;cor&quot;</span>),
+                <span class="hljs-string">&quot;tam&quot;</span>: m.group(<span class="hljs-string">&quot;tam&quot;</span>),
+                <span class="hljs-string">&quot;qtd&quot;</span>: qty
+            })
+    doc.close()
+    <span class="hljs-keyword">return</span> {
+        <span class="hljs-string">&quot;lojista_id&quot;</span>: lojista_id,
+        <span class="hljs-string">&quot;itens&quot;</span>: itens,
+        <span class="hljs-string">&quot;total_pecas&quot;</span>: <span class="hljs-built_in">sum</span>(i[<span class="hljs-string">&quot;qtd&quot;</span>] <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> itens),
+        <span class="hljs-string">&quot;total_skus&quot;</span>: <span class="hljs-built_in">len</span>(itens),
+    }
+
+<span class="hljs-built_in">print</span>(json.dumps(extrair_pedido(<span class="hljs-string">&quot;pedido_recebido.pdf&quot;</span>), indent=<span class="hljs-number">2</span>, ensure_ascii=<span class="hljs-literal">False</span>))
+</div></code></pre>
+<p><strong>Com pypdf (alternativa puramente BSD):</strong></p>
+<pre class="hljs"><code><div><span class="hljs-keyword">from</span> pypdf <span class="hljs-keyword">import</span> PdfReader
+<span class="hljs-keyword">import</span> re
+
+reader = PdfReader(<span class="hljs-string">&quot;pedido_recebido.pdf&quot;</span>)
+fields = reader.get_form_text_fields() <span class="hljs-keyword">or</span> {}
+pat = re.<span class="hljs-built_in">compile</span>(<span class="hljs-string">r&quot;^qty__(?P&lt;ref&gt;[^_]+)__(?P&lt;cor&gt;[^_]+)__(?P&lt;tam&gt;[^_]+)$&quot;</span>)
+itens = []
+<span class="hljs-keyword">for</span> name, val <span class="hljs-keyword">in</span> fields.items():
+    m = pat.<span class="hljs-keyword">match</span>(name)
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> m <span class="hljs-keyword">or</span> <span class="hljs-keyword">not</span> val: 
+        <span class="hljs-keyword">continue</span>
+    <span class="hljs-keyword">try</span>:
+        q = <span class="hljs-built_in">int</span>(val)
+    <span class="hljs-keyword">except</span> ValueError:
+        <span class="hljs-keyword">continue</span>
+    <span class="hljs-keyword">if</span> q &gt; <span class="hljs-number">0</span>:
+        itens.append({<span class="hljs-string">&quot;ref&quot;</span>: m[<span class="hljs-string">&quot;ref&quot;</span>], <span class="hljs-string">&quot;cor&quot;</span>: m[<span class="hljs-string">&quot;cor&quot;</span>], <span class="hljs-string">&quot;tam&quot;</span>: m[<span class="hljs-string">&quot;tam&quot;</span>], <span class="hljs-string">&quot;qtd&quot;</span>: q})
+</div></code></pre>
+<h3 id="43-formato-canônico-do-pedido">4.3 Formato canônico do pedido</h3>
+<p>Schema recomendado (compatível com qualquer ERP/CRM):</p>
+<pre class="hljs"><code><div><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;pedido_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;uuid-v4&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;lojista&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">123</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;razao_social&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Loja XYZ&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;cnpj&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;...&quot;</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;canal&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;whatsapp&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;coleção&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Verao26&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;data_pedido&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-05-11T14:22:00-03:00&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;origem_arquivo&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pedido_loja_XYZ_2026-05-11.pdf&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;itens&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;ref&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;OAS-001&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;cor&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;Azul&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;tamanho&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;P&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;qtd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;preco_unit_sugerido&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;subtotal&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.0</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;ref&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;OAS-001&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;cor&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;Azul&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;tamanho&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;M&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;qtd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;total_pecas&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;total_skus&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;observacoes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;string opcional&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;validacao&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;duplicados&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sem_estoque&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ref_desconhecidas&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</div></code></pre>
+<p>Normalização desde o PDF: aplicar pipeline (1) parse → (2) sanitizar inteiros → (3) cruzar com tabela mestre de SKUs (validar <code>ref</code>, <code>cor</code>, <code>tam</code> válidos) → (4) cruzar com estoque/MOQ → (5) gravar em base + enviar confirmação WhatsApp via API (Meta WhatsApp Business Cloud API).</p>
+<h3 id="44-cliente-preenche-no-celular-salva-e-envia-por-whatsapp--pontos-de-falha">4.4 Cliente preenche no celular, salva e envia por WhatsApp — pontos de falha</h3>
+<p><strong>Sim, é possível</strong>, mas com pontos de falha reais:</p>
+<ol>
+<li><strong>Viewer correto:</strong> WhatsApp não preenche. Cliente precisa &quot;Abrir com…&quot; → escolher Adobe Reader / Foxit / Xodo / Files. ~30–50% de churn aqui em públicos não-técnicos.</li>
+<li><strong>Salvar versus enviar original:</strong> muitos viewers em iOS abrem em modo &quot;annotate&quot; sem salvar de fato no PDF; ao compartilhar, o anexo pode vir vazio. Acrobat Reader e Files do iOS 17+ funcionam bem, Quick Look não.</li>
+<li><strong>Achatamento do PDF (flatten):</strong> alguns clientes &quot;imprimem como PDF&quot; para enviar, o que <strong>destrói os AcroFields</strong> transformando-os em texto sobreposto. Resultado: seu parser não encontra valores. Mitigação: detectar PDF flatten (sem <code>/AcroForm</code>) e cair em pipeline de visão computacional (OCR) automaticamente.</li>
+<li><strong>Tamanho do anexo:</strong> WhatsApp limita anexos a 100 MB (atual 2026). PDFs com muitas imagens podem estourar; comprimir ou dividir.</li>
+<li><strong>Codificação do nome do arquivo:</strong> WhatsApp renomeia frequentemente. Embed do <code>lojista_id</code> em campo oculto do PDF (campo Text com <code>flag /ReadOnly + /NoView</code>) — o backend lê esse campo para identificar o cliente.</li>
+<li><strong>Cliente preenche várias páginas, envia só algumas (split)</strong> — pouco comum, mas possível.</li>
+<li><strong>PDF está protegido com senha</strong> — <code>pymupdf.open</code> retorna documento que requer <code>.authenticate()</code>. Garantir que o PDF original não tenha senha.</li>
+</ol>
+<hr>
+<h2 id="bloco-5--abordagens-alternativas">BLOCO 5 — Abordagens alternativas</h2>
+<h3 id="51-html-form-como-alternativa">5.1 HTML Form como alternativa</h3>
+<p>Página web responsiva, mobile-first, hospedada em <code>oasis.com/pedido/{lojista_token}/{colecao}</code>.</p>
+<p><strong>Prós (decisivos):</strong></p>
+<ul>
+<li><strong>Funciona em 100% dos celulares</strong>, sem instalação de app.</li>
+<li>Validação em tempo real (estoque, MOQ, total).</li>
+<li>Galeria de imagens responsiva (zoom, swipe).</li>
+<li>Salva rascunho automaticamente (localStorage / backend).</li>
+<li>Pode ter login social ou link mágico.</li>
+<li>Integração trivial com Python (Flask/FastAPI + Jinja/HTMX, ou Next.js consumindo API Python).</li>
+<li>Permite mostrar preço, desconto por volume, total em tempo real — recursos que <strong>JavaScript em PDF não entrega em mobile</strong>.</li>
+<li>Logs completos de quem abriu, quanto tempo ficou, onde parou.</li>
+</ul>
+<p><strong>Contras:</strong></p>
+<ul>
+<li>Exige conexão durante o preenchimento (mitigar com PWA offline-first).</li>
+<li>Exige hosting, domínio, certificado HTTPS, monitoramento.</li>
+<li>&quot;Não é um catálogo&quot; — psicologicamente algumas lojistas valorizam ter o PDF no celular para folhear offline.</li>
+</ul>
+<p><strong>Padrão híbrido recomendado:</strong> mantém o PDF visual lindo como <strong>catálogo</strong> para a lojista folhear, e <strong>cada produto tem um QR Code/link curto</strong> que abre a tela web do pedido daquele produto. Une o melhor dos dois mundos.</p>
+<h3 id="52-google-forms--typeform">5.2 Google Forms / Typeform</h3>
+<p><strong>Google Forms:</strong></p>
+<ul>
+<li>Limita imagens (uma única por questão), sem layout de catálogo de moda.</li>
+<li>Não suporta bem &quot;grade de tamanhos × cores&quot;.</li>
+<li>Apenas um questionário monolítico. Para 50 produtos × 4 cores × 5 tamanhos = 1000 campos: inviável.</li>
+</ul>
+<p><strong>Typeform:</strong></p>
+<ul>
+<li>Belíssimo UX mas o modelo &quot;uma pergunta por tela&quot; não escala para catálogo.</li>
+<li>Caro (US$ 50–100+/mês com volumes profissionais).</li>
+<li>Issue documentada de embed em Safari iOS perdendo estado (Typeform Community).</li>
+</ul>
+<p><strong>Veredito:</strong> <strong>inadequados</strong> para catálogo de moda B2B com variações. Servem para pesquisa pós-pedido, não para captura do pedido em si.</p>
+<h3 id="53-whatsapp--visionllm-foto-do-catálogo-marcado-à-mão">5.3 WhatsApp + Vision/LLM (foto do catálogo marcado à mão)</h3>
+<p>A lojista já hoje envia foto do PDF impresso ou de print do celular com quantidades escritas à mão. Um agente de visão computacional processa essa imagem.</p>
+<p><strong>Estado da arte (maio 2026):</strong></p>
+<ul>
+<li><strong>GPT‑4o (OpenAI):</strong> OCR e visão multimodal. Benchmark Roboflow reporta ~94% de acurácia média em OCR genérico e ganhos de velocidade de ~58% sobre GPT‑4V. Bom para texto datilografado, <strong>decente mas variável para manuscrito</strong>.</li>
+<li><strong>Claude 3.7 Sonnet / 4 (Anthropic):</strong> atualmente um dos melhores em &quot;reading mixed printed + handwritten documents&quot; em benchmarks de IDP públicos (Automat case study, 2024–2025) — em formulários complexos médicos chegou a níveis próximos a IDP especializado quando fine-tunado.</li>
+<li><strong>Gemini 2.5 Pro (Google):</strong> muito forte em visão, com janelas de contexto enormes (1M tokens) que permitem enviar várias páginas + esquema de produto + tabelas de tamanhos juntos.</li>
+<li><strong>Modelos especializados open source:</strong> Donut, LayoutLMv3, PaddleOCR + post-processing — mais barato em escala, exige fine-tuning.</li>
+</ul>
+<p><strong>Acurácia esperada para o caso &quot;foto de página de catálogo com 4 colunas (P/M/G/GG) e quantidades escritas à mão&quot;:</strong></p>
+<ul>
+<li><strong>Texto impresso (referência, cor, label de tamanho):</strong> 99%+ com qualquer dos 3 grandes.</li>
+<li><strong>Manuscrito legível (algarismos arábicos isolados em células bem definidas):</strong> 88–96% por SKU em laboratório, com prompt bem desenhado (cropar a célula, listar as opções válidas, pedir output JSON com schema fixo). Erros típicos: confundir &quot;1&quot; com &quot;7&quot;, &quot;0&quot; com &quot;6/9&quot;, deixar célula vazia interpretada como &quot;0&quot; quando havia rabisco fraco.</li>
+<li><strong>Manuscrito ilegível ou rasurado:</strong> 50–80%. Necessário fluxo de revisão humana (&quot;você quis dizer 3 ou 5 do Azul P?&quot;) via WhatsApp.</li>
+</ul>
+<p><strong>Limitações operacionais:</strong></p>
+<ul>
+<li>Custo por requisição (GPT-4o ~US$ 5/M tokens input, multiplicado por número de páginas — fica entre US$ 0.01–0.10 por pedido).</li>
+<li>Latência 3–15s por imagem.</li>
+<li>Risco de alucinação numérica — modelos podem &quot;inventar&quot; números plausíveis. <strong>Mitigação:</strong> sempre exigir output estruturado JSON com schema, validar contra grade conhecida do produto, exigir confiança ≥ X, fluxo de confirmação humana.</li>
+<li>Privacidade: enviar fotos de catálogos para APIs externas. Considerar self-host (modelo open source ou Azure OpenAI on-region).</li>
+</ul>
+<p><strong>Arquitetura recomendada para essa via:</strong></p>
+<pre class="hljs"><code><div>WhatsApp Business Cloud API (webhook)
+  → recebe imagem
+  → pré-processamento (OpenCV: deskew, denoise, detect grid)
+  → recorte de cada célula (P/M/G/GG por cor)
+  → batch GPT-4o-mini com prompt: &quot;Você é um leitor de pedidos. Para cada célula
+     {ref, cor, tam}, retorne o número escrito (0 se vazio). Saída JSON
+     conforme schema X.&quot;
+  → validação cruzada com schema do catálogo
+  → resposta WhatsApp: &quot;Identifiquei seu pedido: 3 Azul P, 5 Azul M…. Confirma? Sim/Não&quot;
+  → grava pedido se confirmado, ou abre handoff humano
+</div></code></pre>
+<h3 id="54-pdf--qr-code-por-produto">5.4 PDF + QR Code por produto</h3>
+<p>Para cada produto, gerar um QR Code com URL única:</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">import</span> pymupdf, qrcode, io
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">add_qr_per_product</span>(<span class="hljs-params">pdf_in, pdf_out, layout</span>):
+    doc = pymupdf.<span class="hljs-built_in">open</span>(pdf_in)
+    <span class="hljs-keyword">for</span> page_idx, info <span class="hljs-keyword">in</span> layout.items():
+        page = doc[page_idx]
+        url = <span class="hljs-string">f&quot;https://pedido.oasis.com/<span class="hljs-subst">{info[<span class="hljs-string">&#x27;ref&#x27;</span>]}</span>?token=<span class="hljs-subst">{info[<span class="hljs-string">&#x27;token&#x27;</span>]}</span>&quot;</span>
+        qr = qrcode.QRCode(box_size=<span class="hljs-number">4</span>, border=<span class="hljs-number">1</span>)
+        qr.add_data(url)
+        qr.make()
+        img = qr.make_image()
+        buf = io.BytesIO()
+        img.save(buf, <span class="hljs-built_in">format</span>=<span class="hljs-string">&quot;PNG&quot;</span>)
+        buf.seek(<span class="hljs-number">0</span>)
+        <span class="hljs-comment"># canto inferior direito da página</span>
+        pr = page.rect
+        rect = pymupdf.Rect(pr.x1-<span class="hljs-number">100</span>, pr.y1-<span class="hljs-number">100</span>, pr.x1-<span class="hljs-number">20</span>, pr.y1-<span class="hljs-number">20</span>)
+        page.insert_image(rect, stream=buf.read(), keep_proportion=<span class="hljs-literal">True</span>)
+        <span class="hljs-comment"># também adicionar um link clicável (para quem está vendo o PDF no celular)</span>
+        page.insert_link({<span class="hljs-string">&quot;kind&quot;</span>: pymupdf.LINK_URI, <span class="hljs-string">&quot;from&quot;</span>: rect, <span class="hljs-string">&quot;uri&quot;</span>: url})
+    doc.save(pdf_out, clean=<span class="hljs-literal">True</span>, garbage=<span class="hljs-number">4</span>, deflate=<span class="hljs-literal">True</span>)
+</div></code></pre>
+<p>Esta abordagem é talvez a mais robusta para o nosso contexto: o catálogo continua sendo o catálogo, e qualquer celular abrindo o PDF (mesmo no preview do WhatsApp) <strong>pode tocar no QR/área e abrir o formulário web do produto</strong>.</p>
+<hr>
+<h2 id="bloco-6--implementação-prática-referências-e-recomendação-final">BLOCO 6 — Implementação prática, referências e recomendação final</h2>
+<h3 id="61-artigos-posts-e-repositórios-verificados">6.1 Artigos, posts e repositórios verificados</h3>
+<p><strong>Documentação oficial e canônica:</strong></p>
+<ul>
+<li>PyMuPDF Widget reference: <a href="https://pymupdf.readthedocs.io/en/latest/widget.html">https://pymupdf.readthedocs.io/en/latest/widget.html</a></li>
+<li>PyMuPDF Page reference (<code>add_widget</code>, <code>widgets()</code>): <a href="https://pymupdf.readthedocs.io/en/latest/page.html">https://pymupdf.readthedocs.io/en/latest/page.html</a></li>
+<li>PyMuPDF &quot;How to Add Form Fields&quot; wiki: <a href="https://github.com/pymupdf/PyMuPDF/wiki/How-to-Add-Form-Fields">https://github.com/pymupdf/PyMuPDF/wiki/How-to-Add-Form-Fields</a></li>
+<li>PyMuPDF-Utilities repo (<code>fields/form-fields.py</code>): <a href="https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/fields/form-fields.py">https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/fields/form-fields.py</a></li>
+<li>Artifex blog &quot;Automating PDF Form Filling and Flattening&quot;: <a href="https://artifex.com/blog/automating-pdf-form-filling-and-flattening-with-pymupdf">https://artifex.com/blog/automating-pdf-form-filling-and-flattening-with-pymupdf</a></li>
+<li>pypdf forms interactions: <a href="https://pypdf.readthedocs.io/en/stable/user/forms.html">https://pypdf.readthedocs.io/en/stable/user/forms.html</a></li>
+<li>ReportLab user guide ch.4 (acroForm): <a href="https://docs.reportlab.com/reportlab/userguide/ch4_pdffeatures/">https://docs.reportlab.com/reportlab/userguide/ch4_pdffeatures/</a></li>
+<li>&quot;Creating Interactive PDF Forms in ReportLab with Python&quot;: <a href="https://blog.pythonlibrary.org/2018/05/29/creating-interactive-pdf-forms-in-reportlab-with-python/">https://blog.pythonlibrary.org/2018/05/29/creating-interactive-pdf-forms-in-reportlab-with-python/</a></li>
+<li>pdfrw fillable forms (West Health): <a href="https://westhealth.github.io/exploring-fillable-forms-with-pdfrw.html">https://westhealth.github.io/exploring-fillable-forms-with-pdfrw.html</a></li>
+<li>&quot;Filling Editable PDF in Python&quot; (Medium): <a href="https://medium.com/@vivsvaan/filling-editable-pdf-in-python-76712c3ce99">https://medium.com/@vivsvaan/filling-editable-pdf-in-python-76712c3ce99</a></li>
+<li>&quot;Dynamically changing PDF Acroforms with Python and Javascript&quot; (TheCodeWork): <a href="https://thecodework.com/blog/dynamically-changing-pdf-acroforms-with-python-and-javascript/">https://thecodework.com/blog/dynamically-changing-pdf-acroforms-with-python-and-javascript/</a></li>
+</ul>
+<p><strong>Bibliotecas open source relevantes:</strong></p>
+<ul>
+<li><code>pymupdf/PyMuPDF</code> (AGPL) — <a href="https://github.com/pymupdf/PyMuPDF">https://github.com/pymupdf/PyMuPDF</a></li>
+<li><code>chinapandaman/PyPDFForm</code> (MIT) — <a href="https://github.com/chinapandaman/PyPDFForm">https://github.com/chinapandaman/PyPDFForm</a> e doc <a href="https://chinapandaman.github.io/PyPDFForm/">https://chinapandaman.github.io/PyPDFForm/</a></li>
+<li><code>pmaupin/pdfrw</code> (MIT) — <a href="https://github.com/pmaupin/pdfrw">https://github.com/pmaupin/pdfrw</a></li>
+<li><code>py-pdf/pypdf</code> (BSD) — <a href="https://github.com/py-pdf/pypdf">https://github.com/py-pdf/pypdf</a></li>
+<li><code>ccnmtl/fdfgen</code> — geração de FDF para preencher forms — <a href="https://github.com/ccnmtl/fdfgen">https://github.com/ccnmtl/fdfgen</a></li>
+<li><code>altaurog/pdfforms</code> — wrapper pdftk para preencher com CSV — <a href="https://github.com/altaurog/pdfforms">https://github.com/altaurog/pdfforms</a></li>
+</ul>
+<p><strong>Sobre AcroForm vs XFA e compatibilidade:</strong></p>
+<ul>
+<li>Foxit &quot;Acroforms vs XFA&quot;: <a href="https://www.foxit.com/blog/acroforms-vs-xfa-forms/">https://www.foxit.com/blog/acroforms-vs-xfa-forms/</a></li>
+<li>Datalogics &quot;How to Work With AcroForms &amp; XFA&quot;: <a href="https://www.datalogics.com/how-to-work-with-acroforms-xfa">https://www.datalogics.com/how-to-work-with-acroforms-xfa</a></li>
+<li>Apryse &quot;Effortlessly Manage XFA Documents 2024&quot;: <a href="https://apryse.com/blog/xfa-options-alternatives-by-apryse">https://apryse.com/blog/xfa-options-alternatives-by-apryse</a></li>
+<li>Appligent Labs JS dynamic forms: <a href="https://labs.appligent.com/appligent-labs/acroforms-vs.-xfa/aem-forms-dynamic-report-generation-with-javascript">https://labs.appligent.com/appligent-labs/acroforms-vs.-xfa/aem-forms-dynamic-report-generation-with-javascript</a></li>
+<li>Wikipedia XFA: <a href="https://en.wikipedia.org/wiki/XFA">https://en.wikipedia.org/wiki/XFA</a></li>
+<li>&quot;PDF Form Types Explained&quot; (Flipper File): <a href="https://flipperfile.com/pdf-guides/pdf-form-types-explained/">https://flipperfile.com/pdf-guides/pdf-form-types-explained/</a></li>
+</ul>
+<p><strong>Submit de formulário e mobile:</strong></p>
+<ul>
+<li>Adobe Acrobat tutorial &quot;Submitting PDF form data&quot;: <a href="https://acrobatusers.com/tutorials/submitting-data/">https://acrobatusers.com/tutorials/submitting-data/</a></li>
+<li>PSPDFKit/Nutrient guide form submission iOS: <a href="https://pspdfkit.com/guides/ios/forms/form-submission/">https://pspdfkit.com/guides/ios/forms/form-submission/</a></li>
+<li>Adobe Community thread &quot;submit button on Acrobat Mobile&quot; (problema documentado): <a href="https://community.adobe.com/t5/acrobat-discussions/submit-button-on-acrobat-mobile/m-p/9396139">https://community.adobe.com/t5/acrobat-discussions/submit-button-on-acrobat-mobile/m-p/9396139</a></li>
+<li>Jotform &quot;Form mobile firendly submit&quot;: <a href="https://www.jotform.com/answers/2147593-i-need-a-fillable-pdf-form-to-be-mobile-firendly-the-form-now-is-not-allowing-to-submit-from-a-mobile-device">https://www.jotform.com/answers/2147593-i-need-a-fillable-pdf-form-to-be-mobile-firendly-the-form-now-is-not-allowing-to-submit-from-a-mobile-device</a></li>
+</ul>
+<p><strong>Visão computacional com manuscrito:</strong></p>
+<ul>
+<li>Roboflow &quot;GPT-4o vision use cases&quot; (benchmarks OCR): <a href="https://blog.roboflow.com/gpt-4o-vision-use-cases/">https://blog.roboflow.com/gpt-4o-vision-use-cases/</a></li>
+<li>Automat case &quot;Fine-Tune GPT-4o for IDP &amp; RPA&quot;: <a href="https://www.runautomat.com/blog/how-to-fine-tune-gpt-4o-for-industry-specific-document-processing-and-robotic-process-automation">https://www.runautomat.com/blog/how-to-fine-tune-gpt-4o-for-industry-specific-document-processing-and-robotic-process-automation</a></li>
+<li>Encord &quot;GPT-4 Vision explained&quot;: <a href="https://encord.com/blog/gpt4-vision/">https://encord.com/blog/gpt4-vision/</a></li>
+<li>arXiv &quot;Putting GPT-4o to the Sword&quot; (avaliação ampla): <a href="https://arxiv.org/pdf/2407.09519">https://arxiv.org/pdf/2407.09519</a></li>
+</ul>
+<h3 id="62-existe-projeto-open-source-que-resolve-pdf-visual--pdf-com-formulário-de-pedido">6.2 Existe projeto open source que resolve &quot;PDF visual → PDF com formulário de pedido&quot;?</h3>
+<p>Após varredura no GitHub: <strong>não existe projeto open source maduro que entregue exatamente o pipeline ponta-a-ponta</strong> (catálogo de moda PDF → AcroForm → WhatsApp/web → pedido estruturado). O que existe são componentes reutilizáveis:</p>
+<ul>
+<li><strong>PyPDFForm</strong> (5k+ stars): cobre a parte de criar campos sobre PDF existente com API limpa, em Python puro com licença MIT. <strong>Reutilizável quase 100%</strong> para o estágio &quot;tornar PDF editável&quot;.</li>
+<li><strong>PyMuPDF-Utilities</strong> (<code>fields/form-fields.py</code>): exemplo direto do mantenedor da lib.</li>
+<li><strong>pdfforms</strong> de altaurog: preenchimento em lote com CSV — útil para gerar PDFs <strong>pré-preenchidos</strong> por lojista (ex.: já com nome da loja, CNPJ, vendedor).</li>
+<li><strong>fdfgen</strong>: geração de FDF/XFDF — útil para servidor receber dados via Submit e converter de volta para PDF.</li>
+<li>Para WhatsApp Cloud API + Python: tutoriais como o da GuruSup e implementações no <code>dlthub</code>.</li>
+</ul>
+<p><strong>Conclusão:</strong> o produto Oasis Resortwear precisa ser desenvolvido juntando componentes. Não existe &quot;monolito&quot; pronto.</p>
+<h3 id="63-recomendação-técnica-final--fundamentada">6.3 Recomendação técnica final — fundamentada</h3>
+<p>Dadas as restrições (catálogo PDF visual sem camadas, lojistas em celular usando WhatsApp, dados estruturados no backend Python, mínima fricção):</p>
+<p><strong>Arquitetura recomendada (em ordem de prioridade de implementação):</strong></p>
+<h4 id="fase-1--mvp-46-semanas-pdf-com-qr-codelinks--web-form-mobile-first">Fase 1 — MVP (4–6 semanas): <strong>PDF com QR Code/links + Web Form mobile-first</strong></h4>
+<ol>
+<li><strong>Pipeline de produção do catálogo editável</strong> (Python, executado a cada nova coleção):
+<ul>
+<li>Input: PDF visual da agência + JSON <code>catalogo_skus.json</code> (lista de produtos com cores, tamanhos, preços, MOQs).</li>
+<li>Para cada página/produto: gerar token único + URL <code>https://pedido.oasis.com/{token}</code>, gerar QR Code, sobrepor no canto da página com <strong>PyMuPDF</strong> (<code>page.insert_image</code> + <code>page.insert_link</code>).</li>
+<li>Output: PDF &quot;linkado&quot; idêntico ao original, mais um QR/link visível.</li>
+</ul>
+</li>
+<li><strong>Distribuição:</strong> WhatsApp Business Cloud API envia o PDF para a base de lojistas com mensagem template aprovada.</li>
+<li><strong>Web form (FastAPI + HTMX + Tailwind):</strong>
+<ul>
+<li>Mobile-first, telão de imagens, grade tamanhos × cores intuitiva.</li>
+<li>Salva rascunho a cada digitação (autosave a cada 2s).</li>
+<li>Mostra total de peças e valor estimado em tempo real.</li>
+<li>Submissão grava em Postgres + dispara confirmação WhatsApp.</li>
+<li>Tempo médio de pedido &lt; 5 minutos por loja média (estimativa).</li>
+</ul>
+</li>
+</ol>
+<h4 id="fase-2--catálogo-verdadeiramente-editável-610-semanas-acroform--submit-web-fallback-desktop">Fase 2 — Catálogo verdadeiramente editável (6–10 semanas): <strong>AcroForm + Submit web (fallback desktop)</strong></h4>
+<p>Para lojistas que prefiram o fluxo offline-no-PDF (algumas regiões com internet ruim):</p>
+<ol>
+<li>Mesmo pipeline acima, mas além do QR Code, <strong>adicionar AcroForm fields com PyPDFForm ou PyMuPDF</strong> em cada célula de quantidade.</li>
+<li>Botão &quot;Enviar pedido&quot; com action <code>SubmitForm</code> para <code>https://api.oasis.com/pedido/submit</code> em formato <code>XFDF</code>. Funciona em desktop. <strong>Aceitar também o envio manual do PDF preenchido por WhatsApp</strong> — webhook recebe, parser extrai (código da seção 4.2).</li>
+<li>Adicionar campos ocultos no PDF (read-only + no-view) com <code>lojista_token</code> e <code>colecao_id</code> para identificação ao receber.</li>
+</ol>
+<h4 id="fase-3--fluxo-de-visão-computacional-812-semanas-fallback-para-foto-manuscrita">Fase 3 — Fluxo de visão computacional (8–12 semanas): <strong>Fallback para foto manuscrita</strong></h4>
+<p>Algumas lojistas vão continuar mandando foto com pedido escrito à mão (cultural, especialmente Norte/Nordeste). Para essas:</p>
+<ol>
+<li>Webhook WhatsApp detecta imagem (não PDF).</li>
+<li>Pipeline: deskew (OpenCV) → detecção de grade da página (cv2/contour) → recorte de cada célula → chamada batch a <strong>GPT‑4o-mini ou Claude 3.5 Haiku</strong> com prompt estruturado pedindo JSON Schema fixo.</li>
+<li>Validação cruzada contra <code>catalogo_skus.json</code>.</li>
+<li>Resposta WhatsApp: &quot;Identifiquei seu pedido: [resumo]. <strong>Responda 1 para confirmar ou 2 para corrigir.</strong>&quot;</li>
+<li>Em caso de baixa confiança ou recusa, escalonamento humano via inbox.</li>
+</ol>
+<p><strong>Por que esta arquitetura é a melhor:</strong></p>
+<ul>
+<li><strong>Mínima fricção</strong> real para a lojista: ela toca em um QR/link e está num formulário web que funciona em qualquer celular. <strong>Não depende</strong> de a lojista ter Adobe Reader instalado, nem de o WhatsApp suportar o submit do PDF.</li>
+<li><strong>Sobreviva ao zoo de viewers PDF mobile</strong>, conforme evidências coletadas no Bloco 1.5 e na thread Adobe Community 9396139.</li>
+<li><strong>Aproveita o catálogo bonito da agência</strong> sem reprocessar layout (overlay puro via <code>page.insert_image</code> + <code>page.insert_link</code> — não toca em design).</li>
+<li><strong>Backend 100% Python</strong>: FastAPI + PyMuPDF + qrcode + httpx (para WhatsApp Cloud API) + openai/anthropic SDK (visão).</li>
+<li><strong>Escalonável</strong>: cada fase entrega valor em separado. A Fase 1 já cobre 80% do caso de uso. As fases 2 e 3 são fallbacks para edge cases (offline e fotos manuscritas).</li>
+<li><strong>Custo licença:</strong> se Fase 1 isolada, usa só <code>pymupdf</code> (AGPL — atenção) ou trocar por <code>pdfrw + reportlab</code> (MIT) para a geração do QR Code overlay. PyPDFForm (MIT) cobre Fase 2 sem ferir AGPL.</li>
+</ul>
+<p><strong>Por que NÃO recomendar &quot;PDF AcroForm puro como caminho principal&quot; para o público alvo:</strong></p>
+<ol>
+<li><strong>Adobe Reader mobile + WhatsApp + Submit HTTP é uma combinação documentadamente quebrada</strong> (Adobe Community 9396139, Jotform community, Apple Discussions).</li>
+<li><strong>Lojistas em Android genérico raramente têm Adobe Reader</strong>; o viewer padrão é o do Google Drive ou do fabricante (Samsung, Xiaomi), os quais <strong>não preenchem AcroForm</strong>.</li>
+<li>JavaScript no PDF (cálculo de total, validação) <strong>não funciona em mobile</strong> com confiabilidade — perde-se a UX rica.</li>
+<li>Não tem analytics. Não dá para ver se a lojista abriu, quanto tempo ficou, onde parou.</li>
+<li>PDF preenchido enviado por WhatsApp <strong>muitas vezes é flatten</strong> (achatado), perdendo os campos. Aí cai-se em visão computacional sem ter planejado.</li>
+</ol>
+<p><strong>Veredito final:</strong> a tecnologia &quot;PDF AcroForm com submit&quot; foi pensada em 1996 para fluxos B2B desktop com Acrobat instalado. Para 2026 com lojistas brasileiras em celulares variados chegando via WhatsApp, ela é tecnicamente fascinante mas <strong>operacionalmente subótima</strong>. O caminho moderno é <strong>PDF lindo (intocável) + QR Code/link em cada produto → Web App mobile-first → backend Python → confirmação WhatsApp</strong>, com fallback de visão computacional para quem manda foto manuscrita. Essa combinação atende mínima fricção, dados estruturados, backend Python e aproveita o catálogo da agência sem retrabalho.</p>
+<hr>
+<h2 id="apêndice--snippet-completo-de-geração-do-catálogo-qr-linked-fase-1-mvp">Apêndice — Snippet completo de geração do catálogo &quot;QR-linked&quot; (Fase 1 MVP)</h2>
+<pre class="hljs"><code><div><span class="hljs-string">&quot;&quot;&quot;
+generate_catalog_links.py
+Adiciona QR Code + link clicável em cada página/produto de um PDF visual.
+Backend: gera URLs únicas por (lojista, produto, coleção) que abrem o formulário web.
+&quot;&quot;&quot;</span>
+<span class="hljs-keyword">import</span> io, json, uuid, pymupdf, qrcode
+<span class="hljs-keyword">from</span> pathlib <span class="hljs-keyword">import</span> Path
+
+BASE_URL = <span class="hljs-string">&quot;https://pedido.oasis.com&quot;</span>
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">gerar_qr_png_bytes</span>(<span class="hljs-params">url: <span class="hljs-built_in">str</span>, size_px: <span class="hljs-built_in">int</span> = <span class="hljs-number">240</span></span>) -&gt; <span class="hljs-built_in">bytes</span>:
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M,
+                       box_size=<span class="hljs-number">6</span>, border=<span class="hljs-number">1</span>)
+    qr.add_data(url); qr.make(fit=<span class="hljs-literal">True</span>)
+    img = qr.make_image(fill_color=<span class="hljs-string">&quot;black&quot;</span>, back_color=<span class="hljs-string">&quot;white&quot;</span>)
+    buf = io.BytesIO(); img.save(buf, <span class="hljs-built_in">format</span>=<span class="hljs-string">&quot;PNG&quot;</span>); buf.seek(<span class="hljs-number">0</span>)
+    <span class="hljs-keyword">return</span> buf.read()
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">gerar_catalogo_linkado</span>(<span class="hljs-params">pdf_in: <span class="hljs-built_in">str</span>, pdf_out: <span class="hljs-built_in">str</span>,
+                           catalogo_meta: <span class="hljs-built_in">list</span>[<span class="hljs-built_in">dict</span>], lojista_token: <span class="hljs-built_in">str</span></span>):
+    <span class="hljs-string">&quot;&quot;&quot;
+    catalogo_meta: [{&quot;page&quot;: 0, &quot;ref&quot;: &quot;OAS-001&quot;}, {&quot;page&quot;: 1, &quot;ref&quot;: &quot;OAS-002&quot;}, ...]
+    &quot;&quot;&quot;</span>
+    doc = pymupdf.<span class="hljs-built_in">open</span>(pdf_in)
+    by_page = {m[<span class="hljs-string">&quot;page&quot;</span>]: m <span class="hljs-keyword">for</span> m <span class="hljs-keyword">in</span> catalogo_meta}
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-built_in">len</span>(doc)):
+        meta = by_page.get(i)
+        <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> meta:
+            <span class="hljs-keyword">continue</span>
+        url = <span class="hljs-string">f&quot;<span class="hljs-subst">{BASE_URL}</span>/<span class="hljs-subst">{lojista_token}</span>/<span class="hljs-subst">{meta[<span class="hljs-string">&#x27;ref&#x27;</span>]}</span>?p=<span class="hljs-subst">{i+<span class="hljs-number">1</span>}</span>&quot;</span>
+        page = doc[i]
+        pr = page.rect
+
+        <span class="hljs-comment"># 1) inserir QR Code no canto inferior direito (≈ 60pt)</span>
+        qr_size = <span class="hljs-number">70</span>
+        margin = <span class="hljs-number">18</span>
+        qr_rect = pymupdf.Rect(pr.x1 - margin - qr_size,
+                               pr.y1 - margin - qr_size,
+                               pr.x1 - margin,
+                               pr.y1 - margin)
+        page.insert_image(qr_rect, stream=gerar_qr_png_bytes(url),
+                          keep_proportion=<span class="hljs-literal">True</span>, overlay=<span class="hljs-literal">True</span>)
+
+        <span class="hljs-comment"># 2) inserir link clicável sobre o QR (para quem está vendo o PDF</span>
+        <span class="hljs-comment">#    direto no celular - toque abre URL)</span>
+        page.insert_link({<span class="hljs-string">&quot;kind&quot;</span>: pymupdf.LINK_URI,
+                          <span class="hljs-string">&quot;from&quot;</span>: qr_rect, <span class="hljs-string">&quot;uri&quot;</span>: url})
+
+        <span class="hljs-comment"># 3) inserir um pequeno texto &quot;Pedir&quot; acima do QR</span>
+        text_rect = pymupdf.Rect(qr_rect.x0, qr_rect.y0 - <span class="hljs-number">14</span>,
+                                 qr_rect.x1, qr_rect.y0 - <span class="hljs-number">2</span>)
+        page.insert_textbox(text_rect, <span class="hljs-string">&quot;Toque para pedir →&quot;</span>,
+                            fontsize=<span class="hljs-number">8</span>, fontname=<span class="hljs-string">&quot;helv&quot;</span>,
+                            color=(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>), align=pymupdf.TEXT_ALIGN_CENTER)
+
+    doc.save(pdf_out, clean=<span class="hljs-literal">True</span>, garbage=<span class="hljs-number">4</span>, deflate=<span class="hljs-literal">True</span>)
+    doc.close()
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    meta = json.loads(Path(<span class="hljs-string">&quot;colecao_verao26.json&quot;</span>).read_text())
+    gerar_catalogo_linkado(
+        pdf_in=<span class="hljs-string">&quot;catalogo_verao26.pdf&quot;</span>,
+        pdf_out=<span class="hljs-string">f&quot;catalogo_loja_ABC_<span class="hljs-subst">{uuid.uuid4()}</span>.pdf&quot;</span>,
+        catalogo_meta=meta,
+        lojista_token=<span class="hljs-string">&quot;abc-7f3e-91ad&quot;</span>
+    )
+</div></code></pre>
+<p>E o <code>endpoint</code> Python que recebe o pedido pelo web form ou pelo PDF preenchido enviado por WhatsApp:</p>
+<pre class="hljs"><code><div><span class="hljs-string">&quot;&quot;&quot;
+api_pedidos.py — FastAPI endpoint que aceita pedido via JSON (web form) ou via PDF preenchido.
+&quot;&quot;&quot;</span>
+<span class="hljs-keyword">from</span> fastapi <span class="hljs-keyword">import</span> FastAPI, UploadFile, File, HTTPException
+<span class="hljs-keyword">from</span> pydantic <span class="hljs-keyword">import</span> BaseModel
+<span class="hljs-keyword">import</span> pymupdf, re, datetime, uuid
+
+app = FastAPI()
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">ItemIn</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    ref: <span class="hljs-built_in">str</span>; cor: <span class="hljs-built_in">str</span>; tam: <span class="hljs-built_in">str</span>; qtd: <span class="hljs-built_in">int</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">PedidoIn</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    lojista_token: <span class="hljs-built_in">str</span>; colecao: <span class="hljs-built_in">str</span>; itens: <span class="hljs-built_in">list</span>[ItemIn]; obs: <span class="hljs-built_in">str</span> | <span class="hljs-literal">None</span> = <span class="hljs-literal">None</span>
+
+<span class="hljs-meta">@app.post(<span class="hljs-params"><span class="hljs-string">&quot;/pedido/web&quot;</span></span>)</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">pedido_web</span>(<span class="hljs-params">p: PedidoIn</span>):
+    <span class="hljs-keyword">return</span> _normalizar_e_persistir(p.lojista_token, p.colecao,
+                                   [i.<span class="hljs-built_in">dict</span>() <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> p.itens], p.obs)
+
+<span class="hljs-meta">@app.post(<span class="hljs-params"><span class="hljs-string">&quot;/pedido/pdf&quot;</span></span>)</span>
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">pedido_pdf</span>(<span class="hljs-params">file: UploadFile = File(<span class="hljs-params">...</span>), lojista_token: <span class="hljs-built_in">str</span> | <span class="hljs-literal">None</span> = <span class="hljs-literal">None</span></span>):
+    data = <span class="hljs-keyword">await</span> file.read()
+    doc = pymupdf.<span class="hljs-built_in">open</span>(stream=data, filetype=<span class="hljs-string">&quot;pdf&quot;</span>)
+    itens, lojista, colecao = [], lojista_token, <span class="hljs-literal">None</span>
+    pat = re.<span class="hljs-built_in">compile</span>(<span class="hljs-string">r&quot;^qty__(?P&lt;ref&gt;[^_]+)__(?P&lt;cor&gt;[^_]+)__(?P&lt;tam&gt;[^_]+)$&quot;</span>)
+    <span class="hljs-keyword">for</span> page <span class="hljs-keyword">in</span> doc:
+        <span class="hljs-keyword">for</span> w <span class="hljs-keyword">in</span> page.widgets() <span class="hljs-keyword">or</span> []:
+            <span class="hljs-keyword">if</span> w.field_name == <span class="hljs-string">&quot;_meta_lojista_token&quot;</span>:
+                lojista = lojista <span class="hljs-keyword">or</span> w.field_value
+            <span class="hljs-keyword">elif</span> w.field_name == <span class="hljs-string">&quot;_meta_colecao&quot;</span>:
+                colecao = w.field_value
+            <span class="hljs-keyword">elif</span> w.field_type == pymupdf.PDF_WIDGET_TYPE_TEXT:
+                m = pat.<span class="hljs-keyword">match</span>(w.field_name <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;&quot;</span>)
+                <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> m: <span class="hljs-keyword">continue</span>
+                <span class="hljs-keyword">try</span>: q = <span class="hljs-built_in">int</span>((w.field_value <span class="hljs-keyword">or</span> <span class="hljs-string">&quot;0&quot;</span>).strip() <span class="hljs-keyword">or</span> <span class="hljs-number">0</span>)
+                <span class="hljs-keyword">except</span>: q = <span class="hljs-number">0</span>
+                <span class="hljs-keyword">if</span> q &gt; <span class="hljs-number">0</span>:
+                    itens.append({<span class="hljs-string">&quot;ref&quot;</span>: m[<span class="hljs-string">&quot;ref&quot;</span>], <span class="hljs-string">&quot;cor&quot;</span>: m[<span class="hljs-string">&quot;cor&quot;</span>],
+                                  <span class="hljs-string">&quot;tam&quot;</span>: m[<span class="hljs-string">&quot;tam&quot;</span>], <span class="hljs-string">&quot;qtd&quot;</span>: q})
+    doc.close()
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> itens:
+        <span class="hljs-comment"># fallback opcional: pipeline de visão computacional sobre o PDF achatado</span>
+        <span class="hljs-keyword">raise</span> HTTPException(<span class="hljs-number">422</span>, <span class="hljs-string">&quot;PDF sem campos preenchidos (talvez achatado)&quot;</span>)
+    <span class="hljs-keyword">return</span> _normalizar_e_persistir(lojista, colecao, itens, <span class="hljs-literal">None</span>)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">_normalizar_e_persistir</span>(<span class="hljs-params">token, colecao, itens, obs</span>):
+    <span class="hljs-comment"># ... validar SKUs contra master, estoque, MOQ, persistir, disparar WhatsApp ...</span>
+    <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;pedido_id&quot;</span>: <span class="hljs-built_in">str</span>(uuid.uuid4()),
+            <span class="hljs-string">&quot;lojista_token&quot;</span>: token,
+            <span class="hljs-string">&quot;colecao&quot;</span>: colecao,
+            <span class="hljs-string">&quot;total_pecas&quot;</span>: <span class="hljs-built_in">sum</span>(i[<span class="hljs-string">&quot;qtd&quot;</span>] <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> itens),
+            <span class="hljs-string">&quot;total_skus&quot;</span>: <span class="hljs-built_in">len</span>(itens),
+            <span class="hljs-string">&quot;itens&quot;</span>: itens,
+            <span class="hljs-string">&quot;criado_em&quot;</span>: datetime.datetime.now().isoformat()}
+</div></code></pre>
+<p>Este código cobre os dois principais caminhos de entrada de pedido (web e PDF) num único backend Python, com ~80 linhas, e é a espinha dorsal do produto.</p>
+
+</body>
+</html>

@@ -1,0 +1,76 @@
+# ── Python ─────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+pip-wheel-metadata/
+.Python
+
+# ── Virtual envs ───────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ── Test / coverage ────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+.cache
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# ── IDEs ───────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Env & secrets ──────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ── Logs ───────────────────────────────────────
+*.log
+logs/
+
+# ── Docker volumes (local) ─────────────────────
+docker/volumes/
+postgres_data/
+redis_data/
+
+# ── Alembic (uploads locais) ───────────────────
+# Migrations versionadas são commitadas; estado local não é.
+
+# ── PDFs reais de cliente ──────────────────────
+# CLAUDE.md: nunca commitar PDFs reais da Oasis ao repo.
+# Pasta example/ permanece local para smoke test manual.
+example/*.pdf
+
+# ── Output local de POC ────────────────────────
+*_output.pdf
+OASIS_MOTION_v2*.pdf
+romaneio_*.pdf
+
+# ── Claude Code workspace ──────────────────────
+.claude/settings.local.json

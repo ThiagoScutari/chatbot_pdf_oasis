@@ -1,0 +1,252 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "catalogflow"
+version = "0.1.0"
+description = "B2B SaaS para transformar catálogos PDF visuais em instrumentos de captura de pedido."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [
+    { name = "Thiago Scutari", email = "thiagoscutari@gmail.com" },
+]
+classifiers = [
+    "Private :: Do Not Upload",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+]
+
+dependencies = [
+    # Web framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+
+    # Validação e configuração
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "email-validator>=2.2.0",
+
+    # ORM e migrations
+    "sqlalchemy[asyncio]>=2.0.36",
+    "alembic>=1.14.0",
+    "asyncpg>=0.30.0",
+
+    # Queue / cache
+    "celery>=5.4.0",
+    "redis>=5.2.0",
+    "flower>=2.0.1",
+
+    # PDF engines
+    "pymupdf>=1.27.0",
+    "pdfplumber>=0.11.0",
+    "pypdfform>=4.0.0",
+    "qrcode[pil]>=8.0",
+
+    # Storage
+    "boto3>=1.35.0",
+    "aioboto3>=13.2.0",
+
+    # Auth
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+
+    # HTTP client
+    "httpx>=0.27.0",
+
+    # File / MIME
+    "python-magic>=0.4.27; sys_platform != 'win32'",
+    "python-magic-bin>=0.4.14; sys_platform == 'win32'",
+
+    # Observabilidade
+    "structlog>=24.4.0",
+    "sentry-sdk[fastapi,celery]>=2.18.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testes
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
+    "factory-boy>=3.3.0",
+    "testcontainers[postgres,redis]>=4.8.0",
+    "moto[s3]>=5.0.0",
+    "respx>=0.21.0",
+
+    # Lint / format / type
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+    "types-redis>=4.6.0",
+    "boto3-stubs[s3]>=1.35.0",
+    "types-python-jose>=3.3.0",
+    "types-passlib>=1.7.0",
+
+    # Segurança
+    "pip-audit>=2.7.0",
+    "bandit>=1.7.10",
+
+    # Pre-commit
+    "pre-commit>=4.0.0",
+]
+
+[project.scripts]
+catalogflow-api = "catalogflow.scripts.run_api:main"
+catalogflow-worker = "catalogflow.scripts.run_worker:main"
+
+[project.urls]
+Homepage = "https://github.com/ThiagoScutari/chatbot_pdf_oasis"
+Repository = "https://github.com/ThiagoScutari/chatbot_pdf_oasis.git"
+
+# ──────────────────────────────────────────────
+#  setuptools — discover packages under src/
+# ──────────────────────────────────────────────
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["catalogflow*"]
+
+# ──────────────────────────────────────────────
+#  ruff — lint + format
+# ──────────────────────────────────────────────
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = [
+    "migrations/versions",
+    "oasis_form_v2.py",
+    "oasis_romaneio.py",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "S",    # bandit subset
+    "A",    # flake8-builtins
+    "ASYNC",# async best practices
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",  # line length (formatter handles)
+    "S101",  # assert (pytest depende)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S105", "S106", "S311"]  # senhas/tokens de teste, random
+"src/catalogflow/scripts/*.py" = ["S104"]    # bind 0.0.0.0 em dev
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ──────────────────────────────────────────────
+#  mypy — strict mode
+# ──────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+files = ["src"]
+exclude = [
+    "migrations/versions",
+    "oasis_form_v2\\.py",
+    "oasis_romaneio\\.py",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "pymupdf",
+    "pdfplumber",
+    "pdfplumber.*",
+    "pypdfform",
+    "pypdfform.*",
+    "qrcode",
+    "qrcode.*",
+    "aioboto3",
+    "moto",
+    "moto.*",
+    "factory",
+    "factory.*",
+    "testcontainers",
+    "testcontainers.*",
+]
+ignore_missing_imports = true
+
+# ──────────────────────────────────────────────
+#  pytest
+# ──────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["src", "tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+]
+markers = [
+    "integration: testes de integração que requerem Postgres/Redis reais",
+    "e2e: testes end-to-end via HTTP",
+    "slow: testes lentos (>2s)",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:passlib.*",
+    "ignore::DeprecationWarning:pydantic.*",
+]
+
+# ──────────────────────────────────────────────
+#  coverage
+# ──────────────────────────────────────────────
+[tool.coverage.run]
+branch = true
+source = ["src/catalogflow"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/scripts/*",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@overload",
+]
+
+# ──────────────────────────────────────────────
+#  bandit
+# ──────────────────────────────────────────────
+[tool.bandit]
+exclude_dirs = ["tests", "migrations", ".venv"]
+skips = ["B101"]  # assert

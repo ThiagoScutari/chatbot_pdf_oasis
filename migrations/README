@@ -1,0 +1,4 @@
+Alembic migrations directory.
+
+Conteúdo gerado na Fase B (Sprint 01, Prompt 2). Não criar migrations
+manualmente — use `alembic revision --autogenerate -m "<desc>"`.
