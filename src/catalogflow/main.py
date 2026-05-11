@@ -21,7 +21,9 @@ from fastapi.responses import JSONResponse
 from catalogflow.infra import cache, database
 from catalogflow.infra.settings import Settings, get_settings
 from catalogflow.modules.auth.router import router as auth_router
+from catalogflow.modules.catalog.router import router as catalog_router
 from catalogflow.shared.errors import DomainError
+from catalogflow.shared.jobs_router import router as jobs_router
 from catalogflow.shared.middleware import RequestIdMiddleware, get_request_id
 from catalogflow.shared.responses import error_response, ok
 
@@ -225,6 +227,8 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
 
     # ── Routers de domínio
     app.include_router(auth_router)
+    app.include_router(catalog_router)
+    app.include_router(jobs_router)
 
     logger.info(
         "app: ready (env=%s, cors=%s)",

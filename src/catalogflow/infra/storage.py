@@ -171,6 +171,15 @@ def get_storage_client() -> StorageClient:
     return _storage
 
 
+async def get_storage() -> StorageClient:
+    """FastAPI dependency — retorna o singleton.
+
+    Em testes, faça override:
+        app.dependency_overrides[get_storage] = lambda: fake_storage
+    """
+    return get_storage_client()
+
+
 def reset_storage_client() -> None:
     """Limpa o singleton — útil em testes."""
     global _storage
