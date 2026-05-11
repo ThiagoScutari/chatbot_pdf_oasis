@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
@@ -32,6 +33,10 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from catalogflow.infra.database import Base
+
+if TYPE_CHECKING:
+    # Apenas para anotações — em runtime SQLAlchemy resolve via class registry.
+    from catalogflow.modules.romaneio.models import Romaneio
 
 # Status válidos — não há CHECK constraint no banco (Fase A) por flexibilidade
 # da Fase E para introduzir 'error' quando o PDF chega flatten.
@@ -96,9 +101,16 @@ class Order(Base):
         passive_deletes=True,
         order_by="(OrderItem.sku, OrderItem.color_index, OrderItem.size)",
     )
-    # Order.romaneio (1:1) é declarada no romaneio.models junto com a
-    # introdução do model `Romaneio` (Fase D). Evita configurar back_populates
-    # apontando para uma classe inexistente.
+    # Forward reference por string — SQLAlchemy resolve via class registry no
+    # primeiro acesso. `Romaneio` é definido em `romaneio/models.py`, importado
+    # via env.py / lifespan do app.
+    romaneio: Mapped[Romaneio | None] = relationship(
+        "Romaneio",
+        back_populates="order",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Order id={self.id} status={self.status}>"

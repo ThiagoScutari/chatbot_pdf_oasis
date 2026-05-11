@@ -25,6 +25,7 @@ from catalogflow.infra.settings import get_settings
 from catalogflow.modules.auth import models as _auth_models  # noqa: F401
 from catalogflow.modules.catalog import models as _catalog_models  # noqa: F401
 from catalogflow.modules.orders import models as _orders_models  # noqa: F401
+from catalogflow.modules.romaneio import models as _romaneio_models  # noqa: F401
 
 # ──────────────────────────────────────────────
 #  Configuração
