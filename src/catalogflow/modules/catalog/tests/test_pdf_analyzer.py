@@ -23,7 +23,7 @@ from catalogflow.shared.errors import (
     PDFNoProductsError,
 )
 
-FIXTURES_DIR = Path(__file__).resolve().parents[4] / "tests" / "fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parents[5] / "tests" / "fixtures"
 
 
 @pytest.fixture(scope="module")
