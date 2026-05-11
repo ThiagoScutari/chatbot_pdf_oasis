@@ -34,8 +34,12 @@ from testcontainers.postgres import PostgresContainer
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # Tabelas alvo do TRUNCATE entre testes. Mantenha sincronizada com modelos
-# conforme novos módulos forem adicionados.
+# conforme novos módulos forem adicionados. Ordem: filhos antes dos pais
+# para o caso de FK sem CASCADE no TRUNCATE.
 _TABLES_TO_TRUNCATE: tuple[str, ...] = (
+    "jobs",
+    "catalog_products",
+    "catalogs",
     "api_keys",
     "brands",
 )
