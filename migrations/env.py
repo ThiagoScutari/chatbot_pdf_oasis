@@ -24,6 +24,7 @@ from catalogflow.infra.settings import get_settings
 # Mantenha esta lista sincronizada quando módulos novos forem criados.
 from catalogflow.modules.auth import models as _auth_models  # noqa: F401
 from catalogflow.modules.catalog import models as _catalog_models  # noqa: F401
+from catalogflow.modules.orders import models as _orders_models  # noqa: F401
 
 # ──────────────────────────────────────────────
 #  Configuração

@@ -38,6 +38,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # para o caso de FK sem CASCADE no TRUNCATE.
 _TABLES_TO_TRUNCATE: tuple[str, ...] = (
     "jobs",
+    "romaneios",
+    "order_items",
+    "orders",
     "catalog_products",
     "catalogs",
     "api_keys",
