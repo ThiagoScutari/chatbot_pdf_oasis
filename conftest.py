@@ -28,10 +28,10 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool  # noqa: F401  (reservado p/ futuras configs)
 from testcontainers.postgres import PostgresContainer
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 # Tabelas alvo do TRUNCATE entre testes. Mantenha sincronizada com modelos
 # conforme novos módulos forem adicionados. Ordem: filhos antes dos pais
@@ -96,13 +96,45 @@ def _apply_migrations(database_url: str) -> Iterator[None]:
 # ──────────────────────────────────────────────
 
 
-@pytest.fixture(scope="session")
-def _async_engine(database_url: str) -> Iterator[AsyncEngine]:
-    """Engine async session-scoped — recurso caro, criado uma vez."""
+@pytest_asyncio.fixture
+async def _async_engine(database_url: str) -> AsyncIterator[AsyncEngine]:
+    """Engine async **function-scoped**.
+
+    Tentativa anterior com `scope="session"` quebrou no Windows: asyncpg
+    + pytest-asyncio reaproveitavam um connection pool ligado a um event
+    loop fechado, resultando em `RuntimeError('Event loop is closed')` /
+    `NoneType.send`. Criar engine fresco por teste é mais lento mas
+    estável.
+
+    Também limpa o singleton global de `infra/database.py` para que
+    código de produção que chama `get_engine()` (ex: health endpoint) não
+    reutilize um engine ligado a um loop fechado de um teste anterior.
+    """
+    # Garantir que qualquer engine global pré-existente seja descartado
+    # antes deste teste — caso outro teste tenha criado.
+    from catalogflow.infra import database as _db
+
+    if _db._engine is not None:
+        try:
+            await _db._engine.dispose()
+        except Exception:
+            pass
+        _db._engine = None
+        _db._session_factory = None
+
     engine = create_async_engine(database_url, poolclass=NullPool, future=True)
-    yield engine
-    # Cleanup em loop dedicado para não conflitar com event loops de testes.
-    asyncio.run(engine.dispose())
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
+        # Limpa o singleton global para o próximo teste.
+        if _db._engine is not None:
+            try:
+                await _db._engine.dispose()
+            except Exception:
+                pass
+            _db._engine = None
+            _db._session_factory = None
 
 
 @pytest_asyncio.fixture

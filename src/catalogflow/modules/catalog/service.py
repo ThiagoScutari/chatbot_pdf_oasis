@@ -19,6 +19,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from catalogflow.infra.settings import Settings, get_settings
 from catalogflow.infra.storage import StorageClient, get_storage_client
@@ -146,12 +147,16 @@ class CatalogService:
     async def get_catalog(self, catalog_id: UUID, brand_id: UUID) -> Catalog:
         """Recupera o catálogo verificando isolamento por brand.
 
+        Faz eager load de `products` via `selectinload` — endpoints sempre
+        precisam, e lazy load não funciona em contexto async sem greenlet.
+
         Levanta `NotFoundError` (404) tanto para id inexistente quanto para
         catálogo de outra brand. Não vaza informação sobre existência.
         """
-        stmt = select(Catalog).where(
-            Catalog.id == catalog_id,
-            Catalog.brand_id == brand_id,
+        stmt = (
+            select(Catalog)
+            .where(Catalog.id == catalog_id, Catalog.brand_id == brand_id)
+            .options(selectinload(Catalog.products))
         )
         result = await self.db.execute(stmt)
         catalog = result.scalar_one_or_none()

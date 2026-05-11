@@ -87,6 +87,22 @@ async def _domain_error_handler(request: Request, exc: Exception) -> JSONRespons
     )
 
 
+def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]:
+    """Converte os errors do Pydantic para JSON-safe.
+
+    `ctx.error` carrega o `ValueError` original — não é serializável.
+    Removemos `ctx` e mantemos apenas `loc/msg/type/input` quando presentes.
+    """
+    safe: list[dict[str, Any]] = []
+    for err in exc.errors():
+        item = {k: v for k, v in err.items() if k != "ctx"}
+        # `input` pode conter UploadFile / bytes — coage para repr seguro.
+        if "input" in item and not isinstance(item["input"], (str, int, float, bool, type(None))):
+            item["input"] = repr(item["input"])[:200]
+        safe.append(item)
+    return safe
+
+
 async def _validation_error_handler(
     request: Request,
     exc: Exception,
@@ -96,7 +112,7 @@ async def _validation_error_handler(
     envelope = error_response(
         code="VALIDATION_ERROR",
         message="payload inválido",
-        details={"errors": exc.errors()},
+        details={"errors": _safe_validation_errors(exc)},
         request_id=request_id,
     )
     return JSONResponse(

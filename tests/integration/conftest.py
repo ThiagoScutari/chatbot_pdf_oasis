@@ -53,6 +53,9 @@ def app(
 
 @pytest_asyncio.fixture
 async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
+    # `raise_app_exceptions=False` — sem isso, o transport re-levanta a
+    # exceção original DEPOIS do exception_handler convertê-la em 500,
+    # mascarando o comportamento do handler nos testes.
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
