@@ -72,7 +72,7 @@ COPY --from=builder --chown=catalogflow:catalogflow /opt/venv /opt/venv
 # Código da aplicação.
 COPY --chown=catalogflow:catalogflow src ./src
 COPY --chown=catalogflow:catalogflow migrations ./migrations
-COPY --chown=catalogflow:catalogflow pyproject.toml README.md ./
+COPY --chown=catalogflow:catalogflow pyproject.toml README.md alembic.ini ./
 
 # Reinstala em modo desenvolvimento para registrar entry points no venv.
 RUN pip install --no-deps --no-cache-dir -e .
