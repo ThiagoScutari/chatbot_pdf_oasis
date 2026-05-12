@@ -6,11 +6,12 @@
 #    docker compose -f docker/docker-compose.yml up -d postgres redis minio
 #
 #  Serviços expostos:
-#    api      → http://localhost:8000
-#    flower   → http://localhost:5555  (Celery monitoring, dev only)
-#    minio    → http://localhost:9001  (console web)
-#    postgres → localhost:5432
-#    redis    → localhost:6379
+#    api      → http://localhost:8004
+#    flower   → http://localhost:5556  (Celery monitoring, dev only)
+#    minio    → http://localhost:9003  (console web)
+#    minio s3 → http://localhost:9002
+#    postgres → localhost:5437
+#    redis    → localhost:6380
 # ──────────────────────────────────────────────
 
 name: catalogflow
@@ -41,7 +42,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catalogflow}
       POSTGRES_DB: ${POSTGRES_DB:-catalogflow}
     ports:
-      - "5432:5432"
+      - "5437:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -57,7 +58,7 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -76,8 +77,8 @@ services:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minio-dev-key}
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minio-dev-secret}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9002:9000"
+      - "9003:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -105,7 +106,7 @@ services:
     <<: *app-base
     command: ["uvicorn", "catalogflow.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
-      - "8000:8000"
+      - "8004:8000"
 
   worker:
     <<: *app-base
@@ -119,7 +120,7 @@ services:
     <<: *app-base
     command: ["celery", "-A", "catalogflow.infra.celery_app", "flower", "--port=5555"]
     ports:
-      - "5555:5555"
+      - "5556:5555"
 
 volumes:
   postgres_data:
