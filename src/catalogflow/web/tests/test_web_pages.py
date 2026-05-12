@@ -369,3 +369,63 @@ class TestOrderBadgeFragment:
         bogus = uuid4()
         resp = await client.get(f"/orders/{bogus}/_badge")
         assert resp.status_code == 404
+
+
+# ──────────────────────────────────────────────────────────────
+#  Global error handlers — rotas web desconhecidas
+# ──────────────────────────────────────────────────────────────
+
+
+class TestWebErrorPages:
+    """Garante que rotas web nunca retornam JSON para o navegador.
+
+    Estes testes precisam dos exception handlers globais registrados em
+    `main.create_app()`. O conftest desta suite monta um FastAPI mínimo
+    sem esses handlers, então construímos um app dedicado aqui.
+    """
+
+    async def test_unknown_web_route_returns_html_404(self) -> None:
+        """Browser pedindo página inexistente → HTML 404 elegante.
+
+        Passamos `Accept: text/html` para simular o User-Agent — é a
+        mesma heurística que `_is_web_path` em main.py usa pra decidir
+        entre envelope JSON e template HTML.
+        """
+        from httpx import ASGITransport, AsyncClient
+
+        from catalogflow.main import create_app
+
+        app = create_app()
+        transport = ASGITransport(app=app)
+        async with AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            follow_redirects=False,
+        ) as ac:
+            resp = await ac.get(
+                "/this-page-does-not-exist",
+                headers={"Accept": "text/html"},
+            )
+
+        assert resp.status_code == 404
+        assert "text/html" in resp.headers.get("content-type", "")
+        # Template elegante do projeto, não a página padrão do Starlette.
+        assert "Voltar ao início" in resp.text
+
+    async def test_api_unknown_route_remains_json(self) -> None:
+        """Cliente API (sem Accept text/html) pra rota /api/v1/* → JSON."""
+        from httpx import ASGITransport, AsyncClient
+
+        from catalogflow.main import create_app
+
+        app = create_app()
+        transport = ASGITransport(app=app)
+        async with AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            follow_redirects=False,
+        ) as ac:
+            resp = await ac.get("/api/v1/no-such-endpoint")
+
+        assert resp.status_code == 404
+        assert "application/json" in resp.headers.get("content-type", "")

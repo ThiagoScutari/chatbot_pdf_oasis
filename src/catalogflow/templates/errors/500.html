@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Erro interno — CatalogFlow{% endblock %}
+
+{# Página de erro 500 — mantém o shell para o usuário poder voltar. #}
+{# Nunca expõe detalhes internos (traceback, request_id literal etc.). #}
+
+{% block content %}
+<div class="empty-state" style="margin-top: var(--space-7);">
+  <p class="empty-title">Algo não correu como esperado</p>
+  <p class="empty-body">
+    O time já foi notificado e estamos investigando.
+    Tente novamente em alguns instantes.
+  </p>
+  <a class="btn-primary" href="/dashboard">← Voltar ao início</a>
+</div>
+{% endblock %}

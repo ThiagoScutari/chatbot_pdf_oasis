@@ -14,11 +14,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from catalogflow.infra import cache, database
 from catalogflow.infra.settings import Settings, get_settings
@@ -29,6 +30,7 @@ from catalogflow.shared.errors import DomainError
 from catalogflow.shared.jobs_router import router as jobs_router
 from catalogflow.shared.middleware import RequestIdMiddleware, get_request_id
 from catalogflow.shared.responses import error_response, ok
+from catalogflow.web.router import render_web_404, render_web_500
 from catalogflow.web.router import router as web_router
 
 logger = logging.getLogger(__name__)
@@ -125,16 +127,54 @@ async def _validation_error_handler(
     )
 
 
-async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+def _is_web_path(request: Request) -> bool:
+    """Heurística para decidir entre resposta HTML (web) vs JSON (API).
+
+    Regra: `/api/v1/*` é sempre API. Para qualquer outra rota, olhamos
+    o header `Accept` — navegadores mandam `text/html` na navegação,
+    enquanto clientes API (httpx, curl, fetch) usam `*/*` ou
+    `application/json` por padrão. Isso preserva o envelope JSON para
+    rotas auxiliares de teste que não vivem sob `/api/v1/`.
+    """
+    if request.url.path.startswith("/api/v1/"):
+        return False
+    accept = request.headers.get("accept", "")
+    return "text/html" in accept.lower()
+
+
+async def _http_exception_handler(request: Request, exc: Exception) -> Response:
+    """Roteia 404 (e outros HTTPExceptions) para HTML em rotas web.
+
+    Para `/api/v1/*`, mantém o comportamento padrão do Starlette (JSON
+    minimalista) ou re-emite envelope quando faz sentido. Para web,
+    qualquer 404 vira o template `errors/404.html` elegante.
+    """
+    assert isinstance(exc, StarletteHTTPException)
+    if exc.status_code == status.HTTP_404_NOT_FOUND and _is_web_path(request):
+        return render_web_404(request)
+    # Fallback: comportamento default do FastAPI (JSON {"detail": ...}).
+    # Importação tardia para não pagar o overhead no boot dos workers.
+    from fastapi.exception_handlers import (
+        http_exception_handler as _fastapi_default,
+    )
+
+    return await _fastapi_default(request, exc)
+
+
+async def _unhandled_error_handler(request: Request, exc: Exception) -> Response:
     """Catch-all. Não vaza detalhes internos para o cliente.
 
-    O traceback fica nos logs com o `request_id` para correlação.
+    O traceback fica nos logs com o `request_id` para correlação. Para
+    rotas web, renderiza o template `errors/500.html`; para a API, mantém
+    o envelope JSON estável.
     """
     request_id = get_request_id(request)
     logger.exception(
         "unhandled exception",
         extra={"request_id": request_id, "path": request.url.path},
     )
+    if _is_web_path(request):
+        return render_web_500(request)
     envelope = error_response(
         code="INTERNAL_ERROR",
         message="erro interno do servidor",
@@ -273,6 +313,8 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     # ── Exception handlers
     app.add_exception_handler(DomainError, _domain_error_handler)
     app.add_exception_handler(RequestValidationError, _validation_error_handler)
+    # 404 (e outros HTTPException) — HTML pra web, JSON pra API.
+    app.add_exception_handler(StarletteHTTPException, _http_exception_handler)
     app.add_exception_handler(Exception, _unhandled_error_handler)
 
     # ── Health (sem prefixo de router p/ deixar acessível mesmo sem auth)

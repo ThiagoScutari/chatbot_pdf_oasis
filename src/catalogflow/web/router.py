@@ -395,6 +395,40 @@ def _render_not_found(
     )
 
 
+# ──────────────────────────────────────────────
+#  Helpers públicos — usados pelos handlers globais em main.py
+# ──────────────────────────────────────────────
+
+
+def render_web_404(
+    request: Request,
+    *,
+    title: str = "Não encontramos esta página",
+    message: str = "A página pode ter sido removida ou o endereço está incorreto.",
+) -> HTMLResponse:
+    """Renderiza o template 404 elegante para rotas web desconhecidas."""
+    return templates.TemplateResponse(
+        request,
+        "errors/404.html",
+        {"title": title, "message": message},
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
+def render_web_500(request: Request) -> HTMLResponse:
+    """Renderiza o template 500 elegante para erros internos em rotas web.
+
+    Não recebe detalhes do erro — a página é deliberadamente estéril
+    para nunca vazar traceback / dados sensíveis para o navegador.
+    """
+    return templates.TemplateResponse(
+        request,
+        "errors/500.html",
+        {},
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
 @router.get("/catalogs/{catalog_id}", response_class=HTMLResponse)
 async def catalog_detail(
     request: Request,
