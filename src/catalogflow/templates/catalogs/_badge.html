@@ -1,0 +1,15 @@
+{# Fragmento HTML — somente o <span> do badge.
+   Quando o status ainda é 'pending' ou 'processing', o badge se auto-substitui
+   a cada 3s via HTMX. Em 'ready' ou 'error', o atributo hx-trigger é omitido
+   e o polling encerra naturalmente.
+#}
+{% set badge = catalog_status_badge(status) %}
+<span
+  class="badge-status {{ badge[1] }}"
+  id="catalog-badge-{{ catalog_id }}"
+  {% if status in ("pending", "processing") %}
+    hx-get="/catalogs/{{ catalog_id }}/_badge"
+    hx-trigger="every 3s"
+    hx-swap="outerHTML"
+  {% endif %}
+>{{ badge[0] }}</span>

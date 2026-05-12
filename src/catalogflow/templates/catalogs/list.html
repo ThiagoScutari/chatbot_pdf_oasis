@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Catálogos — CatalogFlow{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div class="page-header-row">
+    <h1>Catálogos</h1>
+    <a class="btn-primary" href="/catalogs/upload">+ Novo catálogo</a>
+  </div>
+</section>
+
+{% if page.items %}
+
+  <!-- ── Mobile: lista de cards ── -->
+  <ul class="card-list mobile-list" aria-label="Catálogos">
+    {% for cat in page.items %}
+    {% set catalog_id = cat.id %}
+    {% set status = cat.status %}
+    <li class="card-list-item">
+      <div class="title-row">
+        <a class="name row-link" href="/catalogs/{{ cat.id }}">{{ cat.name }}</a>
+        {% include "catalogs/_badge.html" %}
+      </div>
+      <div class="meta">
+        {% if cat.collection %}Coleção {{ cat.collection }} · {% endif %}
+        {{ cat.n_skus or 0 }} SKUs · {{ format_date_short_pt(cat.created_at) }}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <!-- ── Desktop: tabela ── -->
+  <div class="desktop-table">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Coleção</th>
+          <th class="num">SKUs</th>
+          <th>Status</th>
+          <th>Criado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in page.items %}
+        {% set status = cat.status %}
+        {% set catalog_id = cat.id %}
+        <tr onclick="window.location='/catalogs/{{ cat.id }}'" style="cursor:pointer;">
+          <td>{{ cat.name }}</td>
+          <td>{{ cat.collection or "—" }}</td>
+          <td class="num">{{ cat.n_skus if cat.n_skus is not none else "—" }}</td>
+          <td>{% include "catalogs/_badge.html" %}</td>
+          <td>{{ format_date_short_pt(cat.created_at) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.has_prev or page.has_next %}
+  <nav class="pagination" aria-label="Paginação">
+    <span class="info">
+      Página {{ page.page }} · {{ page.total }} catálogo{{ "" if page.total == 1 else "s" }}
+    </span>
+    <span>
+      <a class="pager-btn"
+         href="?page={{ page.page - 1 }}"
+         aria-disabled="{{ 'true' if not page.has_prev else 'false' }}">← Anterior</a>
+      <a class="pager-btn"
+         href="?page={{ page.page + 1 }}"
+         aria-disabled="{{ 'true' if not page.has_next else 'false' }}">Próxima →</a>
+    </span>
+  </nav>
+  {% endif %}
+
+{% else %}
+
+<div class="empty-state">
+  <p class="empty-title">Nenhum catálogo ainda</p>
+  <p class="empty-body">Comece enviando o catálogo da sua coleção.</p>
+  <a class="btn-primary" href="/catalogs/upload">+ Enviar primeiro catálogo</a>
+</div>
+
+{% endif %}
+{% endblock %}

@@ -24,10 +24,15 @@ from __future__ import annotations
 
 from typing import Final
 
-from fastapi import HTTPException, Request, Response, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from catalogflow.infra.database import get_db
 from catalogflow.infra.settings import get_settings
+from catalogflow.modules.auth import service as auth_service
+from catalogflow.modules.auth.models import Brand
+from catalogflow.shared.errors import AuthenticationError
 
 SESSION_COOKIE: Final[str] = "cf_session"
 SESSION_MAX_AGE: Final[int] = 60 * 60 * 8  # 8 horas
@@ -104,3 +109,24 @@ def require_session(request: Request) -> str:
             headers={"Location": "/login"},
         )
     return api_key
+
+
+async def require_session_brand(
+    api_key: str = Depends(require_session),
+    db: AsyncSession = Depends(get_db),
+) -> Brand:
+    """Resolve a `Brand` autenticada a partir do cookie de sessão.
+
+    Útil em rotas web protegidas que precisam consultar dados da marca
+    (lista de catálogos, contagens do dashboard etc.). Se a assinatura
+    do cookie é válida mas a chave foi revogada/deletada — caso raro mas
+    possível — devolve o usuário para a tela de login em vez de jogar
+    erro 401 JSON (que o browser não saberia tratar).
+    """
+    try:
+        return await auth_service.verify_api_key(db, api_key)
+    except AuthenticationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_302_FOUND,
+            headers={"Location": "/login"},
+        ) from exc

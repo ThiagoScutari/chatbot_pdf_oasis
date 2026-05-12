@@ -588,3 +588,308 @@ p {
   font-size: 0.82rem;
   color: var(--color-text-muted);
 }
+
+/* ──────────────────────────────────────────────────────────────
+   Page header (greeting / título de seção + meta)
+   ────────────────────────────────────────────────────────────── */
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.page-header .greeting,
+.page-header h1 {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.page-header .meta {
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.page-header-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .page-header-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .page-header .greeting,
+  .page-header h1 { font-size: 2rem; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Dashboard counters
+   ────────────────────────────────────────────────────────────── */
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-7);
+}
+
+@media (min-width: 768px) {
+  .counters {
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+.counter {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .counter { padding: var(--space-5); }
+}
+
+.counter-value {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  color: var(--color-text);
+  line-height: 1;
+  margin: var(--space-2) 0;
+}
+
+.counter-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Activity list
+   ────────────────────────────────────────────────────────────── */
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin: 0 0 var(--space-4);
+  color: var(--color-text);
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.activity-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.activity-list li:first-child { border-top: none; }
+
+.activity-kind {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  flex-shrink: 0;
+  width: 78px;
+}
+
+.activity-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.activity-when {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.activity-link {
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .activity-list li { flex-wrap: wrap; }
+  .activity-when { width: 100%; padding-left: 78px; font-size: 0.8rem; }
+  .activity-link { width: auto; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Generic table (catalogs list, orders list)
+   ────────────────────────────────────────────────────────────── */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.92rem;
+}
+
+.data-table thead th {
+  border-top: none;
+  background: var(--color-bg);
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.data-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(107, 58, 42, 0.03);
+}
+
+.data-table td.num,
+.data-table th.num { text-align: right; }
+
+.row-link {
+  color: inherit;
+  display: block;
+}
+
+/* ── Card-list (mobile alternative para tabelas) ──────────── */
+
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.card-list-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.card-list-item .title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.card-list-item .name {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.card-list-item .meta {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* ── Toggle entre layouts (mobile / desktop) ─────────────── */
+
+.mobile-list { display: block; }
+.desktop-table { display: none; }
+
+@media (min-width: 768px) {
+  .mobile-list { display: none; }
+  .desktop-table { display: block; }
+}
+
+/* ── Pagination ──────────────────────────────────────────── */
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-5);
+  gap: var(--space-3);
+}
+
+.pagination .info {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.pagination .pager-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pagination .pager-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.pagination .pager-btn[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+
+/* ── Empty state ─────────────────────────────────────────── */
+
+.empty-state {
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-7);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.empty-state .empty-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--color-text);
+  margin: 0 0 var(--space-3);
+}
+
+.empty-state .empty-body {
+  margin: 0 0 var(--space-5);
+}
+
+/* Inline CTA bar after a list */
+.list-actions {
+  margin-top: var(--space-6);
+  display: flex;
+  justify-content: center;
+}

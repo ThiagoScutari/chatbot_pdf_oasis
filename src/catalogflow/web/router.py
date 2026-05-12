@@ -9,7 +9,9 @@ internas à API REST.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -19,11 +21,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from catalogflow.infra.database import get_db
 from catalogflow.infra.settings import get_settings
 from catalogflow.modules.auth import service as auth_service
+from catalogflow.modules.auth.models import Brand
 from catalogflow.shared.errors import AuthenticationError
+from catalogflow.web import _helpers, data
 from catalogflow.web.auth import (
     SESSION_COOKIE,
     clear_session_cookie,
     create_session,
+    require_session_brand,
     set_session_cookie,
     verify_session,
 )
@@ -34,6 +39,12 @@ logger = logging.getLogger(__name__)
 _TEMPLATES_DIR: Path = Path(__file__).resolve().parent.parent / "templates"
 
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+# Helpers expostos como globals — evita repetir `_helpers.format_*` nos templates.
+templates.env.globals["format_date_long_pt"] = _helpers.format_date_long_pt
+templates.env.globals["format_date_short_pt"] = _helpers.format_date_short_pt
+templates.env.globals["humanize_when"] = _helpers.humanize_when
+templates.env.globals["catalog_status_badge"] = _helpers.catalog_status_badge
+templates.env.globals["order_status_badge"] = _helpers.order_status_badge
 
 router = APIRouter(include_in_schema=False)
 
@@ -119,3 +130,81 @@ async def logout(request: Request) -> RedirectResponse:
     response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     clear_session_cookie(response)
     return response
+
+
+# ──────────────────────────────────────────────
+#  GET /dashboard
+# ──────────────────────────────────────────────
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(
+    request: Request,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Visão geral da brand — 4 contagens + atividade recente."""
+    counts = await data.get_dashboard_counts(db, brand.id)
+    activity = await data.get_recent_activity(db, brand.id, limit=5)
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "brand": brand,
+            "counts": counts,
+            "activity": activity,
+            "today": datetime.now(),
+        },
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /catalogs (lista)
+# ──────────────────────────────────────────────
+
+
+@router.get("/catalogs", response_class=HTMLResponse)
+async def catalogs_list(
+    request: Request,
+    page: int = 1,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Lista paginada de catálogos da brand."""
+    catalog_page = await data.list_catalogs(db, brand.id, page=page)
+    return templates.TemplateResponse(
+        request,
+        "catalogs/list.html",
+        {
+            "brand": brand,
+            "page": catalog_page,
+        },
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /catalogs/{id}/_badge  — fragmento p/ polling HTMX
+# ──────────────────────────────────────────────
+
+
+@router.get("/catalogs/{catalog_id}/_badge", response_class=HTMLResponse)
+async def catalog_badge(
+    request: Request,
+    catalog_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Devolve apenas o `<span>` do badge — usado por `hx-get` a cada 3s
+    nas linhas em processamento. Não há header/footer/main; é fragmento puro."""
+    current_status = await data.get_catalog_status(db, catalog_id, brand.id)
+    if current_status is None:
+        # 404 silencioso → HTMX simplesmente para o polling.
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+    return templates.TemplateResponse(
+        request,
+        "catalogs/_badge.html",
+        {
+            "catalog_id": catalog_id,
+            "status": current_status,
+        },
+    )
