@@ -59,6 +59,8 @@ dependencies = [
     # Web UI (Sprint 03) — Jinja2 templates + signed session cookies
     "jinja2>=3.1",
     "itsdangerous>=2.1",
+    # Scraping de imagens do AMC QRCode para thumbnails de produto
+    "beautifulsoup4>=4.12",
 
     # File / MIME
     "python-magic>=0.4.27; sys_platform != 'win32'",
@@ -194,6 +196,8 @@ module = [
     "factory.*",
     "testcontainers",
     "testcontainers.*",
+    "bs4",
+    "bs4.*",
 ]
 ignore_missing_imports = true
 

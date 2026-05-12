@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -374,6 +375,86 @@ class TestOrderBadgeFragment:
 # ──────────────────────────────────────────────────────────────
 #  Global error handlers — rotas web desconhecidas
 # ──────────────────────────────────────────────────────────────
+
+
+class TestProductImage:
+    """Testes da rota `/product-image/{sku}` (Sprint 03 Fase F).
+
+    Mockamos `fetch_product_image_url` (em vez de bater no AMC real)
+    e `httpx.AsyncClient` para garantir comportamento determinístico.
+    """
+
+    async def test_requires_session(self, client: AsyncClient) -> None:
+        resp = await client.get("/product-image/0142500001-0")
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/login"
+
+    async def test_returns_upstream_bytes_when_image_found(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Quando o AMC devolve a foto, encaminhamos os bytes."""
+        from catalogflow.web import router as web_router
+
+        # Mock 1: fetch_product_image_url devolve uma URL conhecida.
+        async def fake_fetch(_sku: str) -> str:
+            return "https://qrcode.amctextil.com.br/img/teste.jpg"
+
+        monkeypatch.setattr(web_router, "fetch_product_image_url", fake_fetch)
+
+        # Mock 2: AsyncClient.get retorna bytes JPEG.
+        class _FakeResp:
+            def __init__(self) -> None:
+                self.status_code = 200
+                self.content = b"\xff\xd8\xff\xe0FAKE-JPEG"
+                self.headers: dict[str, str] = {"content-type": "image/jpeg"}
+
+        class _FakeClient:
+            def __init__(self, *a: object, **kw: object) -> None: ...
+            async def __aenter__(self) -> _FakeClient:
+                return self
+
+            async def __aexit__(self, *a: object) -> None: ...
+            async def get(self, *a: object, **kw: object) -> _FakeResp:
+                return _FakeResp()
+
+        monkeypatch.setattr("catalogflow.web.router.httpx.AsyncClient", _FakeClient)
+
+        await _login(client, sample_api_key)
+        resp = await client.get("/product-image/0142500001-0")
+
+        assert resp.status_code == 200
+        assert "image/jpeg" in resp.headers["content-type"]
+        assert resp.content.startswith(b"\xff\xd8\xff")
+
+    async def test_returns_svg_placeholder_for_unknown_sku(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """SKU desconhecido ou erro upstream → SVG placeholder 200."""
+        from catalogflow.web import router as web_router
+
+        async def fake_fetch(_sku: str) -> None:
+            return None  # nada encontrado no AMC
+
+        monkeypatch.setattr(web_router, "fetch_product_image_url", fake_fetch)
+
+        await _login(client, sample_api_key)
+        resp = await client.get(
+            "/product-image/sku-invalido?name=Vestido%20Joana"
+        )
+
+        assert resp.status_code == 200
+        assert "image/svg+xml" in resp.headers["content-type"]
+        body = resp.text
+        # Iniciais "VJ" (Vestido Joana) renderizadas no SVG.
+        assert ">VJ<" in body
+        # Cor de fundo conforme paleta da marca.
+        assert "#E8E0D5" in body
 
 
 class TestWebErrorPages:

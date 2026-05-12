@@ -37,6 +37,12 @@
     <div class="mobile-list">
       {% for prod in grouped %}
       <div class="item-card">
+        <img
+          class="product-cover"
+          src="/product-image/{{ prod.sku }}?name={{ prod.product_name|urlencode }}"
+          alt="{{ prod.product_name }}"
+          loading="lazy"
+        >
         <div class="item-head">
           <span class="item-name">{{ prod.product_name }}</span>
           <span class="item-sku">{{ prod.sku }}</span>
@@ -88,6 +94,7 @@
       <table class="items-table">
         <thead>
           <tr>
+            <th class="product-thumb-cell"><span class="sr-only">Foto</span></th>
             <th>Produto</th>
             <th>Cor</th>
             {% for size in all_sizes %}
@@ -100,6 +107,16 @@
           {% for prod in grouped %}
             {% for color in prod.color_rows %}
             <tr>
+              <td class="product-thumb-cell">
+                {% if loop.first %}
+                <img
+                  class="product-thumb"
+                  src="/product-image/{{ prod.sku }}?name={{ prod.product_name|urlencode }}"
+                  alt=""
+                  loading="lazy"
+                >
+                {% endif %}
+              </td>
               <td>{% if loop.first %}{{ prod.product_name }}{% endif %}</td>
               <td>
                 <span class="swatch-dot"
@@ -117,7 +134,7 @@
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="{{ 2 + all_sizes|length }}" style="text-align: right;">
+            <td colspan="{{ 3 + all_sizes|length }}" style="text-align: right;">
               Total
               {% if order.valor_total is not none %}
                 · R$ {{ "%.2f"|format(order.valor_total)|replace(",", "X")|replace(".", ",")|replace("X", ".") }}

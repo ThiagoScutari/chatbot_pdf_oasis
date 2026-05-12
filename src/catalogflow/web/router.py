@@ -35,6 +35,7 @@ from catalogflow.web.auth import (
     set_session_cookie,
     verify_session,
 )
+from catalogflow.web.product_image import fetch_product_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -750,3 +751,88 @@ async def order_romaneio_download(
         title="Romaneio indisponível",
         message="O romaneio ainda não está pronto para download.",
     )
+
+
+# ═════════════════════════════════════════════════════════════
+#  GET /product-image/{sku}  — proxy de thumbnail + placeholder SVG
+# ═════════════════════════════════════════════════════════════
+
+
+_PLACEHOLDER_BG = "#E8E0D5"
+_PLACEHOLDER_FG = "#7A6E65"
+
+
+def _initials_for(name: str, sku: str) -> str:
+    """Extrai até 2 letras iniciais do nome do produto.
+
+    Fallback: primeiros 2 caracteres alfanuméricos do SKU. Usado dentro
+    do SVG placeholder, então deve sair MAIÚSCULO e tirar acentos com
+    `ascii` no mínimo possível — Jinja já passa unicode.
+    """
+    words = [w for w in (name or "").split() if w]
+    if words:
+        if len(words) == 1:
+            return words[0][:2].upper()
+        return (words[0][0] + words[1][0]).upper()
+    fallback = "".join(c for c in (sku or "") if c.isalnum())
+    return fallback[:2].upper() or "?"
+
+
+def _placeholder_svg_response(sku: str, name: str) -> Response:
+    """SVG inline 100x100 com iniciais — escalável via CSS no template.
+
+    Servido com `Cache-Control: public, max-age=3600` para não bater
+    nesta rota a cada scroll. Fonts dentro de SVG não herdam do parent;
+    usamos Georgia como fallback universalmente disponível.
+    """
+    initials = _initials_for(name, sku)
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" '
+        'viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">'
+        f'<rect width="100" height="100" fill="{_PLACEHOLDER_BG}"/>'
+        f'<text x="50" y="50" text-anchor="middle" '
+        f'dominant-baseline="central" '
+        f'font-family="Cormorant Garamond, Georgia, serif" '
+        f'font-size="36" font-weight="500" fill="{_PLACEHOLDER_FG}">'
+        f"{initials}</text>"
+        "</svg>"
+    )
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get("/product-image/{sku}")
+async def product_image(
+    sku: str,
+    name: str = "",
+    api_key: str = Depends(require_session),
+) -> Response:
+    """Devolve thumbnail do produto: foto do AMC ou SVG placeholder.
+
+    O endpoint é protegido por sessão pra que SKUs aleatórios de
+    terceiros não usem o servidor como proxy genérico de scraping.
+    O parâmetro `name` é opcional — quando presente, dá iniciais
+    bonitas para o placeholder; sem ele, caímos no SKU.
+    """
+    del api_key  # gate de sessão; não usado pelo handler
+
+    image_url = await fetch_product_image_url(sku)
+    if image_url:
+        upstream: httpx.Response | None
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                upstream = await client.get(image_url)
+        except httpx.HTTPError:
+            upstream = None
+
+        if upstream is not None and upstream.status_code == 200:
+            return Response(
+                content=upstream.content,
+                media_type=upstream.headers.get("content-type", "image/jpeg"),
+                headers={"Cache-Control": "public, max-age=86400"},
+            )
+
+    return _placeholder_svg_response(sku, name)

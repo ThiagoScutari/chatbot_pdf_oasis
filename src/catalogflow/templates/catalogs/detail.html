@@ -33,6 +33,12 @@
     <ul class="card-list mobile-list" aria-label="Produtos do catálogo">
       {% for p in products.items %}
       <li class="card-list-item">
+        <img
+          class="product-cover"
+          src="/product-image/{{ p.sku }}?name={{ (p.name or p.sku)|urlencode }}"
+          alt="{{ p.name or p.sku }}"
+          loading="lazy"
+        >
         <div class="title-row">
           <span class="name">{{ p.name or p.sku }}</span>
           <span class="text-muted text-sm">{{ p.sku }}</span>
@@ -51,6 +57,7 @@
       <table class="data-table">
         <thead>
           <tr>
+            <th class="product-thumb-cell"><span class="sr-only">Foto</span></th>
             <th>SKU</th>
             <th>Nome</th>
             <th class="num">Preço</th>
@@ -61,6 +68,14 @@
         <tbody>
           {% for p in products.items %}
           <tr>
+            <td class="product-thumb-cell">
+              <img
+                class="product-thumb"
+                src="/product-image/{{ p.sku }}?name={{ (p.name or p.sku)|urlencode }}"
+                alt=""
+                loading="lazy"
+              >
+            </td>
             <td>{{ p.sku }}</td>
             <td>{{ p.name or "—" }}</td>
             <td class="num">{% if p.price %}R$ {{ "%.2f"|format(p.price)|replace(".", ",") }}{% else %}—{% endif %}</td>
