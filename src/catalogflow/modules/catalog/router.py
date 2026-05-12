@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 from fastapi.responses import RedirectResponse
 
 from catalogflow.modules.auth.dependencies import get_current_brand
@@ -22,6 +22,7 @@ from catalogflow.modules.catalog.schemas import (
     ProcessCatalogResponse,
 )
 from catalogflow.modules.catalog.service import CatalogService
+from catalogflow.shared.errors import JobNotReadyError
 from catalogflow.shared.middleware import get_request_id
 from catalogflow.shared.responses import StandardResponse, ok
 
@@ -104,15 +105,27 @@ async def get_catalog_endpoint(
 
 @router.get(
     "/{catalog_id}/download",
-    status_code=status.HTTP_302_FOUND,
-    response_class=RedirectResponse,
-    summary="Redireciona para a URL assinada do PDF editável.",
+    summary="Download do PDF editável — bytes diretos em dev, 302 presigned em produção.",
 )
 async def download_catalog(
     catalog_id: UUID,
     brand: Brand = Depends(get_current_brand),
     service: CatalogService = Depends(get_catalog_service),
-) -> RedirectResponse:
-    """302 → URL assinada do storage. Levanta 409 se o catálogo não está pronto."""
-    url = await service.get_download_url(catalog_id, brand.id)
+) -> Response:
+    """Em dev (`s3_public_url` definido) serve os bytes pelo backend.
+
+    Em produção retorna 302 para a URL assinada do storage. 409 se o catálogo
+    ainda não está pronto.
+    """
+    catalog = await service.get_catalog(catalog_id, brand.id)
+    if catalog.status != "ready" or not catalog.output_key:
+        raise JobNotReadyError(
+            f"catalog {catalog_id} ainda não está pronto (status={catalog.status})",
+            code="CATALOG_NOT_READY",
+            details={"catalog_id": str(catalog_id), "status": catalog.status},
+        )
+    if service.settings.s3_public_url:
+        pdf_bytes = await service.storage.download(catalog.output_key)
+        return Response(content=pdf_bytes, media_type="application/pdf")
+    url = await service.storage.presigned_url(catalog.output_key)
     return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)

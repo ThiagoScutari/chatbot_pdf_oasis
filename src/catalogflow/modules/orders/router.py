@@ -184,8 +184,11 @@ async def get_order_romaneio(
 
     romaneio = await romaneio_service.find_romaneio_for_brand(order.id, brand.id)
 
-    # Caso 1: PDF já pronto — 302 redirect.
+    # Caso 1: PDF já pronto — bytes diretos em dev, 302 em produção.
     if romaneio is not None and romaneio.output_key:
+        if romaneio_service.settings.s3_public_url:
+            pdf_bytes = await romaneio_service.storage.download(romaneio.output_key)
+            return Response(content=pdf_bytes, media_type="application/pdf")
         url = await romaneio_service.get_download_url(order.id, brand.id)
         return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
 

@@ -81,6 +81,9 @@ def _apply_migrations(database_url: str) -> Iterator[None]:
     os.environ["DATABASE_URL"] = database_url
     os.environ.setdefault("INTERNAL_SECRET", "test-internal-secret")
     os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-use")
+    # Suprime S3_PUBLIC_URL vindo do .env do dev — testes exercitam o
+    # caminho de produção (presigned URL), não o atalho de download direto.
+    os.environ["S3_PUBLIC_URL"] = ""
 
     # Limpa o cache do singleton de settings — recarrega vars novas.
     from catalogflow.infra import settings as _settings_mod
