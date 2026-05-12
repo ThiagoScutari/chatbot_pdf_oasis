@@ -296,6 +296,7 @@ class CatalogService:
                     catalog_id=catalog_id,
                     sku=product.sku,
                     name=product.name,
+                    price=product.price,
                     grade=product.grade,
                     sizes=list(product.sizes),
                     n_colors=product.n_colors,

@@ -7,6 +7,7 @@ commitadas. Se a estrutura visual mudar, regenere com:
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -181,6 +182,67 @@ class TestSwatchHexConversion:
         # 0.5 → 128 (int(round(0.5 * 255)))
         hx = an._rgb_to_hex((0.5, 0.5, 0.5))
         assert hx in {"#7f7f7f", "#808080"}
+
+
+class TestPriceExtraction:
+    """Preço do produto vem na 3ª linha do bloco no formato `R$ 3.488,00`."""
+
+    def test_extracts_decimal_with_thousand_separator(
+        self,
+        analyzer: PDFAnalyzer,
+    ) -> None:
+        import pymupdf
+
+        doc = pymupdf.open()
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((50, 780), "0322500004-0", fontsize=9)
+        page.insert_text((50, 790), "JAQUETA BERENICE", fontsize=9)
+        page.insert_text((50, 800), "R$ 3.488,00", fontsize=9)
+        page.insert_text((50, 810), "PP-G", fontsize=9)
+        page.draw_rect(
+            pymupdf.Rect(50, 820, 70, 840),
+            color=(0.0, 0.0, 0.0),
+            fill=(0.3, 0.4, 0.5),
+        )
+        data = doc.tobytes()
+        doc.close()
+
+        meta = analyzer.analyze(data)
+        (product,) = meta.product_pages
+        assert product.price == Decimal("3488.00")
+
+    def test_extracts_price_without_thousand_separator(
+        self,
+        analyzer: PDFAnalyzer,
+    ) -> None:
+        import pymupdf
+
+        doc = pymupdf.open()
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((50, 780), "0322500004-0", fontsize=9)
+        page.insert_text((50, 790), "BLUSA SIMPLES", fontsize=9)
+        page.insert_text((50, 800), "R$ 122,50", fontsize=9)
+        page.insert_text((50, 810), "PP-M", fontsize=9)
+        page.draw_rect(
+            pymupdf.Rect(50, 820, 70, 840),
+            color=(0.0, 0.0, 0.0),
+            fill=(0.1, 0.2, 0.3),
+        )
+        data = doc.tobytes()
+        doc.close()
+
+        meta = analyzer.analyze(data)
+        (product,) = meta.product_pages
+        assert product.price == Decimal("122.50")
+
+    def test_returns_none_when_price_absent(
+        self,
+        analyzer: PDFAnalyzer,
+    ) -> None:
+        """Fixtures sintéticas existentes não têm preço → price=None."""
+        meta = analyzer.analyze(_load("catalogo_1_produto_1_cor.pdf"))
+        (product,) = meta.product_pages
+        assert product.price is None
 
 
 class TestSwatchDetectionThreshold:

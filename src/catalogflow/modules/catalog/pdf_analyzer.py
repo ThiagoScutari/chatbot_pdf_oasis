@@ -18,7 +18,8 @@ from __future__ import annotations
 import io
 import re
 from dataclasses import dataclass, field
-from typing import ClassVar, Final
+from decimal import Decimal
+from typing import Any, ClassVar, Final
 
 import pdfplumber
 import pymupdf
@@ -62,6 +63,7 @@ class ProductPageMeta:
 
     sku: str
     name: str | None
+    price: Decimal | None
     grade: str
     sizes: list[str]
     n_colors: int
@@ -104,6 +106,8 @@ class PDFAnalyzer:
         r"\b(JAQUETA|CAL[ÇC]A|VESTIDO|CONJUNTO|BLUSA|BODY|SHORT|BLAZER|SAIA|TOP)\b",
         re.IGNORECASE,
     )
+    # Preço no padrão "R$ 3.488,00" — ponto = milhar, vírgula = decimal.
+    PRICE_RE: ClassVar[re.Pattern[str]] = re.compile(r"R\$\s*([\d.]+,\d{2})")
 
     # Constantes do swatch (replicadas exatamente do POC)
     SWATCH_THRESHOLD_FRAC: Final[float] = 0.920
@@ -164,6 +168,7 @@ class PDFAnalyzer:
                             ProductPageMeta(
                                 sku=block["sku"],
                                 name=block["name"],
+                                price=block["price"],
                                 grade=block["grade"],
                                 sizes=block["sizes"],
                                 n_colors=n_colors,
@@ -244,6 +249,14 @@ class PDFAnalyzer:
         return out
 
     @staticmethod
+    def _parse_price(raw: str) -> Decimal | None:
+        """Converte "3.488,00" → Decimal("3488.00"). Retorna None se inválido."""
+        try:
+            return Decimal(raw.replace(".", "").replace(",", "."))
+        except (ArithmeticError, ValueError):
+            return None
+
+    @staticmethod
     def _rgb_to_hex(rgb: tuple[float, float, float]) -> str:
         return "#{:02x}{:02x}{:02x}".format(
             int(round(rgb[0] * 255)),
@@ -255,7 +268,7 @@ class PDFAnalyzer:
         self,
         page_p: pdfplumber.page.Page,
         page_w: float,
-    ) -> list[dict[str, object]]:
+    ) -> list[dict[str, Any]]:
         """Extrai blocos de legenda (SKU + grade + bounding box) da página.
 
         Replica `extrair_blocos_legenda` do POC.
@@ -267,6 +280,7 @@ class PDFAnalyzer:
 
         grades = self.GRADE_RE.findall(text)
         names = self.NAME_RE.findall(text)
+        prices = self.PRICE_RE.findall(text)
 
         words = page_p.extract_words()
         h = float(page_p.height)
@@ -275,7 +289,7 @@ class PDFAnalyzer:
         if not bot_words:
             return []
 
-        blocks: list[dict[str, object]] = []
+        blocks: list[dict[str, Any]] = []
         n = len(skus)
         x_mid = page_w / 2.0
 
@@ -286,6 +300,7 @@ class PDFAnalyzer:
                 grade = self.DEFAULT_GRADE
             sizes = self.SIZE_MAP.get(grade, self.DEFAULT_SIZES)
             name = names[0].upper() if names else None
+            price = self._parse_price(prices[i]) if i < len(prices) else None
 
             if n == 1:
                 side = "single"
@@ -309,6 +324,7 @@ class PDFAnalyzer:
                 {
                     "sku": sku,
                     "name": name,
+                    "price": price,
                     "grade": grade,
                     "sizes": list(sizes),
                     "x_ini": min(xs),
@@ -323,7 +339,7 @@ class PDFAnalyzer:
 
     def _swatches_for(
         self,
-        block: dict[str, object],
+        block: dict[str, Any],
         all_swatches: list[SwatchInfo],
         page_w: float,
     ) -> list[SwatchInfo]:
@@ -331,7 +347,7 @@ class PDFAnalyzer:
 
         Replica `swatches_para` do POC.
         """
-        n = int(block["n_prods"])  # type: ignore[arg-type]
+        n = int(block["n_prods"])
         side = str(block["side"])
         if n == 1 or side == "single":
             return list(all_swatches)
