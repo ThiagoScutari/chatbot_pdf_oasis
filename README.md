@@ -1,10 +1,12 @@
 # CatalogFlow
 
-> **Status:** Sprint 01 / Foundation — completa.
+> **Status:** Sprint 03 / Web UI para gerente comercial — completa.
 
 B2B SaaS que transforma catálogos PDF visuais de moda em instrumentos
-interativos de captura de pedido (Sprint 01) e processa pedidos preenchidos
-em romaneios estruturados (Sprint 02).
+interativos de captura de pedido (Sprint 01), processa pedidos preenchidos
+em romaneios estruturados (Sprint 02), e expõe uma interface web em
+português pt-BR para a gerente comercial operar o ciclo completo sem
+terminal (Sprint 03).
 
 A fonte de verdade técnica é [`spec.md`](./spec.md). O escopo da sprint
 ativa está em [`docs/sprint_01/PRD_sprint_01.md`](./docs/sprint_01/PRD_sprint_01.md).
@@ -32,15 +34,29 @@ docker compose -f docker/docker-compose.yml exec api \
 # Copie a linha `export CATALOGFLOW_API_KEY="cf_..."`
 
 # 4) Smoke check
-curl http://localhost:8000/api/v1/health
+curl http://localhost:8004/api/v1/health
 ```
+
+### Acesso via navegador (Sprint 03)
+
+A gerente comercial usa a UI servida no mesmo container da API:
+
+1. Abra <http://localhost:8004/login> no celular ou no desktop.
+2. Cole a `CATALOGFLOW_API_KEY` (gerada pelo `seed_dev`) no campo de login.
+3. Após autenticar, o ciclo completo está disponível pelo menu:
+   `Dashboard` · `Catálogos` · `Pedidos` · `Sair`.
+4. Sessão dura 8 horas (cookie `cf_session` assinado HMAC, `httponly`).
+
+A UI é Jinja2 + HTMX + Alpine.js servida pelo próprio FastAPI — sem
+build step, sem porta extra. O cookie carrega a API Key assinada; cada
+request da web faz chamadas internas autenticadas à API REST.
 
 ### Smoke test do upload
 
 ```bash
 export CATALOGFLOW_API_KEY="cf_xxxxx"  # vindo do seed_dev
 
-curl -X POST http://localhost:8000/api/v1/catalogs/process \
+curl -X POST http://localhost:8004/api/v1/catalogs/process \
   -H "Authorization: Bearer $CATALOGFLOW_API_KEY" \
   -F "file=@example/CATÁLOGO OASIS MOTION_original.pdf" \
   -F "name=Inverno 26 MOTION" \
@@ -50,12 +66,12 @@ curl -X POST http://localhost:8000/api/v1/catalogs/process \
 
 # polling
 curl -H "Authorization: Bearer $CATALOGFLOW_API_KEY" \
-  http://localhost:8000/api/v1/jobs/<job_id>
+  http://localhost:8004/api/v1/jobs/<job_id>
 
 # quando status == "success", baixar
 curl -L -H "Authorization: Bearer $CATALOGFLOW_API_KEY" \
   -o editable.pdf \
-  http://localhost:8000/api/v1/catalogs/<catalog_id>/download
+  http://localhost:8004/api/v1/catalogs/<catalog_id>/download
 ```
 
 ---
@@ -67,7 +83,7 @@ Ciclo ponta a ponta: catálogo → PDF editável → preenchimento pela lojista
 polling). `Bearer cf_*` em todos os endpoints.
 
 ```bash
-export API="http://localhost:8000/api/v1"
+export API="http://localhost:8004/api/v1"
 export KEY="cf_xxxxx"
 
 # ── 1) Submete o catálogo PDF visual
@@ -136,7 +152,7 @@ curl -L -H "Authorization: Bearer $KEY" \
 | `POST` | `/internal/brands` | `X-Internal-Secret` | Cria nova brand (admin) |
 | `POST` | `/internal/brands/{id}/api-keys` | `X-Internal-Secret` | Cria API key (raw retornado uma única vez) |
 
-OpenAPI completo em <http://localhost:8000/api/v1/docs> (apenas em
+OpenAPI completo em <http://localhost:8004/api/v1/docs> (apenas em
 `ENVIRONMENT != production`).
 
 ---
@@ -145,7 +161,7 @@ OpenAPI completo em <http://localhost:8000/api/v1/docs> (apenas em
 
 | Serviço | Porta | Notas |
 |---|---|---|
-| API (FastAPI) | 8000 | `uvicorn` com hot-reload em dev |
+| API (FastAPI) | 8004 | `uvicorn` com hot-reload em dev (serve API REST **e** UI web) |
 | Celery worker | — | Concurrency 2; queues `catalog`, `orders`, `romaneio` |
 | Celery beat | — | Scheduler (sem jobs periódicos por ora) |
 | Flower | 5555 | Monitoring do Celery (dev only) |

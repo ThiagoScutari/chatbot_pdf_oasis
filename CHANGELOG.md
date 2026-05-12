@@ -5,6 +5,182 @@ versionamento [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] — Sprint 03: Web UI para gerente comercial
+
+Fecha o ciclo da gerente comercial via navegador. Toda a Sprint 02 já
+funcionava por API; agora a Oasis Resortwear faz login com a API Key,
+envia catálogos, acompanha processamento em tempo real, abre detalhes
+de pedidos recebidos e baixa romaneios sem encostar em terminal. UI é
+Jinja2 + HTMX + Alpine.js servida pelo próprio FastAPI — sem build
+step, sem porta extra (mesma 8004 da API).
+
+### Decisão arquitetural — frontend
+
+- **Jinja2 + HTMX + Alpine.js** em vez de React/Vue/Next. Caso de uso
+  estreito (uma persona, poucas telas, baixa interatividade complexa),
+  polling de jobs nativo do HTMX (`hx-trigger="every 2s"`), zero
+  serviço novo, zero build. Decisão revisitável na Sprint 04 se surgir
+  interatividade que justifique SPA.
+- **Sem nova porta** — UI e API compartilham o container e a porta 8004.
+
+### Added — Fundação (Fase A)
+
+- `pyproject.toml`: adiciona `jinja2>=3.1` e `itsdangerous>=2.1`
+  (python-multipart já existia desde Sprint 01).
+- `static/css/app.css`: tokens da paleta Oasis (off-white `#FAF8F5`,
+  bordô `#6B3A2A`, verde sábio `#4A7C59`, âmbar `#9A6B1A`, vermelho
+  escuro `#A63228`) + Cormorant Garamond / Inter. Reset mínimo,
+  utilitários, breakpoint mobile→desktop em 768px.
+- `static/js/app.js`: `window.uploadProgress()` (XHR com `lengthComputable`
+  para barra real, não `fetch` que não expõe progresso), `Alpine.store("toasts")`
+  e `Alpine.data("uploadFlow")` registrados em `alpine:init`.
+- `web/auth.py`: `create_session` / `verify_session` com
+  `URLSafeTimedSerializer`, cookie `cf_session` (`httponly`, `samesite=lax`,
+  `secure` em prod), TTL 8h. Dependency `require_session` retorna a
+  API Key; `require_session_brand` adiciona o lookup da `Brand`.
+
+### Added — Layout + login (Fase B)
+
+- `templates/base.html`: layout mobile-first com header hambúrguer
+  (Alpine inline `x-data="{ open: false }"`, drawer com `x-show`),
+  Google Fonts via CDN, HTMX 1.9.12 e Alpine.js 3.14.1 (app.js carrega
+  ANTES do Alpine para o listener `alpine:init` chegar a tempo), nav
+  desktop horizontal a partir de 768px, área de toasts persistente.
+- `templates/login.html`: tela isolada (sobrescreve o bloco `shell`)
+  com card centralizado, "OASIS Resortwear" em Cormorant 32px, input
+  API Key como password, botão bordô full-width, erro inline.
+- `web/router.py`: GET `/login`, POST `/login` (valida direto via
+  `auth_service.verify_api_key` — `/api/v1/health` é público e não
+  serviria), GET `/logout`, GET `/` (redirect conforme sessão).
+
+### Added — Dashboard + lista de catálogos (Fase C)
+
+- `templates/dashboard.html`: saudação `Bem-vinda, {brand.name}`, data
+  em pt-BR ("Terça-feira, 12 de maio de 2026"), 4 contadores em grid
+  2x2 (mobile) / linha (desktop), atividade recente unificando
+  catálogos e pedidos.
+- `templates/catalogs/list.html` + `_badge.html`: tabela desktop /
+  cards mobile + paginação 20/página + badge com polling HTMX every
+  3s enquanto `pending`/`processing`. Estado vazio elegante.
+- `web/data.py`: `DashboardCounts`, `ActivityItem`,
+  `CatalogListPage`, `ProductListPage` — dataclasses de leitura para
+  manter os templates limpos. Toda query inclui `brand_id` explícito.
+- `web/_helpers.py`: `format_date_long_pt` / `format_date_short_pt` /
+  `humanize_when` + mapeamento de status para `(label_pt, css_variant)`.
+
+### Added — Upload + detalhe de catálogo (Fase D)
+
+- `templates/catalogs/upload.html`: formulário com dropzone (clique
+  no celular abre seletor, drag & drop no desktop com highlight
+  bordô), state machine Alpine `idle → uploading → polling →
+  success | error`. Upload via `window.uploadProgress` (XHR com
+  progresso real), depois Alpine instala HTMX no `$nextTick` para
+  começar o polling.
+- `templates/catalogs/_upload_progress.html`: 3 estados:
+  pending/running com barra animada, success com "✓ Catálogo pronto"
+  + n_skus / n_fields + CTAs Baixar e Ver detalhes, erro com tile
+  vermelho + mensagem amigável mapeada de códigos (PDF_ENCRYPTED →
+  "PDF protegido com senha", FILE_TOO_LARGE → "Arquivo maior que 50
+  MB", PDF_NO_PRODUCTS → "Nenhum produto detectado no catálogo").
+- `templates/catalogs/detail.html` + `_actions_strip.html`:
+  breadcrumb, título + badge polling, metadata strip, tabela
+  paginada de produtos (mobile cards / desktop tabela 20/página).
+  Strip de ações muda conforme status (botão Download em ready;
+  barra animada em processing; tile de erro em error).
+- `templates/errors/404.html`: template 404 elegante mantendo o
+  shell, usado por catálogo inexistente, de outra brand ou download
+  indisponível.
+- POST `/catalogs/upload` faz proxy via httpx ASGI in-process para
+  `/api/v1/catalogs/process` — mesma rota que cliente externo
+  usaria, sem TCP roundtrip. Mapeia erros para mensagens amigáveis.
+
+### Added — Lista + detalhe de pedidos (Fase E)
+
+- `templates/orders/list.html` + `_badge.html`: tabela desktop /
+  cards mobile com Lojista, Catálogo (via JOIN), Peças, Status, Data
+  humanizada (hoje 10:45 / ontem 18:30 / 12/05 14:00). Polling do
+  badge em pedidos `draft`.
+- `templates/orders/detail.html`: items agrupados por SKU → cor →
+  tamanho. **Mobile** — card por SKU com mini-grid de tamanhos ×
+  quantidades (sub-seção por cor com swatch dot quando múltiplas).
+  **Desktop** — tabela com colunas dinâmicas Produto | Cor | (sizes
+  presentes) | Total, footer com total geral em pt-BR.
+- `templates/orders/_romaneio_action.html`: 3 estados — `absent`
+  (botão "Gerar romaneio" via HTMX POST), `processing` (spinner +
+  polling every 2s), `ready` (link de download direto + script de
+  auto-download na primeira detecção do estado pronto via polling).
+- `web/data.py`: `OrderListPage`, `OrderDetail`,
+  `group_items_by_sku()` (ordem canônica PP/P/M/G/GG/XG).
+- POST `/orders/{id}/romaneio` → proxy via httpx para
+  `GET /api/v1/orders/{id}/romaneio` (a API combina disparar +
+  consultar no GET).
+- GET `/orders/{id}/romaneio/poll` inspeciona estado direto via
+  banco — não dispara nova geração.
+
+### Added — Polimento (Fase F)
+
+- `templates/errors/500.html`: página estéril (não vaza traceback
+  nem request_id literal). Mantém o shell para usuário voltar.
+- `main.py`: `_http_exception_handler` registra `StarletteHTTPException`
+  → renderiza HTML 404 quando o path NÃO começa com `/api/v1/`,
+  delegando para o handler padrão do FastAPI nos demais casos.
+  `_unhandled_error_handler` agora renderiza HTML 500 em rotas web
+  e mantém envelope JSON em rotas API.
+- Acessibilidade: hambúrguer com `:aria-expanded="open"` +
+  `aria-controls`; drawer com `role="dialog"` + `aria-modal="true"`
+  + `aria-label`; ícones decorativos com `aria-hidden="true"`.
+- `[x-cloak] { display: none !important; }` no CSS para futuros
+  usos (evita flash de elementos com `x-show=false` antes do Alpine
+  inicializar).
+
+### Tests
+
+- 34 testes em `src/catalogflow/web/tests/`:
+  10 `test_web_auth.py` (login/logout/redirect com sessão),
+  24 `test_web_pages.py` (dashboard, catalogs list/upload/detail,
+  orders list/detail, badge fragment 404, 404 elegante para
+  recursos inexistentes / de outra brand, handlers globais
+  renderizam HTML para web e JSON para API).
+- Suite total: **275 passed**, cobertura mantida ≥ 80%.
+
+### Fixed
+
+- `fix(web): register Alpine components and store before init` —
+  `app.js` agora carrega antes do Alpine CDN no `base.html`. Com
+  `defer`, scripts executam na ordem do DOM; o Alpine disparava
+  `alpine:init` antes do listener ser instalado.
+- `fix(web): fix hamburger menu not opening on mobile` — substituiu
+  `<template x-if="open">` por `x-show="open"` (listener atachado
+  desde o boot), `.stop` no clique do hambúrguer, removido
+  `@click.outside` redundante do aside (overlay já cobre o caso).
+
+### Decisões registradas
+
+- **Validação de login direto no auth_service** — `/api/v1/health` é
+  público (não exige Bearer) e portanto não pode diferenciar uma
+  chave válida de uma inválida. Roteamos pela camada de serviço sem
+  indireção HTTP.
+- **POST `/catalogs/upload` proxy via httpx ASGI** — mesma rota que
+  um cliente externo usaria, mas sem TCP roundtrip. Mantém a UI
+  desacoplada da camada de domínio (não importa services aqui).
+- **POST web `/orders/{id}/romaneio` apesar do GET na API** — a API
+  expõe apenas GET (combina disparar+consultar). No web criamos POST
+  para que o botão fique semanticamente correto (dispara ação),
+  internamente chama o GET.
+- **Inline `x-data="{...}"` em vez de `Alpine.data(...)` registrado** —
+  componentes do shell (hambúrguer) usam objeto inline pra não
+  depender de ordem de carregamento. `uploadFlow` permanece via
+  `Alpine.data` (factory complexa o suficiente para justificar JS).
+
+### Next (Sprint 04 — preview)
+
+- Cadastro de novas brands via interface (sai do `/internal/`).
+- Visualização de produtos com thumbnail extraído do PDF.
+- Notificações push do navegador quando o processamento termina.
+- Dashboard com gráficos (catálogos mais pedidos, lojistas top, etc.).
+
+---
+
 ## [0.2.0] — Sprint 02: Order extraction + Romaneio
 
 Fecha o ciclo de pedido ponta a ponta. Quando uma lojista preenche o PDF
