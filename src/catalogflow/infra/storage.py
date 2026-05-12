@@ -41,9 +41,11 @@ class StorageClient:
         access_key_id: str,
         secret_access_key: str,
         presigned_url_ttl_seconds: int,
+        public_endpoint_url: str | None = None,
     ) -> None:
         self._bucket = bucket
         self._endpoint_url = endpoint_url
+        self._public_endpoint_url = public_endpoint_url
         self._region = region
         self._access_key_id = access_key_id
         self._secret_access_key = secret_access_key
@@ -61,6 +63,7 @@ class StorageClient:
             access_key_id=s.aws_access_key_id.get_secret_value(),
             secret_access_key=s.aws_secret_access_key.get_secret_value(),
             presigned_url_ttl_seconds=s.s3_presigned_url_ttl_seconds,
+            public_endpoint_url=s.s3_public_url,
         )
 
     @property
@@ -132,6 +135,8 @@ class StorageClient:
                 )
                 if not isinstance(url, str):
                     raise StorageError(f"unexpected url type for {key}")
+                if self._public_endpoint_url and self._endpoint_url:
+                    url = url.replace(self._endpoint_url, self._public_endpoint_url)
                 return url
         except StorageError:
             raise

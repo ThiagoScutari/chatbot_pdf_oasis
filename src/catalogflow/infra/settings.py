@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     # ── Storage (S3 / R2) ─────────────────────
     s3_bucket: str = "catalogflow-dev"
     s3_endpoint_url: str | None = None
+    s3_public_url: str | None = None
     s3_region: str = "auto"
     aws_access_key_id: SecretStr = SecretStr("")
     aws_secret_access_key: SecretStr = SecretStr("")
