@@ -18,14 +18,19 @@
     <div class="progress-bar-fill" style="width: {{ job.progress }}%"></div>
   </div>
   <p class="processing-meta">
-    {% if job.progress >= 90 %}
-      Finalizando…
-    {% elif job.progress >= 50 %}
-      Inserindo campos de pedido nas páginas de produto…
+    {% if job.progress < 30 %}
+      <span aria-hidden="true">⟳</span> Analisando produtos…
+    {% elif job.progress < 70 %}
+      <span aria-hidden="true">⟳</span> Inserindo campos de pedido…
     {% else %}
-      Analisando páginas do catálogo…
+      <span aria-hidden="true">⟳</span> Finalizando PDF…
     {% endif %}
   </p>
+  {% if job.progress <= 50 %}
+  <p class="processing-meta text-sm text-muted" style="margin-top: var(--space-2);">
+    Isso costuma levar cerca de 1 minuto.
+  </p>
+  {% endif %}
 </div>
 
 {% elif job.status == "success" %}
