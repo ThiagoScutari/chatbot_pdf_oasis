@@ -13,8 +13,13 @@
   <link rel="stylesheet" href="/static/css/app.css">
 
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-  <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+  {# app.js DEVE vir antes do Alpine: com `defer`, scripts executam na
+     ordem do DOM após o parse. O app.js registra o listener `alpine:init`,
+     que precisa estar em pé ANTES do Alpine inicializar — caso contrário
+     `Alpine.data('uploadFlow', ...)` e `Alpine.store('toasts', ...)` nunca
+     são chamados e o front quebra com "uploadFlow is not defined". #}
   <script src="/static/js/app.js" defer></script>
+  <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
 </head>
 <body>
 
