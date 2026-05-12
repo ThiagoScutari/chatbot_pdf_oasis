@@ -1,0 +1,287 @@
+/* ──────────────────────────────────────────────────────────────
+   CatalogFlow — Oasis Resortwear identity
+   Design tokens + base reset + atomic utilities.
+   Mobile-first; breakpoint at 768px.
+   ────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Cores — paleta quente, dessaturada */
+  --color-bg:           #FAF8F5;
+  --color-surface:      #FFFFFF;
+  --color-border:       #E8E0D5;
+  --color-text:         #1A1A1A;
+  --color-text-muted:   #7A6E65;
+  --color-accent:       #6B3A2A;
+  --color-accent-hover: #4F2A1D;
+  --color-success:      #4A7C59;
+  --color-warning:      #9A6B1A;
+  --color-error:        #A63228;
+
+  /* Tipografia */
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body:    'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+
+  /* Forma e profundidade */
+  --radius: 4px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  /* Espaçamento sistêmico (rem-based) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+}
+
+/* ── Reset mínimo ─────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-accent-hover);
+}
+
+/* Focus visível em todos os elementos interativos */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* ── Tipografia ───────────────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  margin: 0 0 var(--space-4) 0;
+  line-height: 1.2;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+h4 { font-size: 1.1rem; }
+
+p {
+  margin: 0 0 var(--space-4) 0;
+}
+
+/* ── Layout container ─────────────────────────────────────── */
+
+.container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: 0 40px;
+  }
+}
+
+/* ── Botões ───────────────────────────────────────────────── */
+
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: #fff;
+}
+
+.btn-primary:disabled {
+  background: var(--color-text-muted);
+  border-color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus-visible {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ── Badge de status ─────────────────────────────────────── */
+
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.badge-status::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge-status.ready {
+  color: var(--color-success);
+  border-color: rgba(74, 124, 89, 0.25);
+  background: rgba(74, 124, 89, 0.06);
+}
+
+.badge-status.processing {
+  color: var(--color-warning);
+  border-color: rgba(154, 107, 26, 0.25);
+  background: rgba(154, 107, 26, 0.06);
+}
+
+.badge-status.processing::before {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.badge-status.error {
+  color: var(--color-error);
+  border-color: rgba(166, 50, 40, 0.25);
+  background: rgba(166, 50, 40, 0.06);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+/* ── Card / surface ───────────────────────────────────────── */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+}
+
+@media (min-width: 768px) {
+  .card {
+    padding: var(--space-6);
+  }
+}
+
+/* ── Utilitários ──────────────────────────────────────────── */
+
+.text-muted   { color: var(--color-text-muted); }
+.text-accent  { color: var(--color-accent); }
+.text-success { color: var(--color-success); }
+.text-warning { color: var(--color-warning); }
+.text-error   { color: var(--color-error); }
+
+.text-display { font-family: var(--font-display); }
+.text-body    { font-family: var(--font-body); }
+
+.text-sm  { font-size: 0.85rem; }
+.text-lg  { font-size: 1.15rem; }
+.text-xl  { font-size: 1.4rem; }
+.text-2xl { font-size: 1.8rem; }
+
+.text-center { text-align: center; }
+
+.mt-2 { margin-top: var(--space-2); }
+.mt-4 { margin-top: var(--space-4); }
+.mt-6 { margin-top: var(--space-6); }
+.mb-2 { margin-bottom: var(--space-2); }
+.mb-4 { margin-bottom: var(--space-4); }
+.mb-6 { margin-bottom: var(--space-6); }
+
+.stack > * + * { margin-top: var(--space-4); }
+.stack-sm > * + * { margin-top: var(--space-2); }
+.stack-lg > * + * { margin-top: var(--space-6); }
+
+.hidden { display: none !important; }
+
+/* Visível apenas em mobile */
+.mobile-only { display: block; }
+.desktop-only { display: none; }
+
+@media (min-width: 768px) {
+  .mobile-only { display: none; }
+  .desktop-only { display: block; }
+}
