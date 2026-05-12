@@ -19,7 +19,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from catalogflow.modules.catalog.models import Catalog
+from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
 from catalogflow.modules.orders.models import Order
 from catalogflow.modules.romaneio.models import Romaneio
 
@@ -222,5 +222,90 @@ async def get_catalog_status(
         Catalog.id == catalog_id,
         Catalog.brand_id == brand_id,
     )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+# ──────────────────────────────────────────────
+#  Detalhe do catálogo
+# ──────────────────────────────────────────────
+
+
+async def get_catalog(
+    db: AsyncSession,
+    catalog_id: UUID,
+    brand_id: UUID,
+) -> Catalog | None:
+    """Devolve o catálogo (sem produtos) ou `None` se não existe / outra brand."""
+    stmt = select(Catalog).where(
+        Catalog.id == catalog_id,
+        Catalog.brand_id == brand_id,
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+@dataclass(slots=True)
+class ProductListPage:
+    """Página de produtos do catálogo (paginada para evitar tabela gigante)."""
+
+    items: list[CatalogProduct]
+    total: int
+    page: int
+    page_size: int
+
+    @property
+    def has_prev(self) -> bool:
+        return self.page > 1
+
+    @property
+    def has_next(self) -> bool:
+        return self.page * self.page_size < self.total
+
+
+async def list_catalog_products(
+    db: AsyncSession,
+    catalog_id: UUID,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+) -> ProductListPage:
+    """Página de produtos detectados, ordenados por `page_index` no PDF."""
+    page = max(page, 1)
+    offset = (page - 1) * page_size
+
+    total = await db.scalar(
+        select(func.count(CatalogProduct.id)).where(
+            CatalogProduct.catalog_id == catalog_id
+        )
+    )
+    stmt = (
+        select(CatalogProduct)
+        .where(CatalogProduct.catalog_id == catalog_id)
+        .order_by(CatalogProduct.page_index, CatalogProduct.sku)
+        .limit(page_size)
+        .offset(offset)
+    )
+    items = list((await db.execute(stmt)).scalars().all())
+    return ProductListPage(
+        items=items,
+        total=int(total or 0),
+        page=page,
+        page_size=page_size,
+    )
+
+
+# ──────────────────────────────────────────────
+#  Job
+# ──────────────────────────────────────────────
+
+
+async def get_job_for_brand(
+    db: AsyncSession,
+    job_id: UUID,
+    brand_id: UUID,
+) -> Job | None:
+    """Devolve o Job se pertence à brand, ou `None`."""
+    stmt = select(Job).where(Job.id == job_id, Job.brand_id == brand_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()

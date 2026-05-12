@@ -11,10 +11,12 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request, Response, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+import httpx
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +30,7 @@ from catalogflow.web.auth import (
     SESSION_COOKIE,
     clear_session_cookie,
     create_session,
+    require_session,
     require_session_brand,
     set_session_cookie,
     verify_session,
@@ -207,4 +210,296 @@ async def catalog_badge(
             "catalog_id": catalog_id,
             "status": current_status,
         },
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /catalogs/upload  — formulário
+# ──────────────────────────────────────────────
+
+
+@router.get("/catalogs/upload", response_class=HTMLResponse)
+async def catalog_upload_form(
+    request: Request,
+    brand: Brand = Depends(require_session_brand),
+) -> HTMLResponse:
+    """Renderiza o formulário de envio de catálogo.
+
+    `brand` é injetado para que o gate de sessão dispare 302/login antes
+    de renderizar o template — não é consumido pela página em si.
+    """
+    del brand  # parâmetro existe apenas para acionar o dependency.
+    return templates.TemplateResponse(request, "catalogs/upload.html", {})
+
+
+# ──────────────────────────────────────────────
+#  POST /catalogs/upload  — proxy para /api/v1/catalogs/process
+# ──────────────────────────────────────────────
+
+
+_FRIENDLY_ERROR_MESSAGES: dict[str, str] = {
+    "FILE_TOO_LARGE": "Arquivo maior que 50 MB.",
+    "PDF_ENCRYPTED": "PDF protegido com senha.",
+    "INVALID_FILE_TYPE": "O arquivo não é um PDF válido.",
+    "PDF_NO_PRODUCTS": "Nenhum produto detectado no catálogo.",
+    "PDF_CORRUPT": "Arquivo PDF inválido ou corrompido.",
+}
+
+
+def _friendly_for(code: str | None, fallback: str) -> str:
+    if code and code in _FRIENDLY_ERROR_MESSAGES:
+        return _FRIENDLY_ERROR_MESSAGES[code]
+    return fallback or "Não foi possível processar o catálogo."
+
+
+@router.post("/catalogs/upload")
+async def catalog_upload_submit(
+    request: Request,
+    file: UploadFile = File(...),
+    name: str = Form(..., min_length=1, max_length=255),
+    collection: str | None = Form(default=None, max_length=128),
+    api_key: str = Depends(require_session),
+) -> JSONResponse:
+    """Encaminha o upload para a API REST e devolve um JSON enxuto
+    para o Alpine consumir (job_id + catalog_id, ou erro estruturado).
+
+    Vai via httpx ASGI in-process — mesma rota que um cliente externo
+    usaria, mas sem TCP roundtrip. A validação fica concentrada na API.
+    """
+    pdf_bytes = await file.read()
+    files = {
+        "file": (file.filename or "catalog.pdf", pdf_bytes, "application/pdf"),
+    }
+    form_data: dict[str, str] = {"name": name}
+    if collection:
+        form_data["collection"] = collection
+
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://internal",
+        headers={"Authorization": f"Bearer {api_key}"},
+    ) as client:
+        try:
+            api_resp = await client.post(
+                "/api/v1/catalogs/process",
+                data=form_data,
+                files=files,
+                timeout=60.0,
+            )
+        except httpx.HTTPError as exc:
+            logger.exception("upload: erro de transporte para a API")
+            return JSONResponse(
+                {"success": False, "error": {"code": "UPSTREAM_ERROR", "message": str(exc)}},
+                status_code=status.HTTP_502_BAD_GATEWAY,
+            )
+
+    if api_resp.status_code in (200, 201, 202):
+        envelope = api_resp.json()
+        # Envelope padrão {success, data:{catalog_id, job_id, ...}}.
+        return JSONResponse(envelope.get("data", {}), status_code=200)
+
+    # Erro: extrai code/message do envelope e devolve em formato amigável.
+    try:
+        body = api_resp.json()
+    except ValueError:
+        body = {"error": {"code": "UNKNOWN", "message": api_resp.text[:300]}}
+    err = body.get("error", {}) if isinstance(body, dict) else {}
+    friendly = _friendly_for(err.get("code"), err.get("message", ""))
+    return JSONResponse(
+        {
+            "success": False,
+            "error": {
+                "code": err.get("code", "UNKNOWN"),
+                "message": friendly,
+            },
+        },
+        status_code=api_resp.status_code,
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /catalogs/upload/poll/{job_id}  — fragmento HTMX
+# ──────────────────────────────────────────────
+
+
+@router.get(
+    "/catalogs/upload/poll/{job_id}",
+    response_class=HTMLResponse,
+)
+async def catalog_upload_poll(
+    request: Request,
+    job_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Estado atual do job de processamento — retornado como fragmento HTML."""
+    job = await data.get_job_for_brand(db, job_id, brand.id)
+    if job is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+
+    friendly_error: str | None = None
+    if job.status not in ("pending", "running", "success"):
+        friendly_error = _friendly_for(
+            _error_code_from_message(job.error),
+            job.error or "Ocorreu um erro durante o processamento.",
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "catalogs/_upload_progress.html",
+        {
+            "job": job,
+            "friendly_error": friendly_error,
+        },
+    )
+
+
+def _error_code_from_message(message: str | None) -> str | None:
+    """Tenta extrair um code conhecido do `Job.error` (best-effort).
+
+    O service salva apenas `str(exc)` em `Job.error` — não o `code`. Para
+    o web layer dar uma mensagem amigável, fazemos um lookup textual leve;
+    se nada bater, o fallback do `_friendly_for` cobre.
+    """
+    if not message:
+        return None
+    lower = message.lower()
+    if "50mb" in lower or "file_too_large" in lower:
+        return "FILE_TOO_LARGE"
+    if "encrypt" in lower or "senha" in lower:
+        return "PDF_ENCRYPTED"
+    if "no_products" in lower or "nenhum produto" in lower:
+        return "PDF_NO_PRODUCTS"
+    if "invalid_file_type" in lower or "não é um pdf" in lower:
+        return "INVALID_FILE_TYPE"
+    return None
+
+
+# ──────────────────────────────────────────────
+#  GET /catalogs/{id}  — detalhe
+# ──────────────────────────────────────────────
+
+
+def _render_not_found(
+    request: Request,
+    *,
+    title: str = "Catálogo não encontrado",
+    message: str = "Este catálogo pode ter sido removido ou nunca existiu.",
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "errors/404.html",
+        {"title": title, "message": message},
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
+@router.get("/catalogs/{catalog_id}", response_class=HTMLResponse)
+async def catalog_detail(
+    request: Request,
+    catalog_id: UUID,
+    page: int = 1,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Detalhe do catálogo + lista paginada de produtos."""
+    catalog = await data.get_catalog(db, catalog_id, brand.id)
+    if catalog is None:
+        return _render_not_found(request)
+    products = await data.list_catalog_products(db, catalog_id, page=page)
+    return templates.TemplateResponse(
+        request,
+        "catalogs/detail.html",
+        {
+            "catalog": catalog,
+            "products": products,
+        },
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /catalogs/{id}/_actions_strip  — fragmento polling
+# ──────────────────────────────────────────────
+
+
+@router.get(
+    "/catalogs/{catalog_id}/_actions_strip",
+    response_class=HTMLResponse,
+)
+async def catalog_actions_strip(
+    request: Request,
+    catalog_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Strip de ações da página de detalhe — re-renderizado a cada 3s
+    enquanto status é pending/processing."""
+    catalog = await data.get_catalog(db, catalog_id, brand.id)
+    if catalog is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+    return templates.TemplateResponse(
+        request,
+        "catalogs/_actions_strip.html",
+        {"catalog": catalog},
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /catalogs/{id}/download  — proxy para a API
+# ──────────────────────────────────────────────
+
+
+@router.get("/catalogs/{catalog_id}/download")
+async def catalog_download(
+    request: Request,
+    catalog_id: UUID,
+    api_key: str = Depends(require_session),
+) -> Response:
+    """Encaminha o download do PDF editável.
+
+    Em dev a API serve os bytes diretos (`Content-Type: application/pdf`);
+    em produção devolve 302 para uma URL assinada do storage. Aqui
+    repassamos ambos os caminhos: bytes viram Response, 302 vira redirect.
+    """
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://internal",
+        headers={"Authorization": f"Bearer {api_key}"},
+        follow_redirects=False,
+    ) as client:
+        api_resp = await client.get(
+            f"/api/v1/catalogs/{catalog_id}/download",
+            timeout=60.0,
+        )
+
+    if api_resp.status_code == 302:
+        location = api_resp.headers.get("location", "")
+        return RedirectResponse(url=location, status_code=status.HTTP_302_FOUND)
+
+    if api_resp.status_code == 200:
+        return Response(
+            content=api_resp.content,
+            media_type=api_resp.headers.get("content-type", "application/pdf"),
+            headers={
+                "Content-Disposition": api_resp.headers.get(
+                    "content-disposition",
+                    f'attachment; filename="catalog-{catalog_id}.pdf"',
+                ),
+            },
+        )
+
+    # Não está pronto ou outro erro: 404 elegante.
+    body: dict[str, Any] = {}
+    try:
+        body = api_resp.json()
+    except ValueError:
+        pass
+    err = body.get("error", {}) if isinstance(body, dict) else {}
+    return _render_not_found(
+        request,
+        title="Download indisponível",
+        message=err.get("message")
+        or "O catálogo ainda não está pronto para download.",
     )

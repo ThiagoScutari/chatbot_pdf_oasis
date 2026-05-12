@@ -75,4 +75,107 @@ document.addEventListener("alpine:init", () => {
       this.items = this.items.filter((t) => t.id !== id);
     },
   });
+
+  /* ──────────────────────────────────────────────────────────
+   * uploadFlow — máquina de estados da página de upload.
+   * Estados: idle → uploading → polling | error
+   * Em sucesso, deixa o HTMX (no fragmento de polling) renderizar
+   * o estado final. Em erro de upload (pre-job), mostra mensagem.
+   * ────────────────────────────────────────────────────────── */
+  // eslint-disable-next-line no-undef
+  Alpine.data("uploadFlow", () => ({
+    state: "idle",
+    pct: 0,
+    jobId: null,
+    selectedFile: null,
+    selectedFileName: "",
+    error: null,
+    dragging: false,
+
+    onFileChange(event) {
+      const files = event.target.files;
+      if (files && files.length > 0) {
+        this.selectedFile = files[0];
+        this.selectedFileName = files[0].name;
+      }
+    },
+
+    onDrop(event) {
+      this.dragging = false;
+      const files = event.dataTransfer?.files;
+      if (files && files.length > 0) {
+        this.selectedFile = files[0];
+        this.selectedFileName = files[0].name;
+        // Atualiza o <input type="file"> também — alguns navegadores
+        // exigem que ele tenha o arquivo para o submit nativo funcionar.
+        const input = this.$root.querySelector('input[type="file"]');
+        if (input) {
+          const dt = new DataTransfer();
+          dt.items.add(files[0]);
+          input.files = dt.files;
+        }
+      }
+    },
+
+    async submit(event) {
+      event.preventDefault();
+      this.error = null;
+      const form = event.target;
+      const fd = new FormData(form);
+      if (!fd.get("file") || (this.selectedFile == null && !fd.get("file").size)) {
+        this.error = "Selecione um arquivo PDF.";
+        return;
+      }
+      this.state = "uploading";
+      this.pct = 0;
+      try {
+        const resp = await window.uploadProgress("/catalogs/upload", fd, (p) => {
+          this.pct = p;
+        });
+        this.jobId = resp.job_id;
+        this.state = "polling";
+        // Aguarda o Alpine re-renderizar o bloco de polling e então
+        // instrui o HTMX a processar o div (aplicar hx-get + hx-trigger).
+        this.$nextTick(() => {
+          const target = document.getElementById("upload-poll-target");
+          if (target && window.htmx) {
+            target.setAttribute(
+              "hx-get",
+              "/catalogs/upload/poll/" + this.jobId,
+            );
+            target.setAttribute("hx-trigger", "load, every 2s");
+            target.setAttribute("hx-swap", "innerHTML");
+            window.htmx.process(target);
+            window.htmx.trigger(target, "load");
+          }
+        });
+      } catch (err) {
+        // err: { status, body: { success:false, error:{code,message,...}} }
+        const code = err?.body?.error?.code || "UNKNOWN";
+        const friendly = this._friendlyMessage(code, err?.body?.error?.message);
+        this.error = friendly;
+        this.state = "error";
+      }
+    },
+
+    _friendlyMessage(code, fallback) {
+      const map = {
+        FILE_TOO_LARGE: "Arquivo maior que 50 MB.",
+        PDF_ENCRYPTED: "PDF protegido com senha.",
+        INVALID_FILE_TYPE: "O arquivo não é um PDF válido.",
+        PDF_NO_PRODUCTS: "Nenhum produto detectado no catálogo.",
+        PDF_CORRUPT: "Arquivo PDF inválido ou corrompido.",
+      };
+      return map[code] || fallback || "Não foi possível enviar o catálogo.";
+    },
+
+    reset() {
+      this.state = "idle";
+      this.pct = 0;
+      this.jobId = null;
+      this.error = null;
+      this.selectedFile = null;
+      this.selectedFileName = "";
+    },
+  }));
 });

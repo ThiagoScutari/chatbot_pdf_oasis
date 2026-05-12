@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Novo catálogo — CatalogFlow{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb"><a href="/catalogs">← Catálogos</a></nav>
+
+<section class="page-header">
+  <h1>Novo catálogo</h1>
+</section>
+
+<div class="upload-card" x-data="uploadFlow">
+
+  <!-- ── Estado: idle (formulário) ── -->
+  <form
+    class="upload-form"
+    x-show="state === 'idle' || state === 'error'"
+    @submit="submit($event)"
+    enctype="multipart/form-data"
+  >
+    <div class="field">
+      <label for="name">Nome do catálogo *</label>
+      <input
+        id="name"
+        name="name"
+        type="text"
+        required
+        minlength="1"
+        maxlength="255"
+        placeholder="Inverno 26 MOTION"
+      >
+    </div>
+
+    <div class="field">
+      <label for="collection">Coleção (opcional)</label>
+      <input
+        id="collection"
+        name="collection"
+        type="text"
+        maxlength="128"
+        placeholder="MOTION"
+      >
+    </div>
+
+    <div
+      class="dropzone"
+      :class="{ 'is-dragging': dragging }"
+      @click="$refs.fileInput.click()"
+      @dragover.prevent="dragging = true"
+      @dragleave.prevent="dragging = false"
+      @drop.prevent="onDrop($event)"
+    >
+      <label class="dz-cta" @click.stop>
+        <span aria-hidden="true">↑</span>
+        <span>Selecionar PDF</span>
+        <input
+          x-ref="fileInput"
+          type="file"
+          name="file"
+          accept="application/pdf,.pdf"
+          required
+          @change="onFileChange($event)"
+        >
+      </label>
+      <div class="dz-hint">Toque para selecionar · arraste no desktop · PDF até 50 MB</div>
+      <div class="dz-filename" x-show="selectedFileName" x-text="selectedFileName"></div>
+    </div>
+
+    <p class="field-error" role="alert" x-show="state === 'error' && error" x-text="error"></p>
+
+    <button type="submit" class="btn-primary btn-block">Processar catálogo →</button>
+  </form>
+
+  <!-- ── Estado: uploading (barra com %) ── -->
+  <div x-show="state === 'uploading'" class="processing-block">
+    <h2 class="processing-title">Enviando arquivo…</h2>
+    <div class="progress-bar">
+      <div class="progress-bar-fill" :style="`width: ${pct}%`"></div>
+    </div>
+    <p class="processing-meta"><span x-text="pct"></span>% enviado</p>
+  </div>
+
+  <!-- ── Estado: polling (HTMX preenche este div) ── -->
+  <div
+    id="upload-poll-target"
+    x-show="state === 'polling'"
+  >
+    <!-- preenchido pelo polling do servidor — ver _upload_progress.html -->
+    <div class="processing-block">
+      <h2 class="processing-title">Processando…</h2>
+      <div class="progress-bar progress-bar-indeterminate">
+        <div class="progress-bar-fill"></div>
+      </div>
+      <p class="processing-meta">Aguarde — isso leva alguns segundos.</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

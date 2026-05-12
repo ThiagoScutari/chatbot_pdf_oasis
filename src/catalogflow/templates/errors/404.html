@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Não encontrado — CatalogFlow{% endblock %}
+
+{# Página de erro mantém o shell para que o usuário possa navegar. #}
+
+{% block content %}
+<div class="empty-state" style="margin-top: var(--space-7);">
+  <p class="empty-title">{{ title or "Não encontramos esta página" }}</p>
+  <p class="empty-body">{{ message or "O recurso pode ter sido removido ou nunca existiu." }}</p>
+  <a class="btn-primary" href="/dashboard">← Voltar ao início</a>
+</div>
+{% endblock %}

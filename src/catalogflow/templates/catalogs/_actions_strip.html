@@ -1,0 +1,34 @@
+{# Fragmento — barra de ações no detail page.
+   Re-renderiza por hx-get + hx-trigger="every 3s" enquanto status é
+   pending/processing. Quando vira ready ou error, o polling encerra
+   porque os atributos hx-* não são emitidos.
+
+   Variáveis: catalog (Catalog)
+#}
+<div
+  id="catalog-actions-{{ catalog.id }}"
+  {% if catalog.status in ("pending", "processing") %}
+    hx-get="/catalogs/{{ catalog.id }}/_actions_strip"
+    hx-trigger="every 3s"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  {% if catalog.status == "ready" %}
+    <div class="detail-actions">
+      <a class="btn-primary" href="/catalogs/{{ catalog.id }}/download">↓ Baixar PDF editável</a>
+    </div>
+  {% elif catalog.status in ("pending", "processing") %}
+    <div class="processing-block">
+      <div class="progress-bar progress-bar-indeterminate">
+        <div class="progress-bar-fill"></div>
+      </div>
+      <p class="processing-meta">Catálogo em processamento…</p>
+    </div>
+  {% elif catalog.status == "error" %}
+    <div class="result-tile error">
+      <p class="glyph" aria-hidden="true">✕</p>
+      <h2 class="result-title">Processamento falhou</h2>
+      <p class="result-meta">{{ catalog.error_message or "Erro desconhecido durante o processamento." }}</p>
+    </div>
+  {% endif %}
+</div>

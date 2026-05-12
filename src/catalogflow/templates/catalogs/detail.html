@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}{{ catalog.name }} — CatalogFlow{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb"><a href="/catalogs">← Catálogos</a></nav>
+
+<section class="detail-header">
+  <div>
+    <div class="detail-title-row">
+      <h1>{{ catalog.name }}</h1>
+      {% set catalog_id = catalog.id %}
+      {% set status = catalog.status %}
+      {% include "catalogs/_badge.html" %}
+    </div>
+    <p class="metadata-strip">
+      {% if catalog.collection %}Coleção {{ catalog.collection }} · {% endif %}
+      {% if catalog.n_skus is not none %}{{ catalog.n_skus }} produtos · {% endif %}
+      {% if catalog.n_fields is not none %}{{ catalog.n_fields }} campos · {% endif %}
+      Criado em {{ format_date_short_pt(catalog.created_at) }}
+    </p>
+  </div>
+</section>
+
+{% include "catalogs/_actions_strip.html" %}
+
+<section>
+  <h2 class="section-title">Produtos detectados</h2>
+
+  {% if products.items %}
+
+    <!-- ── Mobile: cards ── -->
+    <ul class="card-list mobile-list" aria-label="Produtos do catálogo">
+      {% for p in products.items %}
+      <li class="card-list-item">
+        <div class="title-row">
+          <span class="name">{{ p.name or p.sku }}</span>
+          <span class="text-muted text-sm">{{ p.sku }}</span>
+        </div>
+        <div class="meta">
+          {% if p.price %}R$ {{ "%.2f"|format(p.price)|replace(".", ",") }} · {% endif %}
+          {% if p.grade %}Grade {{ p.grade }} · {% endif %}
+          {{ p.n_colors }} cor{{ "" if p.n_colors == 1 else "es" }}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <!-- ── Desktop: tabela ── -->
+    <div class="desktop-table">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Nome</th>
+            <th class="num">Preço</th>
+            <th>Grade</th>
+            <th class="num">Cores</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products.items %}
+          <tr>
+            <td>{{ p.sku }}</td>
+            <td>{{ p.name or "—" }}</td>
+            <td class="num">{% if p.price %}R$ {{ "%.2f"|format(p.price)|replace(".", ",") }}{% else %}—{% endif %}</td>
+            <td>{{ p.grade or "—" }}</td>
+            <td class="num">{{ p.n_colors }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if products.has_prev or products.has_next %}
+    <nav class="pagination" aria-label="Paginação de produtos">
+      <span class="info">
+        Página {{ products.page }} · {{ products.total }} produto{{ "" if products.total == 1 else "s" }}
+      </span>
+      <span>
+        <a class="pager-btn" href="?page={{ products.page - 1 }}"
+           aria-disabled="{{ 'true' if not products.has_prev else 'false' }}">← Anterior</a>
+        <a class="pager-btn" href="?page={{ products.page + 1 }}"
+           aria-disabled="{{ 'true' if not products.has_next else 'false' }}">Próxima →</a>
+      </span>
+    </nav>
+    {% endif %}
+
+  {% else %}
+    <div class="empty-state">
+      <p class="empty-body">
+        {% if catalog.status in ("pending", "processing") %}
+          Os produtos aparecem aqui assim que o processamento termina.
+        {% else %}
+          Nenhum produto detectado neste catálogo.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
