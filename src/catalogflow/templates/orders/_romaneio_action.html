@@ -1,0 +1,52 @@
+{# Fragmento — barra de ação do romaneio. Três estados:
+   - "ready": link de download direto.
+   - "processing": spinner + polling HTMX a cada 2s.
+   - "absent": botão "Gerar romaneio" que dispara POST /orders/{id}/romaneio.
+
+   Variáveis: `order` (Order), `romaneio_state` (str).
+   `auto_download` (bool, default False) é True quando o polling acaba de
+   detectar conclusão — inclui um pequeno script que dispara o download.
+#}
+
+{% if romaneio_state == "ready" %}
+<div class="detail-actions" id="romaneio-action">
+  <a class="btn-primary" href="/orders/{{ order.id }}/romaneio/download">
+    ↓ Baixar romaneio
+  </a>
+</div>
+{% if auto_download %}
+  {# Apos a transicao para "ready", abre o download na mesma aba. #}
+  <script>
+    setTimeout(function () {
+      window.location.href = "/orders/{{ order.id }}/romaneio/download";
+    }, 300);
+  </script>
+{% endif %}
+
+{% elif romaneio_state == "processing" %}
+<div
+  class="romaneio-action"
+  id="romaneio-action"
+  hx-get="/orders/{{ order.id }}/romaneio/poll"
+  hx-trigger="every 2s"
+  hx-swap="outerHTML"
+>
+  <div class="processing-block">
+    <p class="processing-meta">
+      <span class="spinner" aria-hidden="true"></span>
+      Gerando romaneio…
+    </p>
+  </div>
+</div>
+
+{% else %}
+<div class="detail-actions" id="romaneio-action">
+  <button
+    type="button"
+    class="btn-primary"
+    hx-post="/orders/{{ order.id }}/romaneio"
+    hx-target="#romaneio-action"
+    hx-swap="outerHTML"
+  >↓ Gerar romaneio</button>
+</div>
+{% endif %}

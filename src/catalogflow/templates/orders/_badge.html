@@ -1,0 +1,13 @@
+{# Fragmento — span do badge de pedido com polling enquanto draft.
+   Variáveis esperadas: `order_id`, `status` (string).
+#}
+{% set badge = order_status_badge(status) %}
+<span
+  class="badge-status {{ badge[1] }}"
+  id="order-badge-{{ order_id }}"
+  {% if status == "draft" %}
+    hx-get="/orders/{{ order_id }}/_badge"
+    hx-trigger="every 3s"
+    hx-swap="outerHTML"
+  {% endif %}
+>{{ badge[0] }}</span>

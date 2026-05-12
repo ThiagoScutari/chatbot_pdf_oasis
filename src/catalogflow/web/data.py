@@ -18,9 +18,10 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
-from catalogflow.modules.orders.models import Order
+from catalogflow.modules.orders.models import Order, OrderItem
 from catalogflow.modules.romaneio.models import Romaneio
 
 # ──────────────────────────────────────────────
@@ -309,3 +310,257 @@ async def get_job_for_brand(
     stmt = select(Job).where(Job.id == job_id, Job.brand_id == brand_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+
+# ──────────────────────────────────────────────
+#  Lista de pedidos
+# ──────────────────────────────────────────────
+
+
+@dataclass(slots=True)
+class OrderListItem:
+    """Linha achatada da lista de pedidos (com nome do catálogo via JOIN)."""
+
+    id: UUID
+    lojista_name: str
+    catalog_name: str | None
+    total_pecas: int | None
+    status: str
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class OrderListPage:
+    items: list[OrderListItem]
+    total: int
+    page: int
+    page_size: int
+
+    @property
+    def has_prev(self) -> bool:
+        return self.page > 1
+
+    @property
+    def has_next(self) -> bool:
+        return self.page * self.page_size < self.total
+
+
+async def list_orders(
+    db: AsyncSession,
+    brand_id: UUID,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+) -> OrderListPage:
+    """Página de pedidos da brand, mais recentes primeiro.
+
+    LEFT JOIN com Catalog para trazer o nome do catálogo de origem
+    quando `Order.catalog_id` está preenchido.
+    """
+    page = max(page, 1)
+    offset = (page - 1) * page_size
+
+    total = await db.scalar(
+        select(func.count(Order.id)).where(Order.brand_id == brand_id)
+    )
+
+    stmt = (
+        select(
+            Order.id,
+            Order.lojista_name,
+            Order.total_pecas,
+            Order.status,
+            Order.created_at,
+            Catalog.name.label("catalog_name"),
+        )
+        .outerjoin(Catalog, Order.catalog_id == Catalog.id)
+        .where(Order.brand_id == brand_id)
+        .order_by(Order.created_at.desc())
+        .limit(page_size)
+        .offset(offset)
+    )
+    rows = (await db.execute(stmt)).all()
+    items = [
+        OrderListItem(
+            id=row.id,
+            lojista_name=row.lojista_name or "Lojista não identificada",
+            catalog_name=row.catalog_name,
+            total_pecas=row.total_pecas,
+            status=row.status,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+    return OrderListPage(
+        items=items,
+        total=int(total or 0),
+        page=page,
+        page_size=page_size,
+    )
+
+
+async def get_order_status(
+    db: AsyncSession,
+    order_id: UUID,
+    brand_id: UUID,
+) -> str | None:
+    """Status atual de um pedido (None se outro tenant / inexistente)."""
+    stmt = select(Order.status).where(
+        Order.id == order_id, Order.brand_id == brand_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+# ──────────────────────────────────────────────
+#  Detalhe do pedido
+# ──────────────────────────────────────────────
+
+
+@dataclass(slots=True)
+class OrderDetail:
+    """Conjunto coeso de tudo que a tela de detalhe precisa."""
+
+    order: Order
+    catalog_name: str | None
+    romaneio: Romaneio | None
+
+
+async def get_order_detail(
+    db: AsyncSession,
+    order_id: UUID,
+    brand_id: UUID,
+) -> OrderDetail | None:
+    """Carrega o Order com items + romaneio (1:1) eager e o nome do catálogo."""
+    stmt = (
+        select(Order)
+        .where(Order.id == order_id, Order.brand_id == brand_id)
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.romaneio),
+        )
+    )
+    order = (await db.execute(stmt)).scalar_one_or_none()
+    if order is None:
+        return None
+
+    catalog_name: str | None = None
+    if order.catalog_id is not None:
+        catalog_name = await db.scalar(
+            select(Catalog.name).where(Catalog.id == order.catalog_id)
+        )
+
+    return OrderDetail(
+        order=order,
+        catalog_name=catalog_name,
+        romaneio=order.romaneio,
+    )
+
+
+# ──────────────────────────────────────────────
+#  Agrupamento de items para a tabela do detalhe
+# ──────────────────────────────────────────────
+
+
+@dataclass(slots=True)
+class ColorRow:
+    """Uma linha (SKU x cor) com quantidades por tamanho."""
+
+    color_index: int
+    color_hex: str | None
+    qty_by_size: dict[str, int]
+    total: int
+
+
+@dataclass(slots=True)
+class GroupedProduct:
+    """Um SKU agrupado, com suas cores e totais."""
+
+    sku: str
+    product_name: str
+    unit_price: object  # Decimal | None — evita import top-level
+    color_rows: list[ColorRow]
+    sizes_seen: list[str]
+    total_pecas: int
+    subtotal: object  # Decimal | None
+
+
+def group_items_by_sku(
+    items: list[OrderItem],
+    *,
+    canonical_size_order: tuple[str, ...] = ("PP", "P", "M", "G", "GG", "XG"),
+) -> list[GroupedProduct]:
+    """Agrupa items por SKU → cor → tamanho.
+
+    Devolve uma lista pronta para o template renderizar:
+    - `sizes_seen` é a ordem canônica filtrada pelos tamanhos presentes.
+    - `color_rows` é uma linha por cor, com `qty_by_size` populado e
+      `total` somando todas as quantidades daquela cor.
+    - `total_pecas` e `subtotal` somam tudo do SKU.
+    """
+    from decimal import Decimal
+
+    by_sku: dict[str, list[OrderItem]] = {}
+    for item in items:
+        by_sku.setdefault(item.sku, []).append(item)
+
+    grouped: list[GroupedProduct] = []
+    for sku, sku_items in by_sku.items():
+        # Tamanhos presentes nesse SKU, na ordem canônica.
+        present_sizes = {it.size for it in sku_items}
+        ordered_sizes = [s for s in canonical_size_order if s in present_sizes]
+        # Tamanhos fora da ordem canônica entram no final (ex.: "U" único).
+        for s in present_sizes - set(ordered_sizes):
+            ordered_sizes.append(s)
+
+        # Agrupa por cor.
+        by_color: dict[int, list[OrderItem]] = {}
+        for it in sku_items:
+            by_color.setdefault(it.color_index, []).append(it)
+
+        color_rows: list[ColorRow] = []
+        for color_index in sorted(by_color):
+            color_items = by_color[color_index]
+            qty_by_size = dict.fromkeys(ordered_sizes, 0)
+            for it in color_items:
+                qty_by_size[it.size] = qty_by_size.get(it.size, 0) + it.quantity
+            color_rows.append(
+                ColorRow(
+                    color_index=color_index,
+                    color_hex=color_items[0].color_hex,
+                    qty_by_size=qty_by_size,
+                    total=sum(qty_by_size.values()),
+                )
+            )
+
+        total_pecas = sum(row.total for row in color_rows)
+        unit_price = next(
+            (it.unit_price for it in sku_items if it.unit_price is not None),
+            None,
+        )
+        subtotal: Decimal | None
+        if unit_price is not None:
+            subtotal = unit_price * total_pecas
+        else:
+            subtotal = None
+
+        product_name = next(
+            (it.product_name for it in sku_items if it.product_name),
+            sku,
+        ) or sku
+
+        grouped.append(
+            GroupedProduct(
+                sku=sku,
+                product_name=product_name,
+                unit_price=unit_price,
+                color_rows=color_rows,
+                sizes_seen=ordered_sizes,
+                total_pecas=total_pecas,
+                subtotal=subtotal,
+            )
+        )
+
+    # Ordena por nome do produto pra UX consistente.
+    grouped.sort(key=lambda g: g.product_name)
+    return grouped

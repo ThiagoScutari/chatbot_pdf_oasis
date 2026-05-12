@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}{{ detail.order.lojista_name or "Pedido" }} — CatalogFlow{% endblock %}
+
+{% block content %}
+{% set order = detail.order %}
+{% set order_id = order.id %}
+{% set status = order.status %}
+
+<nav class="breadcrumb"><a href="/orders">← Pedidos</a></nav>
+
+<section class="detail-header">
+  <div>
+    <div class="detail-title-row">
+      <h1>{{ order.lojista_name or "Lojista não identificada" }}</h1>
+      {% include "orders/_badge.html" %}
+    </div>
+    <p class="metadata-strip">
+      {% if detail.catalog_name %}Catálogo: {{ detail.catalog_name }} · {% endif %}
+      {{ grouped|length }} ref{{ "" if grouped|length == 1 else "s" }} ·
+      {% if order.total_pecas is not none %}{{ order.total_pecas }} peças{% else %}— peças{% endif %}
+      {% if order.valor_total is not none %}
+        · R$ {{ "%.2f"|format(order.valor_total)|replace(",", "X")|replace(".", ",")|replace("X", ".") }}
+      {% endif %}
+    </p>
+  </div>
+</section>
+
+{% include "orders/_romaneio_action.html" %}
+
+<section>
+  <h2 class="section-title">Itens do pedido</h2>
+
+  {% if grouped %}
+
+    <!-- ── Mobile: card por SKU ── -->
+    <div class="mobile-list">
+      {% for prod in grouped %}
+      <div class="item-card">
+        <div class="item-head">
+          <span class="item-name">{{ prod.product_name }}</span>
+          <span class="item-sku">{{ prod.sku }}</span>
+        </div>
+
+        {% for color in prod.color_rows %}
+        {% if prod.color_rows|length > 1 %}
+        <div class="color-label">
+          <span class="swatch-dot"
+                {% if color.color_hex %}style="background:{{ color.color_hex }}"{% endif %}
+          ></span>
+          Cor {{ color.color_index }}
+        </div>
+        {% endif %}
+        <div class="size-grid">
+          <div class="size-row">
+            {% for size in prod.sizes_seen %}
+              <div class="size-cell head">{{ size }}</div>
+            {% endfor %}
+          </div>
+          <div class="size-row">
+            {% for size in prod.sizes_seen %}
+              <div class="size-cell">{{ color.qty_by_size.get(size, 0) }}</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+
+        <div class="item-totals">
+          <span class="pecas">{{ prod.total_pecas }} peças</span>
+          {% if prod.subtotal is not none %}
+          <span class="value">
+            R$ {{ "%.2f"|format(prod.subtotal)|replace(",", "X")|replace(".", ",")|replace("X", ".") }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- ── Desktop: tabela tradicional ── -->
+    <div class="desktop-table">
+      {% set all_sizes = [] %}
+      {% for prod in grouped %}
+        {% for size in prod.sizes_seen %}
+          {% if size not in all_sizes %}{% set _ = all_sizes.append(size) %}{% endif %}
+        {% endfor %}
+      {% endfor %}
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Cor</th>
+            {% for size in all_sizes %}
+              <th>{{ size }}</th>
+            {% endfor %}
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for prod in grouped %}
+            {% for color in prod.color_rows %}
+            <tr>
+              <td>{% if loop.first %}{{ prod.product_name }}{% endif %}</td>
+              <td>
+                <span class="swatch-dot"
+                      {% if color.color_hex %}style="background:{{ color.color_hex }}"{% endif %}
+                ></span>
+                Cor {{ color.color_index }}
+              </td>
+              {% for size in all_sizes %}
+                <td>{{ color.qty_by_size.get(size, 0) or "—" }}</td>
+              {% endfor %}
+              <td><strong>{{ color.total }}</strong></td>
+            </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="{{ 2 + all_sizes|length }}" style="text-align: right;">
+              Total
+              {% if order.valor_total is not none %}
+                · R$ {{ "%.2f"|format(order.valor_total)|replace(",", "X")|replace(".", ",")|replace("X", ".") }}
+              {% endif %}
+            </td>
+            <td><strong>{{ order.total_pecas or 0 }}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+  {% else %}
+
+    <div class="empty-state">
+      <p class="empty-body">
+        {% if order.status == "draft" %}
+          Aguarde — o pedido ainda está sendo extraído.
+        {% else %}
+          Nenhum item registrado neste pedido.
+        {% endif %}
+      </p>
+    </div>
+
+  {% endif %}
+</section>
+{% endblock %}

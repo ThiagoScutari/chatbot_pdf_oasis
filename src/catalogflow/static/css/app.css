@@ -44,6 +44,11 @@
   box-sizing: border-box;
 }
 
+/* Evita flash de elementos com x-show=false antes do Alpine carregar. */
+[x-cloak] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -1112,4 +1117,162 @@ p {
     align-items: flex-end;
   }
   .detail-title-row h1 { font-size: 2rem; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Order detail — item cards (mobile) e item table (desktop)
+   ────────────────────────────────────────────────────────────── */
+
+.item-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.item-card .item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.item-card .item-name {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.item-card .item-sku {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.size-grid {
+  display: grid;
+  grid-auto-rows: minmax(0, auto);
+  border-top: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+
+.size-grid .size-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.size-grid .size-cell {
+  padding: var(--space-2);
+  text-align: center;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.92rem;
+}
+
+.size-grid .size-cell.head {
+  background: var(--color-bg);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.color-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin: var(--space-3) 0 var(--space-2);
+  text-transform: uppercase;
+}
+
+.item-totals {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.item-totals .pecas { color: var(--color-text); font-weight: 500; }
+.item-totals .value { color: var(--color-accent); font-weight: 500; }
+
+/* ── Items table (desktop) ───────────────────────────────── */
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.items-table th,
+.items-table td {
+  text-align: center;
+  padding: var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.92rem;
+}
+
+.items-table thead th {
+  border-top: none;
+  background: var(--color-bg);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.items-table th:first-child,
+.items-table td:first-child { text-align: left; }
+
+.items-table tfoot td {
+  background: var(--color-bg);
+  font-weight: 500;
+  border-top: 2px solid var(--color-border);
+}
+
+.swatch-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  vertical-align: middle;
+  margin-right: var(--space-2);
+}
+
+/* ── Romaneio action area ───────────────────────────────── */
+
+.romaneio-action {
+  margin-bottom: var(--space-6);
+}
+
+.romaneio-action .processing-block {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: var(--space-2);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

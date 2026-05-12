@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.models import Catalog
+from catalogflow.modules.orders.models import Order, OrderItem
 from catalogflow.web.auth import SESSION_COOKIE
 
 
@@ -41,6 +42,61 @@ async def sample_catalog(
     await db_session.commit()
     await db_session.refresh(catalog)
     return catalog
+
+
+@pytest_asyncio.fixture
+async def sample_order(
+    db_session: AsyncSession,
+    sample_brand: Brand,
+    sample_catalog: Catalog,
+) -> Order:
+    """Pedido extraído com 2 SKUs e múltiplos tamanhos para testar detalhe."""
+    from decimal import Decimal
+
+    order = Order(
+        brand_id=sample_brand.id,
+        catalog_id=sample_catalog.id,
+        lojista_name="Loja Moda Arte",
+        status="extracted",
+        total_pecas=10,
+        valor_total=Decimal("15980.00"),
+    )
+    db_session.add(order)
+    await db_session.flush()
+    items = [
+        OrderItem(
+            order_id=order.id,
+            sku="0442500941-0",
+            product_name="Vestido Joana",
+            color_index=1,
+            size="PP",
+            quantity=2,
+            unit_price=Decimal("1598.00"),
+        ),
+        OrderItem(
+            order_id=order.id,
+            sku="0442500941-0",
+            product_name="Vestido Joana",
+            color_index=1,
+            size="P",
+            quantity=4,
+            unit_price=Decimal("1598.00"),
+        ),
+        OrderItem(
+            order_id=order.id,
+            sku="0322500004-0",
+            product_name="Jaqueta Berenice",
+            color_index=1,
+            size="M",
+            quantity=4,
+            unit_price=Decimal("3488.00"),
+        ),
+    ]
+    for it in items:
+        db_session.add(it)
+    await db_session.commit()
+    await db_session.refresh(order)
+    return order
 
 
 class TestDashboard:
@@ -203,3 +259,113 @@ class TestCatalogDetail:
         resp = await client.get(f"/catalogs/{other_catalog.id}")
         assert resp.status_code == 404
         assert "Catálogo secreto" not in resp.text
+
+
+# ──────────────────────────────────────────────────────────────
+#  Orders
+# ──────────────────────────────────────────────────────────────
+
+
+class TestOrdersList:
+    async def test_requires_session(self, client: AsyncClient) -> None:
+        resp = await client.get("/orders")
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/login"
+
+    async def test_empty_state(
+        self, client: AsyncClient, sample_api_key: str
+    ) -> None:
+        await _login(client, sample_api_key)
+        resp = await client.get("/orders")
+        assert resp.status_code == 200
+        assert "Nenhum pedido ainda" in resp.text
+
+    async def test_renders_orders(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_order: Order,
+    ) -> None:
+        await _login(client, sample_api_key)
+        resp = await client.get("/orders")
+        assert resp.status_code == 200
+        body = resp.text
+        assert sample_order.lojista_name is not None
+        assert sample_order.lojista_name in body
+        # Nome do catálogo via JOIN.
+        assert "Inverno 26 MOTION" in body
+
+
+class TestOrderDetail:
+    async def test_requires_session(self, client: AsyncClient) -> None:
+        bogus = uuid4()
+        resp = await client.get(f"/orders/{bogus}")
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/login"
+
+    async def test_unknown_id_returns_friendly_404(
+        self, client: AsyncClient, sample_api_key: str
+    ) -> None:
+        await _login(client, sample_api_key)
+        bogus = uuid4()
+        resp = await client.get(f"/orders/{bogus}")
+        assert resp.status_code == 404
+        assert "text/html" in resp.headers.get("content-type", "")
+        assert "Pedido não encontrado" in resp.text
+
+    async def test_detail_renders_grouped_items(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_order: Order,
+    ) -> None:
+        await _login(client, sample_api_key)
+        resp = await client.get(f"/orders/{sample_order.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        # Header
+        assert sample_order.lojista_name is not None
+        assert sample_order.lojista_name in body
+        # Produtos agrupados
+        assert "Vestido Joana" in body
+        assert "Jaqueta Berenice" in body
+        # Tamanhos presentes
+        assert "PP" in body and ">P<" in body and "M" in body
+        # Botão para gerar romaneio (estado absent — sample_order não tem romaneio)
+        assert "Gerar romaneio" in body
+
+    async def test_detail_isolates_other_brand(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        db_session: AsyncSession,
+    ) -> None:
+        from catalogflow.modules.auth import service as auth_service
+
+        other = await auth_service.create_brand(
+            db_session, slug="outra2", name="Outra Marca 2"
+        )
+        await db_session.commit()
+        other_order = Order(
+            brand_id=other.id,
+            lojista_name="Loja Secreta",
+            status="extracted",
+        )
+        db_session.add(other_order)
+        await db_session.commit()
+        await db_session.refresh(other_order)
+
+        await _login(client, sample_api_key)
+        resp = await client.get(f"/orders/{other_order.id}")
+        assert resp.status_code == 404
+        assert "Loja Secreta" not in resp.text
+
+
+class TestOrderBadgeFragment:
+    async def test_badge_unknown_returns_404(
+        self, client: AsyncClient, sample_api_key: str
+    ) -> None:
+        await _login(client, sample_api_key)
+        bogus = uuid4()
+        resp = await client.get(f"/orders/{bogus}/_badge")
+        assert resp.status_code == 404

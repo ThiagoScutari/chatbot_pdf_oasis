@@ -503,3 +503,216 @@ async def catalog_download(
         message=err.get("message")
         or "O catálogo ainda não está pronto para download.",
     )
+
+
+# ═════════════════════════════════════════════════════════════
+#  ORDERS — lista, detalhe e ação do romaneio
+# ═════════════════════════════════════════════════════════════
+
+
+@router.get("/orders", response_class=HTMLResponse)
+async def orders_list(
+    request: Request,
+    page: int = 1,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Lista paginada de pedidos da brand."""
+    order_page = await data.list_orders(db, brand.id, page=page)
+    return templates.TemplateResponse(
+        request,
+        "orders/list.html",
+        {"brand": brand, "page": order_page},
+    )
+
+
+@router.get("/orders/{order_id}/_badge", response_class=HTMLResponse)
+async def order_badge(
+    request: Request,
+    order_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Fragmento de badge — polling em pedidos com status draft."""
+    current_status = await data.get_order_status(db, order_id, brand.id)
+    if current_status is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+    return templates.TemplateResponse(
+        request,
+        "orders/_badge.html",
+        {"order_id": order_id, "status": current_status},
+    )
+
+
+def _classify_romaneio_state(detail: data.OrderDetail) -> str:
+    """Mapeia o estado do romaneio para o template `_romaneio_action`.
+
+    Retorna:
+      - "ready":      romaneio existe e tem output_key (PDF pronto).
+      - "processing": romaneio existe sem output_key (job em andamento).
+      - "absent":     nenhum romaneio ainda — usuário precisa disparar.
+    """
+    rom = detail.romaneio
+    if rom is None:
+        return "absent"
+    if rom.output_key:
+        return "ready"
+    return "processing"
+
+
+@router.get("/orders/{order_id}", response_class=HTMLResponse)
+async def order_detail(
+    request: Request,
+    order_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Detalhe do pedido — items agrupados por SKU/cor + ação do romaneio."""
+    detail = await data.get_order_detail(db, order_id, brand.id)
+    if detail is None:
+        return _render_not_found(
+            request,
+            title="Pedido não encontrado",
+            message="Este pedido pode ter sido removido ou nunca existiu.",
+        )
+
+    grouped = data.group_items_by_sku(list(detail.order.items))
+    return templates.TemplateResponse(
+        request,
+        "orders/detail.html",
+        {
+            "detail": detail,
+            "grouped": grouped,
+            "romaneio_state": _classify_romaneio_state(detail),
+            "auto_download": False,
+        },
+    )
+
+
+# ──────────────────────────────────────────────
+#  Romaneio actions (HTMX)
+# ──────────────────────────────────────────────
+
+
+async def _hit_romaneio_endpoint(
+    request: Request,
+    order_id: UUID,
+    api_key: str,
+) -> httpx.Response:
+    """Chama GET /api/v1/orders/{id}/romaneio (que dispara/retorna conforme estado)."""
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://internal",
+        headers={"Authorization": f"Bearer {api_key}"},
+        follow_redirects=False,
+    ) as client:
+        return await client.get(
+            f"/api/v1/orders/{order_id}/romaneio",
+            timeout=60.0,
+        )
+
+
+async def _render_romaneio_fragment(
+    request: Request,
+    order_id: UUID,
+    brand: Brand,
+    db: AsyncSession,
+    *,
+    auto_download: bool = False,
+) -> HTMLResponse:
+    """Renderiza `_romaneio_action.html` com o estado atual do romaneio."""
+    detail = await data.get_order_detail(db, order_id, brand.id)
+    if detail is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+    return templates.TemplateResponse(
+        request,
+        "orders/_romaneio_action.html",
+        {
+            "order": detail.order,
+            "romaneio_state": _classify_romaneio_state(detail),
+            "auto_download": auto_download,
+        },
+    )
+
+
+@router.post("/orders/{order_id}/romaneio", response_class=HTMLResponse)
+async def order_romaneio_kick(
+    request: Request,
+    order_id: UUID,
+    api_key: str = Depends(require_session),
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Dispara geração do romaneio via API e devolve o fragmento de polling.
+
+    A API expõe apenas `GET /orders/{id}/romaneio` — o GET enfileira o
+    job quando necessário. Aqui usamos um POST para que o botão do
+    front fique semanticamente correto, e por baixo chamamos o GET.
+    """
+    await _hit_romaneio_endpoint(request, order_id, api_key)
+    return await _render_romaneio_fragment(request, order_id, brand, db)
+
+
+@router.get("/orders/{order_id}/romaneio/poll", response_class=HTMLResponse)
+async def order_romaneio_poll(
+    request: Request,
+    order_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Fragmento de polling do romaneio (chamado a cada 2s pelo HTMX).
+
+    Se o estado virou `ready`, inclui um script que dispara o download
+    automaticamente na primeira ocorrência (`auto_download=True`).
+    """
+    detail = await data.get_order_detail(db, order_id, brand.id)
+    if detail is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+    state = _classify_romaneio_state(detail)
+    return templates.TemplateResponse(
+        request,
+        "orders/_romaneio_action.html",
+        {
+            "order": detail.order,
+            "romaneio_state": state,
+            "auto_download": state == "ready",
+        },
+    )
+
+
+@router.get("/orders/{order_id}/romaneio/download")
+async def order_romaneio_download(
+    request: Request,
+    order_id: UUID,
+    api_key: str = Depends(require_session),
+) -> Response:
+    """Proxy do download do romaneio.
+
+    Em dev a API devolve os bytes do PDF; em produção devolve 302 para
+    presigned URL. Em ambos os casos repassamos para o browser.
+    """
+    api_resp = await _hit_romaneio_endpoint(request, order_id, api_key)
+
+    if api_resp.status_code == 302:
+        location = api_resp.headers.get("location", "")
+        return RedirectResponse(url=location, status_code=status.HTTP_302_FOUND)
+
+    if api_resp.status_code == 200:
+        return Response(
+            content=api_resp.content,
+            media_type=api_resp.headers.get("content-type", "application/pdf"),
+            headers={
+                "Content-Disposition": api_resp.headers.get(
+                    "content-disposition",
+                    f'attachment; filename="romaneio-{order_id}.pdf"',
+                ),
+            },
+        )
+
+    # 202 (enfileirado) ou outro — não é um download válido neste ponto.
+    return _render_not_found(
+        request,
+        title="Romaneio indisponível",
+        message="O romaneio ainda não está pronto para download.",
+    )
