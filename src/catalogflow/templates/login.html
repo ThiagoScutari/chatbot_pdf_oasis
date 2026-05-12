@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Entrar — CatalogFlow{% endblock %}
+
+{# Página isolada: sem header de navegação. #}
+{% block shell %}{% endblock %}
+
+{% block content %}
+<div class="login-screen">
+  <div class="login-card">
+    <h1 class="login-title">OASIS Resortwear</h1>
+    <p class="login-sub">CatalogFlow</p>
+
+    <form method="post" action="/login" novalidate>
+      <div class="field">
+        <label for="api_key">Sua chave de acesso</label>
+        <input
+          id="api_key"
+          name="api_key"
+          type="password"
+          autocomplete="current-password"
+          spellcheck="false"
+          autocapitalize="off"
+          placeholder="cf_______________________"
+          required
+          autofocus
+        >
+      </div>
+
+      {% if error %}
+      <p class="field-error" role="alert">{{ error }}</p>
+      {% endif %}
+
+      <button type="submit" class="btn-primary btn-block">Entrar &rarr;</button>
+    </form>
+
+    <p class="login-hint">
+      Precisa de acesso? Fale com o administrador do sistema.
+    </p>
+  </div>
+</div>
+{% endblock %}

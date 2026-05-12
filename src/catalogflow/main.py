@@ -11,12 +11,14 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from catalogflow.infra import cache, database
 from catalogflow.infra.settings import Settings, get_settings
@@ -27,6 +29,7 @@ from catalogflow.shared.errors import DomainError
 from catalogflow.shared.jobs_router import router as jobs_router
 from catalogflow.shared.middleware import RequestIdMiddleware, get_request_id
 from catalogflow.shared.responses import error_response, ok
+from catalogflow.web.router import router as web_router
 
 logger = logging.getLogger(__name__)
 
@@ -286,6 +289,15 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     app.include_router(catalog_router)
     app.include_router(orders_router)
     app.include_router(jobs_router)
+
+    # ── Web UI (Sprint 03) — assets estáticos + páginas HTML
+    static_dir = Path(__file__).resolve().parent / "static"
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(static_dir)),
+        name="static",
+    )
+    app.include_router(web_router)
 
     logger.info(
         "app: ready (env=%s, cors=%s)",
