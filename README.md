@@ -60,17 +60,81 @@ curl -L -H "Authorization: Bearer $CATALOGFLOW_API_KEY" \
 
 ---
 
-## Endpoints (Sprint 01)
+## Fluxo completo (Sprint 02)
+
+Ciclo ponta a ponta: catálogo → PDF editável → preenchimento pela lojista
+→ extração → romaneio. Cada passo é assíncrono (retorna `job_id` para
+polling). `Bearer cf_*` em todos os endpoints.
+
+```bash
+export API="http://localhost:8000/api/v1"
+export KEY="cf_xxxxx"
+
+# ── 1) Submete o catálogo PDF visual
+curl -X POST "$API/catalogs/process" \
+  -H "Authorization: Bearer $KEY" \
+  -F "file=@catalogo.pdf" \
+  -F "name=Inverno 26 MOTION"
+# → 202 { data: { catalog_id, job_id, poll_url: "/api/v1/jobs/..." } }
+
+# ── 2) Polling do job de processamento (até status="success")
+curl -H "Authorization: Bearer $KEY" "$API/jobs/$JOB_ID"
+
+# ── 3) Download do PDF editável (com campos AcroForm injetados)
+curl -L -H "Authorization: Bearer $KEY" \
+  -o editavel.pdf \
+  "$API/catalogs/$CATALOG_ID/download"
+# → Lojista preenche os campos no Adobe Reader / Foxit / Xodo
+
+# ── 4) Lojista devolve o PDF preenchido. A gerente faz upload:
+curl -X POST "$API/orders/extract" \
+  -H "Authorization: Bearer $KEY" \
+  -F "file=@preenchido.pdf" \
+  -F "catalog_id=$CATALOG_ID" \
+  -F "lojista_name=Loja Moda e Arte"
+# → 202 { data: { order_id, job_id, poll_url } }
+# Sem catalog_id também funciona — items não serão enriquecidos.
+
+# ── 5) Polling até a extração completar
+curl -H "Authorization: Bearer $KEY" "$API/jobs/$ORDER_JOB_ID"
+
+# ── 6) Pedido estruturado (items, totais, lojista)
+curl -H "Authorization: Bearer $KEY" "$API/orders/$ORDER_ID"
+
+# ── 7) Romaneio PDF.
+#   - Se ainda não gerado: 202 com job_id (a geração começa em background).
+#   - Quando pronto: 302 redirect para presigned URL.
+curl -L -H "Authorization: Bearer $KEY" \
+  -o romaneio.pdf \
+  "$API/orders/$ORDER_ID/romaneio"
+```
+
+**Erros relevantes:**
+
+- `INVALID_FILE_TYPE` (400) — arquivo não é PDF.
+- `FILE_TOO_LARGE` (400) — passou de `MAX_PDF_SIZE_MB`.
+- `PDF_FLATTENED` (422) — PDF veio sem `/AcroForm` (foi impresso como PDF
+  em vez de "Salvar como PDF"). Erro **permanente** — Celery não tenta
+  de novo.
+- `CATALOG_NOT_FOUND` / `ORDER_NOT_FOUND` (404) — recurso não pertence à
+  brand autenticada. Não vaza existência.
+
+---
+
+## Endpoints
 
 | Método | Caminho | Auth | Descrição |
 |---|---|---|---|
-| `GET` | `/api/v1/health` | público | Status da API + dependências |
-| `POST` | `/api/v1/catalogs/process` | `Bearer cf_*` | Submete catálogo PDF para processamento (multipart) |
+| `GET` | `/api/v1/health` | público | Status + contagem de jobs pendentes por tipo |
+| `POST` | `/api/v1/catalogs/process` | `Bearer cf_*` | Submete catálogo PDF (multipart) |
 | `GET` | `/api/v1/catalogs/{id}` | `Bearer cf_*` | Metadados + produtos detectados |
 | `GET` | `/api/v1/catalogs/{id}/download` | `Bearer cf_*` | 302 → presigned URL do PDF editável |
-| `GET` | `/api/v1/jobs/{id}` | `Bearer cf_*` | Polling de status de job assíncrono |
+| `POST` | `/api/v1/orders/extract` | `Bearer cf_*` | Submete PDF preenchido para extração |
+| `GET` | `/api/v1/orders/{id}` | `Bearer cf_*` | Pedido completo (items + totais) |
+| `GET` | `/api/v1/orders/{id}/romaneio` | `Bearer cf_*` | 302 → romaneio quando pronto; 202 + job_id em andamento |
+| `GET` | `/api/v1/jobs/{id}` | `Bearer cf_*` | Polling — reconhece `catalog.process`, `order.extract`, `romaneio.generate` |
 | `POST` | `/internal/brands` | `X-Internal-Secret` | Cria nova brand (admin) |
-| `POST` | `/internal/brands/{id}/api-keys` | `X-Internal-Secret` | Cria API key (raw_key retornado uma única vez) |
+| `POST` | `/internal/brands/{id}/api-keys` | `X-Internal-Secret` | Cria API key (raw retornado uma única vez) |
 
 OpenAPI completo em <http://localhost:8000/api/v1/docs> (apenas em
 `ENVIRONMENT != production`).

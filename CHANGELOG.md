@@ -5,6 +5,148 @@ versionamento [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.2.0] — Sprint 02: Order extraction + Romaneio
+
+Fecha o ciclo de pedido ponta a ponta. Quando uma lojista preenche o PDF
+editável gerado na Sprint 01 e devolve, o sistema extrai os campos, estrutura
+o pedido (com enriquecimento opcional via `catalog_id`) e gera o romaneio
+PDF profissional. Toda a parte de extração/geração é função pura (bytes-in,
+bytes-out) — I/O fica confinado nos services.
+
+### Added — Schema & migrations (Fase A)
+
+- Migration `0003_orders_schema.py` (reversível) criando `orders`,
+  `order_items` (UNIQUE `(order_id, sku, color_index, size)` + CHECK
+  `quantity > 0`), `romaneios` (UNIQUE `order_id` para 1:1) e a coluna
+  `brands.logo_key` (S3 key da logo da marca, opcional).
+- `auth/models.Brand.logo_key: Mapped[str | None]`.
+- Índices: `idx_orders_brand_id`, `idx_orders_catalog_id`,
+  `idx_order_items_order_id`, `idx_romaneios_brand_id`.
+
+### Added — Fixtures de pedido (Fase B)
+
+- `tests/fixtures/generate_order_fixtures.py` reusa `PDFAnalyzer` +
+  `FieldInjector` da Sprint 01 e produz 6 fixtures determinísticas:
+  `pedido_preenchido_v2.pdf`, `pedido_preenchido_v1.pdf` (legado),
+  `pedido_campos_vazios.pdf`, `pedido_valores_invalidos.pdf`,
+  `pedido_flattened.pdf` (sem `/AcroForm`), `pedido_mixed_v1_v2.pdf`.
+- Validado que `widget.field_name = ...` + `widget.update()` no PyMuPDF
+  persiste rename para gerar v1 a partir de v2.
+
+### Added — Extractor + Normalizer (Fase C)
+
+- `orders/extractor.py` — `OrderExtractor` puro (`bytes → RawOrderData`):
+  regex v2 (`qty__SKU__corN__TAM`) tentado antes do v1
+  (`qty__SKU__TAM`, color_index=1); valores não-numéricos/float/negativos/
+  zero descartados silenciosamente; PDF sem `/AcroForm` levanta
+  `PDFFlattenedError`. Helpers `_parse_quantity`, `_parse_field_name`,
+  `_consolidate_source_format` testáveis isoladamente.
+- `orders/normalizer.py` — `OrderNormalizer` puro: agrega duplicatas em
+  `(sku, color_index, size)`, enriquece via `CatalogProduct` (nome, preço,
+  hex do swatch), warnings para SKU órfão, totais (peças, valor, n_skus),
+  ordenação por `page_index` quando catálogo disponível.
+- `orders/{models,schemas}.py` — Order/OrderItem SQLAlchemy 2.0 com
+  selectinload-friendly relationship; schemas Pydantic v2
+  (`OrderResponse`, `OrderTotals`, `ExtractOrderResponse`,
+  `RomaneioStatusResponse`).
+
+### Added — RomaneioBuilder (Fase D)
+
+- `romaneio/models.py` — `Romaneio` 1:1 com `Order`. `Order.romaneio`
+  back_populates via string forward reference (padrão SQLAlchemy 2.0).
+- `romaneio/builder.py` — `RomaneioBuilder` puro (`OrderData + Config →
+  bytes`): cabeçalho com logo opcional (`page.insert_image(stream=)`),
+  faixa brand, lojista, data em pt-BR; bloco por SKU com grid cor x
+  tamanho; paginação automática com cabeçalho repetido; totalizador
+  final. Formato monetário pt-BR via string mangling (sem
+  `locale.setlocale`); `format_currency` e `format_date_pt_br` exportados.
+
+### Added — Services + tasks (Fase E)
+
+- `orders/service.OrderService`: `create_order` valida MIME/tamanho/
+  catalog cross-tenant, `get_order` (selectinload),
+  `process_order` (download → extract → normalize → persist).
+- `orders/tasks.extract_order_task`: `PDFFlattenedError` é tratado como
+  **permanente** e NÃO dispara `self.retry()` (Armadilha #3 do PRD);
+  erros transitórios sobem com backoff exponencial `60s × 2^n`.
+- `romaneio/service.RomaneioService`: `generate_romaneio` reaproveita
+  Romaneio existente (UNIQUE `order_id`); `process_romaneio` baixa logo
+  do storage se `brand.logo_key`, constrói PDF e faz upload com chave
+  `{brand}/orders/{order}/romaneio.pdf`; `get_download_url` retorna
+  presigned URL.
+- `romaneio/tasks.generate_romaneio_task` com retry exponencial para
+  todos os erros (geração sem classe "permanente" — falhas de
+  storage/builder são por natureza transientes).
+
+### Added — Routers + health (Fase F)
+
+- `orders/router.py` montado em `main.py`:
+  - `POST /api/v1/orders/extract` (202) — multipart upload, valida e
+    enfileira `order.extract`.
+  - `GET /api/v1/orders/{id}` (200) — order completo com items + totals.
+  - `GET /api/v1/orders/{id}/romaneio` — 302 redirect para presigned URL
+    quando pronto; 202 com `job_id` em andamento ou enfileira nova
+    geração.
+- `GET /api/v1/health` estendido com contagens `jobs.{catalog_pending,
+  order_pending, romaneio_pending}` — útil para dashboards e alertas.
+- `shared/jobs_router.py` já era genérico — reconhece automaticamente
+  `order.extract` e `romaneio.generate`.
+
+### Added — Tests (Sprint 02)
+
+- 34 testes em `orders/tests/test_extractor.py` cobrindo todas as 6
+  fixtures + edge cases + funções puras + pureza.
+- 18 testes em `orders/tests/test_normalizer.py` (sem/com catálogo,
+  warnings, agregação, totais, ordenação, source_format propagation).
+- 24 testes em `romaneio/tests/test_builder.py` (PDF válido, conteúdo
+  textual, logo presente/ausente/corrompida, paginação, sem preço, sem
+  itens, helpers de formato).
+- 11 testes em `orders/tests/test_service.py` (criação, validação,
+  isolamento, processo, PDF flatten, race condition).
+- 15 testes em `romaneio/tests/test_service.py` (generate, process com/
+  sem logo, get_download_url, isolamento, bookkeeping).
+- 13 testes em `orders/tests/test_router.py` (HTTP integration via
+  httpx — auth, MIME, size, isolamento, romaneio endpoint redirects).
+- 10 testes em `*/tests/test_tasks.py` cobrindo o wrapper Celery de
+  catalog/orders/romaneio (resolve dívida da Armadilha #5 do PRD).
+- `tests/integration/test_order_pipeline.py` cobre o pipeline ponta a
+  ponta: catalog → fill widgets → extract → romaneio → download.
+- `_TABLES_TO_TRUNCATE` em `conftest.py` agora inclui `romaneios`,
+  `order_items`, `orders` (ordem dependência-respeitada).
+
+### Fixed / Infra
+
+- `alembic.ini` ganhou `path_separator = os` — silencia
+  `DeprecationWarning` introduzido em Alembic 1.14+ que era promovido
+  a erro pelo `filterwarnings = ["error", ...]` do pyproject.
+- Singleton de `infra.storage._storage` continua respeitando
+  `dispose_engine` em testes — testcontainer não vaza entre runs.
+
+### Decisões registradas
+
+- **`PDFFlattenedError` permanente** — Erro de dados: novo retry não
+  recupera. Estado de erro gravado no `Order` e no `Job` antes da
+  exceção subir, garantindo observabilidade mesmo sem retry.
+- **Builder com `(order_data, config)`** — Mantém a assinatura do PRD;
+  `RomaneioConfig` mescla branding (logo, brand_name) e contexto do
+  pedido (lojista_name, emitted_at), simplificando a chamada do service.
+- **Catálogo opcional** — `process_order` sem `catalog_id` produz items
+  sem enriquecimento (`product_name` / `unit_price` = `None`), conforme
+  PRD. Romaneio funciona com totais sem valor monetário.
+- **Logo opcional + fail-soft** — Download da logo do storage com
+  `try/except`: logo corrompida ou ausente cai pro cabeçalho textual,
+  nunca derruba a geração do romaneio.
+
+### Next (Sprint 03 — preview)
+
+- Webhook de notificação (`catalog.ready`, `order.extracted`,
+  `romaneio.ready`).
+- Módulo `stock` com `StockAdapter` (Fase 2 do roadmap).
+- Web UI mínima (upload + status + download).
+- Módulo `User` com login/senha.
+
+---
+
 ## [0.1.0] — 2026-05-11 — Sprint 01: Foundation
 
 Primeira sprint do CatalogFlow. Entrega a fundação completa do projeto e o

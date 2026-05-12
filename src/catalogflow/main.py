@@ -22,6 +22,7 @@ from catalogflow.infra import cache, database
 from catalogflow.infra.settings import Settings, get_settings
 from catalogflow.modules.auth.router import router as auth_router
 from catalogflow.modules.catalog.router import router as catalog_router
+from catalogflow.modules.orders.router import router as orders_router
 from catalogflow.shared.errors import DomainError
 from catalogflow.shared.jobs_router import router as jobs_router
 from catalogflow.shared.middleware import RequestIdMiddleware, get_request_id
@@ -148,14 +149,50 @@ async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResp
 # ──────────────────────────────────────────────
 
 
+async def _count_pending_jobs() -> dict[str, int]:
+    """Contagem de jobs em `pending` por tipo — usada pelo healthcheck.
+
+    Não é parte do health "estrito" (não derruba o status), apenas
+    observabilidade. Falha silenciosamente devolvendo zeros se o DB
+    estiver indisponível — o status do DB já é refletido em outro campo.
+    """
+    from sqlalchemy import func, select
+
+    from catalogflow.modules.catalog.models import Job
+
+    counts = {"catalog_pending": 0, "order_pending": 0, "romaneio_pending": 0}
+    type_to_key = {
+        "catalog.process": "catalog_pending",
+        "order.extract": "order_pending",
+        "romaneio.generate": "romaneio_pending",
+    }
+    try:
+        factory = database.get_session_factory()
+        async with factory() as session:
+            stmt = (
+                select(Job.job_type, func.count(Job.id))
+                .where(Job.status == "pending")
+                .group_by(Job.job_type)
+            )
+            result = await session.execute(stmt)
+            for job_type, n in result.all():
+                key = type_to_key.get(job_type)
+                if key:
+                    counts[key] = int(n)
+    except Exception:
+        # observabilidade não pode derrubar /health — log e segue
+        logger.exception("health: pending-jobs count failed")
+    return counts
+
+
 async def _health(request: Request) -> JSONResponse:
     """Healthcheck sondando dependências.
 
     Retorna 200 com `success=true` quando tudo OK; 503 quando alguma
-    dependência respondeu erro. O probe `/health` do orquestrador usa o
-    status HTTP, e dashboards usam o payload.
+    dependência respondeu erro. O payload também traz contagens de jobs
+    pendentes por tipo — útil para dashboards e alertas.
     """
-    payload: dict[str, str] = {"status": "ok"}
+    payload: dict[str, object] = {"status": "ok"}
     http_status = status.HTTP_200_OK
 
     try:
@@ -175,6 +212,9 @@ async def _health(request: Request) -> JSONResponse:
         payload["redis"] = "error"
         payload["status"] = "degraded"
         http_status = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    # Pending-jobs por tipo (sempre presente; zeros quando DB falhou).
+    payload["jobs"] = await _count_pending_jobs()
 
     envelope = ok(payload, request_id=get_request_id(request))
     return JSONResponse(status_code=http_status, content=envelope.model_dump(mode="json"))
@@ -244,6 +284,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     # ── Routers de domínio
     app.include_router(auth_router)
     app.include_router(catalog_router)
+    app.include_router(orders_router)
     app.include_router(jobs_router)
 
     logger.info(

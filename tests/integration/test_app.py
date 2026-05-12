@@ -27,7 +27,16 @@ class TestHealth:
         assert resp.status_code == 200
         body = resp.json()
         assert body["success"] is True
-        assert body["data"] == {"status": "ok", "db": "ok", "redis": "ok"}
+        data = body["data"]
+        assert data["status"] == "ok"
+        assert data["db"] == "ok"
+        assert data["redis"] == "ok"
+        # Sprint 02 — contagens de jobs pendentes por tipo.
+        assert data["jobs"] == {
+            "catalog_pending": 0,
+            "order_pending": 0,
+            "romaneio_pending": 0,
+        }
         assert body["error"] is None
         assert _UUID_RE.match(body["meta"]["request_id"])
         assert "timestamp" in body["meta"]
