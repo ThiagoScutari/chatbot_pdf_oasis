@@ -213,15 +213,32 @@ class CatalogService:
 
         catalog.status = "processing"
         await self.db.flush()
+        # Commit imediato pra que o polling do front (sessão separada) veja
+        # status=processing e Job.progress=10 em vez de pending/0 durante
+        # toda a duração do pipeline.
+        await self.db.commit()
 
         try:
             pdf_bytes = await self.storage.download(catalog.source_key)
+
+            # ── Análise: SKUs, preços, swatches.
             metadata = self.analyzer.analyze(pdf_bytes)
+            await self._update_progress(job_id, 40)
+
+            # ── Persistência dos produtos detectados.
+            await self._persist_products(catalog.id, metadata)
+            await self._update_progress(job_id, 60)
+
+            # ── Injeção dos campos AcroForm no PDF.
             output_bytes = self.injector.inject(pdf_bytes, metadata)
+            await self._update_progress(job_id, 80)
+
+            # ── Upload do PDF resultante.
             output_key = output_key_for(catalog.brand_id, catalog.id)
             await self.storage.upload(output_key, output_bytes)
+            await self._update_progress(job_id, 95)
+
             n_fields = count_fields(metadata)
-            await self._persist_products(catalog.id, metadata)
             await self._mark_success(
                 catalog=catalog,
                 job_id=job_id,
@@ -275,6 +292,10 @@ class CatalogService:
 
         Implementa `UPDATE jobs SET status='running' WHERE id=X AND status='pending'`
         (CLAUDE.md #5). Retorna True se este worker assumiu o job.
+
+        Commit imediato: a sessão do polling (separada da do worker) precisa
+        ver `running` + `progress=10` desde o instante do claim, senão exibe
+        `pending`/`progress=0` durante todo o pipeline.
         """
         stmt = (
             update(Job)
@@ -283,7 +304,27 @@ class CatalogService:
             .returning(Job.id)
         )
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        claimed = result.scalar_one_or_none() is not None
+        if claimed:
+            await self.db.commit()
+        return claimed
+
+    async def _update_progress(self, job_id: UUID, value: int) -> None:
+        """Atualiza `Job.progress` e dá commit imediato.
+
+        Usado entre as etapas do pipeline para que a barra de progresso
+        no navegador avance em tempo real. O commit é necessário porque o
+        endpoint de polling (`GET /catalogs/upload/poll/{job_id}`) lê de
+        uma sessão DB independente da que executa o worker; sem commit, o
+        polling vê o valor antigo até o fim do pipeline.
+
+        Mantém o resto do estado pendente da sessão (catalog modificações,
+        produtos persistidos) também visível — o commit aqui efetiva tudo
+        que foi flushed até este ponto, o que é justamente o que queremos.
+        """
+        stmt = update(Job).where(Job.id == job_id).values(progress=value)
+        await self.db.execute(stmt)
+        await self.db.commit()
 
     async def _persist_products(
         self,

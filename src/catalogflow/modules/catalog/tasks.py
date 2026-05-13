@@ -43,7 +43,22 @@ _PERMANENT_ERRORS: tuple[type[Exception], ...] = (
 
 
 async def _run_process_catalog(catalog_id: UUID, job_id: UUID) -> dict[str, Any]:
-    """Executa o pipeline em uma sessão dedicada do worker."""
+    """Executa o pipeline em uma sessão dedicada do worker.
+
+    `asyncio.run()` em `process_catalog_task` cria um event loop novo a
+    cada execução. O singleton de engine em `infra.database`, porém, é
+    cacheado entre tasks — então o pool retorna conexões asyncpg ligadas
+    a loops já fechados. SQLAlchemy faz `ping` no checkout e quebra com
+    `RuntimeError: got Future attached to a different loop`. O sintoma
+    só aparece quando há múltiplos commits dentro de uma task (cada um
+    força checkout/checkin do pool); antes da Sprint 03 Fase F, o
+    pipeline tinha um único commit no final e o problema ficava latente.
+
+    Solução: dispor o engine global antes do trabalho. O próximo
+    `get_session_factory()` recria engine + pool atrelados ao loop
+    deste `asyncio.run()`, e tudo funciona até o final.
+    """
+    await dispose_engine()
     factory = get_session_factory()
     try:
         async with factory() as session:
@@ -62,9 +77,10 @@ async def _run_process_catalog(catalog_id: UUID, job_id: UUID) -> dict[str, Any]
                 await session.commit()
                 raise
     finally:
-        # Cada worker pode rodar mais de uma task; o engine permanece para
-        # reaproveitamento. Disposição global acontece no shutdown do worker.
-        pass
+        # Dispõe ao sair também — evita que a próxima task no mesmo worker
+        # encontre um pool atrelado a este loop, prestes a ser fechado pelo
+        # `asyncio.run()`.
+        await dispose_engine()
 
 
 @celery_app.task(
