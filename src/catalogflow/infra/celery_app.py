@@ -39,6 +39,7 @@ def _build_celery_app() -> Celery:
             "catalog.*": {"queue": "catalog"},
             "orders.*": {"queue": "orders"},
             "romaneio.*": {"queue": "romaneio"},
+            "stock.*": {"queue": "stock"},
         },
         task_default_queue="default",
     )
@@ -49,6 +50,7 @@ def _build_celery_app() -> Celery:
             "catalogflow.modules.catalog",
             "catalogflow.modules.orders",
             "catalogflow.modules.romaneio",
+            "catalogflow.modules.stock",
         ],
         related_name="tasks",
     )

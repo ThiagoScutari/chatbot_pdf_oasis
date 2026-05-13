@@ -110,7 +110,7 @@ services:
 
   worker:
     <<: *app-base
-    command: ["celery", "-A", "catalogflow.infra.celery_app", "worker", "--loglevel=info", "--concurrency=2", "--queues=catalog,orders,romaneio,default"]
+    command: ["celery", "-A", "catalogflow.infra.celery_app", "worker", "--loglevel=info", "--concurrency=2", "--queues=catalog,orders,romaneio,stock,default"]
 
   beat:
     <<: *app-base
