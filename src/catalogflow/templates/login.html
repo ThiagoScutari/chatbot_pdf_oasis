@@ -11,19 +11,37 @@
     <h1 class="login-title">OASIS Resortwear</h1>
     <p class="login-sub">CatalogFlow</p>
 
+    {% if notice == "magic_sent" %}
+    <p class="field-notice" role="status">
+      Se houver uma conta com este email, enviamos um link de acesso.
+    </p>
+    {% endif %}
+
     <form method="post" action="/login" novalidate>
       <div class="field">
-        <label for="api_key">Sua chave de acesso</label>
+        <label for="email">Email</label>
         <input
-          id="api_key"
-          name="api_key"
-          type="password"
-          autocomplete="current-password"
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="username"
           spellcheck="false"
           autocapitalize="off"
-          placeholder="cf_______________________"
+          placeholder="voce@oasis.com.br"
           required
           autofocus
+          value="{{ email or '' }}"
+        >
+      </div>
+
+      <div class="field">
+        <label for="password">Senha</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
         >
       </div>
 
@@ -35,7 +53,7 @@
     </form>
 
     <p class="login-hint">
-      Precisa de acesso? Fale com o administrador do sistema.
+      <a href="/forgot-password">Esqueci minha senha</a>
     </p>
   </div>
 </div>

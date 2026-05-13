@@ -576,10 +576,13 @@ p {
 }
 
 .field input[type="text"],
+.field input[type="email"],
 .field input[type="password"] {
+  width: 100%;
+  box-sizing: border-box;
   font-family: var(--font-body);
-  font-size: 1rem;
-  padding: var(--space-3) var(--space-4);
+  font-size: 16px;
+  padding: 12px 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-bg);
@@ -605,6 +608,62 @@ p {
   margin-top: var(--space-6);
   font-size: 0.82rem;
   color: var(--color-text-muted);
+}
+
+.login-hint a {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}
+
+.login-hint a:hover {
+  color: var(--color-text);
+}
+
+.hint-sep {
+  color: var(--color-border);
+}
+
+.field-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: -8px;
+  margin-bottom: var(--space-3);
+  text-align: left;
+}
+
+.field-notice {
+  font-size: 0.88rem;
+  color: var(--color-text);
+  background: var(--color-surface-alt, #F0EAE0);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 12px 14px;
+  margin-bottom: var(--space-5);
+  text-align: left;
+}
+
+.btn-ghost {
+  display: inline-block;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  margin-left: var(--space-2);
+}
+
+.btn-ghost:hover {
+  background: var(--color-surface);
+  border-color: var(--color-text-muted);
+}
+
+.btn-primary[disabled],
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ──────────────────────────────────────────────────────────────
