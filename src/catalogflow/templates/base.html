@@ -23,6 +23,15 @@
 </head>
 <body>
 
+{#
+  Wrapper Alpine global — guarda o estado do modal de zoom de foto.
+  Qualquer descendente (page content, modal markup) consegue ler/escrever
+  `modalOpen`, `modalSrc`, `modalAlt` sem registrar Alpine.data().
+  Os x-data aninhados do shell (`{ open: false }`) e do upload-flow
+  continuam isolados em seus próprios scopes.
+#}
+<div x-data="{ modalOpen: false, modalSrc: '', modalAlt: '' }">
+
 {% block shell %}
 {#
   Menu hambúrguer — x-data inline (sem depender de Alpine.data/store
@@ -123,6 +132,41 @@
     </div>
   </template>
 </div>
+
+{#
+  Modal global de zoom de foto de produto.
+  Aberto via @click em qualquer .product-thumb / .product-cover:
+    modalOpen=true; modalSrc=$el.src; modalAlt=$el.alt
+  Fecha por: clique no overlay, ESC, ou botão [×].
+#}
+<div
+  class="modal-overlay"
+  x-show="modalOpen"
+  x-transition.opacity.duration.200ms
+  @click.self="modalOpen = false"
+  @keydown.escape.window="modalOpen = false"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-caption"
+>
+  <button
+    type="button"
+    class="modal-close"
+    aria-label="Fechar"
+    @click="modalOpen = false"
+  >&times;</button>
+
+  <div class="modal-content" @click.stop>
+    <img
+      class="modal-img"
+      :src="modalSrc"
+      :alt="modalAlt"
+    >
+    <p id="modal-caption" class="modal-caption" x-text="modalAlt"></p>
+  </div>
+</div>
+
+</div>{# /Alpine wrapper modal #}
 
 </body>
 </html>

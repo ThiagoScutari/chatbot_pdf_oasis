@@ -1274,7 +1274,11 @@ p {
   border-radius: var(--radius);
   display: block;
   background: var(--color-bg);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
 }
+
+.product-thumb:hover { opacity: 0.85; }
 
 .product-thumb-cell {
   width: 60px;
@@ -1289,6 +1293,79 @@ p {
   display: block;
   background: var(--color-bg);
   margin-bottom: var(--space-3);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.product-cover:hover { opacity: 0.92; }
+
+/* ──────────────────────────────────────────────────────────────
+   Photo zoom modal — overlay full-screen, foto flutuando
+   ────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-content {
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-img {
+  display: block;
+  max-width: 90vw;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  background: var(--color-surface);
+}
+
+.modal-caption {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 14px;
+  color: #fff;
+  margin: 0;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.modal-close:hover,
+.modal-close:focus-visible {
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
 }
 
 /* ── Romaneio action area ───────────────────────────────── */

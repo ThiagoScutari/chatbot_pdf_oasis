@@ -42,6 +42,7 @@
           src="/product-image/{{ prod.sku }}?name={{ prod.product_name|urlencode }}"
           alt="{{ prod.product_name }}"
           loading="lazy"
+          @click="modalOpen = true; modalSrc = $el.src; modalAlt = $el.alt"
         >
         <div class="item-head">
           <span class="item-name">{{ prod.product_name }}</span>
@@ -112,8 +113,9 @@
                 <img
                   class="product-thumb"
                   src="/product-image/{{ prod.sku }}?name={{ prod.product_name|urlencode }}"
-                  alt=""
+                  alt="{{ prod.product_name }}"
                   loading="lazy"
+                  @click="modalOpen = true; modalSrc = $el.src; modalAlt = $el.alt"
                 >
                 {% endif %}
               </td>
