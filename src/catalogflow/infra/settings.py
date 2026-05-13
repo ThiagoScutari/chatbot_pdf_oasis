@@ -84,6 +84,31 @@ class Settings(BaseSettings):
     # ── PyMuPDF licenciamento (ADR-004) ───────
     pymupdf_license_mode: Literal["agpl-internal", "commercial"] = "agpl-internal"
 
+    # ── Email transacional (Resend) ───────────
+    # `resend_api_key` vazio mantém o fluxo funcional — `EmailService`
+    # loga ao invés de enviar (modo dev / fail-soft).
+    resend_api_key: SecretStr = SecretStr("")
+    resend_from_email: str = "no-reply@oasis.com.br"
+    # `admin_email` é endereço de notificação para pedidos de acesso
+    # — usado para o admin receber email quando um novo cadastro chega.
+    admin_email: str = "admin@oasis.com.br"
+    # Base URL pública usada para construir links absolutos em emails
+    # (magic-link, aprovações). Em dev, http://localhost:8000.
+    public_base_url: str = "http://localhost:8000"
+
+    # ── Integração ERP (Sprint 04) ────────────
+    # `erp_adapter` controla qual implementação de `StockAdapter` é usada.
+    # "mock" entrega dados determinísticos para demo/testes; "consistem"
+    # consulta o ERP Consistem real (AMC Têxtil) via HTTPS. Trocar sem rebuild.
+    erp_adapter: Literal["mock", "consistem"] = "mock"
+    erp_base_url: str = "https://api.consistem.com.br"
+    erp_api_key: SecretStr | None = None
+    # `erp_empresa` = código da empresa no Consistem (AMC Têxtil = "50").
+    erp_empresa: str = "50"
+    # `erp_cod_natureza` = natureza de estoque (505 = estoque nacional AMC).
+    erp_cod_natureza: int = 505
+    erp_timeout: int = 30
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_cors(cls, value: object) -> object:
