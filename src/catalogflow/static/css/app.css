@@ -1694,6 +1694,18 @@ p {
   color: var(--color-text-muted);
 }
 
+/* ── Link "Regenerar romaneio" — discreto, abaixo do download ──── */
+.romaneio-regen-wrap {
+  /* flex-basis 100% força o item a ocupar uma linha sozinho dentro
+     de .detail-actions (flex-row wrap), efetivamente quebrando linha. */
+  flex-basis: 100%;
+  margin-top: var(--space-1);
+}
+
+.btn-link.romaneio-regen {
+  font-size: 0.85rem;
+}
+
 /* ── Bloco "Pendências de estoque" ───────────────────────── */
 .pendency-block {
   margin-top: var(--space-4);

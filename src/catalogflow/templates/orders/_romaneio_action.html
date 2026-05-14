@@ -13,6 +13,18 @@
   <a class="btn-primary" href="/orders/{{ order.id }}/romaneio/download">
     ↓ Baixar romaneio
   </a>
+  {# Link discreto para regenerar — útil quando entram fotos novas ou
+     o pedido mudou. POST via HTMX para evitar surpresa em reload. #}
+  <div class="romaneio-regen-wrap">
+    <button
+      type="button"
+      class="btn-link romaneio-regen"
+      hx-post="/orders/{{ order.id }}/regenerate-romaneio"
+      hx-target="#romaneio-action"
+      hx-swap="outerHTML"
+      hx-confirm="Regenerar o romaneio? O PDF atual será descartado e um novo gerado."
+    >Regenerar romaneio</button>
+  </div>
 </div>
 {% if auto_download %}
   {# Apos a transicao para "ready", abre o download na mesma aba. #}

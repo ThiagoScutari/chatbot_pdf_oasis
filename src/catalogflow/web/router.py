@@ -991,6 +991,63 @@ async def order_romaneio_kick(
     return await _render_romaneio_fragment(request, order_id, brand, db)
 
 
+@router.post("/orders/{order_id}/regenerate-romaneio", response_class=HTMLResponse)
+async def order_romaneio_regenerate(
+    request: Request,
+    order_id: UUID,
+    api_key: str = Depends(require_session_api_key),
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Deleta o romaneio existente e dispara uma nova geração.
+
+    Fluxo:
+      1. Carrega detalhe do pedido (incluindo o Romaneio se houver).
+      2. Se há romaneio: deleta o objeto do storage (`output_key`) e
+         apaga o registro do banco — clean slate para a UI ver "processing"
+         imediatamente em vez de continuar mostrando o PDF anterior.
+      3. Chama o mesmo fluxo do botão "Gerar romaneio" via API REST
+         (`GET /api/v1/orders/{id}/romaneio`), que cria o `Romaneio`
+         novo + Job e enfileira a task.
+      4. Devolve o fragmento HTMX no estado atual (deve ser "processing").
+
+    Útil para reprocessar quando entram fotos/dados novos sem precisar
+    de intervenção manual no banco.
+    """
+    # 1. Carrega para descobrir o romaneio atual (se houver).
+    detail = await data.get_order_detail(db, order_id, brand.id)
+    if detail is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+
+    # 2. Apaga o romaneio existente — best-effort no storage, hard delete
+    # no banco. A deleção do storage é idempotente; logamos warning em
+    # caso de falha mas seguimos o fluxo (o Romaneio.output_key
+    # eventualmente será sobrescrito pelo novo PDF mesmo assim).
+    if detail.romaneio is not None:
+        from catalogflow.infra.storage import get_storage_client
+
+        if detail.romaneio.output_key:
+            storage = get_storage_client()
+            try:
+                await storage.delete(detail.romaneio.output_key)
+            except Exception:
+                logger.warning(
+                    "regenerate: falha ao deletar %s do storage — segue",
+                    detail.romaneio.output_key,
+                    exc_info=True,
+                )
+        await db.delete(detail.romaneio)
+        await db.flush()
+
+    # 3. Mesma chamada que o botão "Gerar romaneio" — proxia para a API
+    # que cria Romaneio + Job e enfileira a task assincronamente.
+    await _hit_romaneio_endpoint(request, order_id, api_key)
+
+    # 4. Devolve fragmento (deve estar em "processing" agora — Romaneio
+    # foi recém-criado sem output_key).
+    return await _render_romaneio_fragment(request, order_id, brand, db)
+
+
 @router.get("/orders/{order_id}/romaneio/poll", response_class=HTMLResponse)
 async def order_romaneio_poll(
     request: Request,
