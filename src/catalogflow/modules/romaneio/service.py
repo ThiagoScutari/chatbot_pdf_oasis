@@ -16,6 +16,7 @@ semantics via lookup + insert separado.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID
 
@@ -36,6 +37,12 @@ from catalogflow.modules.orders.normalizer import (
 from catalogflow.modules.romaneio.builder import RomaneioBuilder, RomaneioConfig
 from catalogflow.modules.romaneio.models import Romaneio
 from catalogflow.shared.errors import JobNotReadyError, NotFoundError
+
+# Tipo do callable injetável que busca fotos de produto.
+# Recebe lista de SKUs, devolve `dict[sku, image_bytes]` — SKUs sem
+# foto são omitidos. `None` aqui significa "não buscar fotos" — usado
+# nos testes para não disparar I/O de rede.
+ImageFetcher = Callable[[list[str]], Awaitable[dict[str, bytes]]]
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +68,17 @@ class RomaneioService:
         builder: RomaneioBuilder | None = None,
         settings: Settings | None = None,
         dispatch_task: object | None = None,
+        image_fetcher: ImageFetcher | None = None,
     ) -> None:
         self.db = db
         self.storage = storage or get_storage_client()
         self.builder = builder or RomaneioBuilder()
         self.settings = settings or get_settings()
         self._dispatch_task = dispatch_task
+        # `image_fetcher` é opcional por design — `None` deixa o PDF
+        # sair sem fotos (mantém testes existentes verdes sem precisar
+        # mockar rede). Produção injeta `fetch_product_images` via tasks.
+        self._image_fetcher = image_fetcher
 
     # ── Criação / enfileiramento ──────────────
 
@@ -187,7 +199,28 @@ class RomaneioService:
                 lojista_name=order.lojista_name or "—",
                 emitted_at=order.extracted_at,
             )
-            pdf_bytes = self.builder.build(order_data, config)
+
+            # Fotos dos produtos — best-effort. `image_fetcher` é None
+            # nos testes (sem rede); produção injeta `fetch_product_images`.
+            product_images: dict[str, bytes] = {}
+            if self._image_fetcher is not None:
+                skus = sorted({item.sku for item in order.items})
+                try:
+                    product_images = await self._image_fetcher(skus)
+                except Exception:
+                    # Fetcher é best-effort por contrato, mas dupla camada
+                    # de segurança aqui — o PDF sai sem fotos em vez de
+                    # quebrar a geração inteira.
+                    logger.warning(
+                        "romaneio: image_fetcher falhou — PDF sairá sem fotos",
+                        exc_info=True,
+                    )
+
+            pdf_bytes = self.builder.build(
+                order_data,
+                config,
+                product_images=product_images or None,
+            )
 
             output_key = romaneio_output_key_for(brand.id, order.id)
             await self.storage.upload(output_key, pdf_bytes)

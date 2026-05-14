@@ -15,6 +15,7 @@ Layout (baseado em `oasis_romaneio.py` + `example/romaneio_demo.pdf`):
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,6 +23,8 @@ from decimal import Decimal
 from typing import Final
 
 import pymupdf
+
+logger = logging.getLogger(__name__)
 
 from catalogflow.modules.orders.normalizer import (
     NormalizedOrderData,
@@ -76,6 +79,15 @@ ROW_H_DADOS: Final[float] = 20.0
 ROW_H_HEADER: Final[float] = 18.0
 ROW_H_SKU: Final[float] = 24.0
 BLOCO_PADDING_BOTTOM: Final[float] = 12.0
+
+# Foto do produto (Sprint 04) — quadrado pequeno à esquerda do SKU header.
+# Pequeno o suficiente para não dominar o layout, grande o bastante para
+# a Loja reconhecer visualmente o produto.
+PRODUCT_IMAGE_SIZE: Final[float] = 50.0
+PRODUCT_IMAGE_GAP: Final[float] = 10.0
+# Quando há foto, a seção SKU header expande verticalmente para acomodar
+# a altura da imagem (50 + 3pt padding em cima e em baixo).
+ROW_H_SKU_WITH_IMAGE: Final[float] = 56.0
 
 # Tamanhos canônicos do romaneio — ordem fixa de exibição
 COLS_TAMANHOS: Final[tuple[str, ...]] = ("PP", "P", "M", "G", "GG")
@@ -132,6 +144,7 @@ def format_date_pt_br(dt: datetime) -> str:
 
 
 AvailableMap = dict[tuple[str, int, str], int | None]
+ProductImages = dict[str, bytes]
 
 
 class RomaneioBuilder:
@@ -143,6 +156,7 @@ class RomaneioBuilder:
         config: RomaneioConfig,
         *,
         available_map: AvailableMap | None = None,
+        product_images: ProductImages | None = None,
     ) -> bytes:
         """Retorna o PDF em bytes. Suporta pedido vazio (gera apenas cabeçalho).
 
@@ -151,6 +165,12 @@ class RomaneioBuilder:
         a quantidade disponível por tamanho colorida conforme a regra
         contábil (verde / âmbar / vermelho). Usado pelo relatório de
         pendências da Sprint 04.
+
+        Quando `product_images` é fornecido (dict `{sku: bytes}`), cada SKU
+        cujo código está no dict ganha um thumbnail 50x50pt à esquerda do
+        cabeçalho do bloco. SKUs ausentes do dict renderizam sem foto —
+        sem placeholder. Bytes inválidos não derrubam o PDF (pymupdf
+        levanta e capturamos no `_draw_product_block`).
         """
         doc = pymupdf.open()
         try:
@@ -160,9 +180,11 @@ class RomaneioBuilder:
             grouped = self._group_by_sku(order_data.items)
 
             for sku, items_sku in grouped.items():
+                has_image = bool(product_images and sku in product_images)
                 block_h = self._estimate_block_height(
                     items_sku,
                     include_pendency_row=available_map is not None,
+                    has_image=has_image,
                 )
                 if y + block_h > PAGE_H - FOOTER_RESERVE:
                     page, y = self._start_page(doc, config, emitted_at)
@@ -173,6 +195,7 @@ class RomaneioBuilder:
                     y_start=y,
                     config=config,
                     available_map=available_map,
+                    product_images=product_images,
                 )
 
             # Totalizador — se não couber, nova página apenas para ele.
@@ -216,12 +239,12 @@ class RomaneioBuilder:
         items: list[NormalizedOrderItem],
         *,
         include_pendency_row: bool = False,
+        has_image: bool = False,
     ) -> float:
         n_colors = len({item.color_index for item in items})
         per_color = ROW_H_DADOS * (2 if include_pendency_row else 1)
-        return (
-            ROW_H_SKU + ROW_H_HEADER + n_colors * per_color + BLOCO_PADDING_BOTTOM
-        )
+        sku_h = ROW_H_SKU_WITH_IMAGE if has_image else ROW_H_SKU
+        return sku_h + ROW_H_HEADER + n_colors * per_color + BLOCO_PADDING_BOTTOM
 
     # ── Cabeçalho ─────────────────────────────
 
@@ -352,6 +375,40 @@ class RomaneioBuilder:
         )
         return y + ROW_H_HEADER
 
+    # ── Foto do produto (Sprint 04) ───────────
+
+    def _draw_product_image(
+        self,
+        page: pymupdf.Page,
+        y_start: float,
+        image_bytes: bytes | None,
+    ) -> bool:
+        """Tenta inserir a foto 50x50pt à esquerda do bloco. Retorna True se
+        a imagem foi desenhada com sucesso.
+
+        Foto é melhoria visual — bytes inválidos NÃO derrubam o PDF.
+        pymupdf levanta se a stream não for um formato suportado (JPG,
+        PNG, etc.); capturamos qualquer exceção e seguimos sem foto.
+        """
+        if not image_bytes:
+            return False
+        try:
+            rect = pymupdf.Rect(
+                MARGIN_X,
+                y_start + 3,
+                MARGIN_X + PRODUCT_IMAGE_SIZE,
+                y_start + 3 + PRODUCT_IMAGE_SIZE,
+            )
+            page.insert_image(rect, stream=image_bytes, keep_proportion=True)
+            return True
+        except Exception:
+            # Bytes corrompidos, formato não suportado, etc. — segue sem foto.
+            logger.warning(
+                "romaneio: falha ao embedar foto de produto, seguindo sem ela",
+                exc_info=True,
+            )
+            return False
+
     # ── Bloco de produto ──────────────────────
 
     def _draw_product_block(
@@ -363,8 +420,15 @@ class RomaneioBuilder:
         y_start: float,
         config: RomaneioConfig,
         available_map: AvailableMap | None = None,
+        product_images: ProductImages | None = None,
     ) -> float:
-        """Desenha um bloco SKU: linha de cabeçalho + grade cor x tamanho. Retorna y após."""
+        """Desenha um bloco SKU: linha de cabeçalho + grade cor x tamanho. Retorna y após.
+
+        Quando `product_images` contém o SKU, insere um thumbnail 50x50pt
+        à esquerda do cabeçalho. O texto do produto desloca para acomodar
+        a imagem, e a altura do cabeçalho expande para 56pt. Sem imagem,
+        o layout permanece idêntico ao original.
+        """
         product_name = items[0].product_name or sku
         unit_price = items[0].unit_price  # mesmo para todas as linhas do SKU
         total_pecas_sku = sum(item.quantity for item in items)
@@ -373,16 +437,36 @@ class RomaneioBuilder:
             start=Decimal("0"),
         )
 
+        # Foto do produto — opcional, à esquerda do cabeçalho.
+        image_bytes = product_images.get(sku) if product_images else None
+        has_image = self._draw_product_image(page, y_start, image_bytes)
+
+        # Layout do texto: desloca para a direita quando há imagem.
+        if has_image:
+            text_x = MARGIN_X + PRODUCT_IMAGE_SIZE + PRODUCT_IMAGE_GAP
+            # Vertical center dentro de ROW_H_SKU_WITH_IMAGE.
+            text_y_name = y_start + 24
+            text_y_ref = y_start + 38
+            sku_section_h = ROW_H_SKU_WITH_IMAGE
+        else:
+            text_x = MARGIN_X + 4
+            text_y_name = y_start + 14
+            text_y_ref = y_start + 14
+            sku_section_h = ROW_H_SKU
+
         # Linha de SKU
         page.insert_text(
-            (MARGIN_X + 4, y_start + 14),
+            (text_x, text_y_name),
             product_name.upper(),
             fontname=FONT_B,
             fontsize=9,
             color=C_TEXTO,
         )
+        # "Ref: <sku>" — quando há imagem, vai abaixo do nome para evitar
+        # competir pelo mesmo eixo X. Sem imagem, fica na mesma linha do nome.
+        ref_x = text_x if has_image else MARGIN_X + 240
         page.insert_text(
-            (MARGIN_X + 240, y_start + 14),
+            (ref_x, text_y_ref),
             f"Ref: {sku}",
             fontname=FONT,
             fontsize=7,
@@ -397,14 +481,17 @@ class RomaneioBuilder:
         )
         if resumo:
             w_res = pymupdf.get_text_length(resumo, fontname=FONT_B, fontsize=8)
+            # Resumo sempre alinhado à direita — com imagem, fica no topo
+            # (linha do nome); sem imagem, mesma linha de tudo (compat).
+            resumo_y = text_y_name
             page.insert_text(
-                (PAGE_W - MARGIN_X - 4 - w_res, y_start + 14),
+                (PAGE_W - MARGIN_X - 4 - w_res, resumo_y),
                 resumo,
                 fontname=FONT_B,
                 fontsize=8,
                 color=C_ACENTO,
             )
-        y = y_start + ROW_H_SKU
+        y = y_start + sku_section_h
 
         # Calcula posições x — alinhado à margem esquerda
         x_cor = MARGIN_X + 4

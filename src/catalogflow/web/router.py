@@ -1246,6 +1246,7 @@ async def order_pendency_report(
         RomaneioBuilder,
         RomaneioConfig,
     )
+    from catalogflow.shared.image_fetcher import fetch_product_images
 
     detail = await data.get_order_detail(db, order_id, brand.id)
     if detail is None:
@@ -1320,10 +1321,23 @@ async def order_pendency_report(
         footer_note="Itens acima não puderam ser atendidos integralmente.",
     )
 
+    # Fotos dos SKUs pendentes — best-effort, sem caching (relatório
+    # é descartável). Falha de qualquer SKU não derruba o PDF.
+    pending_skus = sorted({it.sku for it in pendency_items})
+    try:
+        product_images = await fetch_product_images(pending_skus)
+    except Exception:
+        logger.warning(
+            "pendency-report: falha ao buscar fotos — PDF sairá sem elas",
+            exc_info=True,
+        )
+        product_images = {}
+
     pdf_bytes = RomaneioBuilder().build(
         order_data,
         config,
         available_map=stock_map,
+        product_images=product_images or None,
     )
 
     filename = f"pendencias-{order_id}.pdf"

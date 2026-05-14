@@ -18,6 +18,7 @@ from celery import Task
 from catalogflow.infra.celery_app import celery_app
 from catalogflow.infra.database import get_session_factory
 from catalogflow.modules.romaneio.service import RomaneioService
+from catalogflow.shared.image_fetcher import fetch_product_images
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,10 @@ async def _run_process_romaneio(
 ) -> dict[str, Any]:
     factory = get_session_factory()
     async with factory() as session:
-        service = RomaneioService(session)
+        # Em produção, injetamos o fetcher real — o PDF sai com fotos.
+        # Em testes, RomaneioService(db_session) sem `image_fetcher` mantém
+        # o PDF gerado offline (sem chamadas ao AMC).
+        service = RomaneioService(session, image_fetcher=fetch_product_images)
         try:
             result = await service.process_romaneio(
                 romaneio_id=romaneio_id,
