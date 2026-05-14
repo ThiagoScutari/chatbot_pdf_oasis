@@ -1,15 +1,16 @@
 # CatalogFlow
 
-> **Status:** Sprint 03 / Web UI para gerente comercial — completa.
+> **Status:** Sprint 04 / Integração ERP (estoque + envio) — completa.
 
 B2B SaaS que transforma catálogos PDF visuais de moda em instrumentos
 interativos de captura de pedido (Sprint 01), processa pedidos preenchidos
-em romaneios estruturados (Sprint 02), e expõe uma interface web em
+em romaneios estruturados (Sprint 02), expõe uma interface web em
 português pt-BR para a gerente comercial operar o ciclo completo sem
-terminal (Sprint 03).
+terminal (Sprint 03), e fecha o ciclo integrando o ERP da marca para
+consulta de estoque e envio de pedidos (Sprint 04).
 
 A fonte de verdade técnica é [`spec.md`](./spec.md). O escopo da sprint
-ativa está em [`docs/sprint_01/PRD_sprint_01.md`](./docs/sprint_01/PRD_sprint_01.md).
+ativa está em [`docs/sprint_04/PRD_sprint_04.md`](./docs/sprint_04/PRD_sprint_04.md).
 
 ---
 
@@ -137,6 +138,112 @@ curl -L -H "Authorization: Bearer $KEY" \
 
 ---
 
+## Integração ERP (Sprint 04)
+
+A partir da Sprint 04 o CatalogFlow conversa com o ERP da marca em dois
+fluxos: consulta de disponibilidade de estoque e envio do pedido. A
+arquitetura usa o **Adapter Pattern** — `StockAdapter` é a interface
+única, implementada por dois adapters intercambiáveis em runtime.
+
+### Configuração
+
+Variáveis de ambiente (todas opcionais, com defaults sensatos):
+
+```bash
+ERP_ADAPTER=mock              # "mock" | "consistem"
+ERP_BASE_URL=https://api.consistem.com.br
+ERP_API_KEY=                  # token de autenticação do Consistem
+ERP_EMPRESA=50                # código da AMC Têxtil
+ERP_COD_NATUREZA=505          # natureza de estoque nacional AMC
+ERP_TIMEOUT=30                # timeout do client (request individual = 3s)
+```
+
+Trocar de adapter é **uma única variável** — reiniciar o container `api`
++ `worker` re-lê settings e usa o novo backend, sem rebuild da imagem.
+
+### Modo `mock` (default)
+
+- Respostas **determinísticas** via hash MD5 do `(sku, size, color)`:
+  ~70% available, ~20% partial, ~10% out_of_stock.
+- `submit_order` aceita sempre e devolve `MOCK-<8 hex>`.
+- Sem dependência de rede — ideal para demo comercial, dev local e CI.
+- Mesmo input ⇒ mesmo output em todas as execuções (testes não-flaky).
+
+### Modo `consistem`
+
+- `check_availability` consulta
+  `GET {erp_base_url}/saldoEstoqueAtual/{codItem}/{erp_cod_natureza}`
+  com header `empresa={erp_empresa}`, paralelismo limitado a 5 requests
+  simultâneos, timeout 3s por item.
+- Fórmula contábil: `disponivel = estoqueAtual - estReservPedido -
+  estReservProducao - estReservLotes`.
+- Mapeamento `(sku, size, color_index) → codItem` está isolado em
+  `_build_cod_item()` — formato provisório `"{sku}.{size}.{color_index}"`.
+  Quando a Oasis fornecer o de-para real, apenas essa função muda.
+- `submit_order` levanta `NotImplementedError` enquanto o endpoint de
+  criação de pedido no Consistem não é definido pela Oasis. O job vai
+  para `error` (sem retry) com mensagem clara.
+
+### Fluxo completo (API)
+
+```bash
+export API="http://localhost:8004/api/v1"
+export KEY="cf_xxxxx"
+
+# Dispara consulta de estoque para o pedido (assíncrono)
+curl -X POST -H "Authorization: Bearer $KEY" \
+  "$API/orders/$ORDER_ID/stock-check"
+# → 202 { data: { stock_check_id, job_id, status: "pending" } }
+
+# Consulta o resultado quando job_id estiver success
+curl -H "Authorization: Bearer $KEY" \
+  "$API/orders/$ORDER_ID/stock-check"
+# → 200 { data: { status: "completed", summary: {...}, items: [...] } }
+
+# Envia o pedido ao ERP
+curl -X POST -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"customer_code": "12345"}' \
+  "$API/orders/$ORDER_ID/submit"
+# → 202 { data: { submission_id, job_id, status: "pending" } }
+
+# Status do envio
+curl -H "Authorization: Bearer $KEY" \
+  "$API/orders/$ORDER_ID/submission"
+# → 200 { data: { status: "accepted", erp_reference: "MOCK-a7f3e91b" } }
+```
+
+### Pelo navegador
+
+O detalhe do pedido em `/orders/{id}` ganha dois blocos novos
+("Disponibilidade em estoque" e "Envio ao ERP") e, quando há itens
+com pendência, um terceiro bloco com botão **"↓ Gerar relatório de
+pendências"** — PDF on-the-fly com os itens não-atendidos e a
+quantidade disponível por tamanho.
+
+A tabela de itens, após a consulta de estoque, passa a mostrar para
+cada `(sku, cor)` uma sub-linha "Disponível" com qtds por tamanho
+coloridas (verde sábio = atende; âmbar = parcial; vermelho escuro =
+zerado).
+
+Os PDFs de romaneio e o relatório de pendências mostram a foto do
+produto à esquerda do bloco (mesmo scraping do AMC QRCode usado
+pelas thumbnails da UI). Botão **"Regenerar romaneio"** no detalhe
+do pedido reprocessa o PDF com os dados atuais (ex: depois de uma
+consulta de estoque) sem necessidade de mexer no banco.
+
+### Erros relevantes
+
+- `ORDER_NOT_FOUND` (404) — pedido inexistente ou de outra brand.
+- `ORDER_ALREADY_SUBMITTED` (409) — tentou enviar um pedido que já
+  está em estado terminal (`accepted` / `partially_accepted` /
+  `rejected`). Se precisar reenviar, use o admin.
+- `STOCK_CHECK_NOT_FOUND` (404) — `GET /stock-check` sem nenhuma
+  consulta prévia para o pedido.
+- `SUBMISSION_NOT_FOUND` (404) — `GET /submission` sem envio prévio.
+
+---
+
 ## Endpoints
 
 | Método | Caminho | Auth | Descrição |
@@ -148,7 +255,11 @@ curl -L -H "Authorization: Bearer $KEY" \
 | `POST` | `/api/v1/orders/extract` | `Bearer cf_*` | Submete PDF preenchido para extração |
 | `GET` | `/api/v1/orders/{id}` | `Bearer cf_*` | Pedido completo (items + totais) |
 | `GET` | `/api/v1/orders/{id}/romaneio` | `Bearer cf_*` | 302 → romaneio quando pronto; 202 + job_id em andamento |
-| `GET` | `/api/v1/jobs/{id}` | `Bearer cf_*` | Polling — reconhece `catalog.process`, `order.extract`, `romaneio.generate` |
+| `POST` | `/api/v1/orders/{id}/stock-check` | `Bearer cf_*` | Dispara consulta de estoque no ERP (Sprint 04) |
+| `GET` | `/api/v1/orders/{id}/stock-check` | `Bearer cf_*` | Resultado da última consulta (summary + items) |
+| `POST` | `/api/v1/orders/{id}/submit` | `Bearer cf_*` | Envia pedido ao ERP (body `{customer_code}`) |
+| `GET` | `/api/v1/orders/{id}/submission` | `Bearer cf_*` | Status do envio (status + erp_reference) |
+| `GET` | `/api/v1/jobs/{id}` | `Bearer cf_*` | Polling — reconhece `catalog.process`, `order.extract`, `romaneio.generate`, `stock.check`, `stock.submit` |
 | `POST` | `/internal/brands` | `X-Internal-Secret` | Cria nova brand (admin) |
 | `POST` | `/internal/brands/{id}/api-keys` | `X-Internal-Secret` | Cria API key (raw retornado uma única vez) |
 
@@ -162,7 +273,7 @@ OpenAPI completo em <http://localhost:8004/api/v1/docs> (apenas em
 | Serviço | Porta | Notas |
 |---|---|---|
 | API (FastAPI) | 8004 | `uvicorn` com hot-reload em dev (serve API REST **e** UI web) |
-| Celery worker | — | Concurrency 2; queues `catalog`, `orders`, `romaneio` |
+| Celery worker | — | Concurrency 2; queues `catalog`, `orders`, `romaneio`, `stock` |
 | Celery beat | — | Scheduler (sem jobs periódicos por ora) |
 | Flower | 5555 | Monitoring do Celery (dev only) |
 | PostgreSQL | 5432 | `catalogflow:catalogflow@postgres:5432/catalogflow` |
@@ -226,17 +337,18 @@ python tests/fixtures/generate_fixtures.py
 src/catalogflow/
 ├── main.py                  # create_app() factory
 ├── modules/
-│   ├── auth/                # Brand + ApiKey, multi-tenant
+│   ├── auth/                # Brand + ApiKey + WebUser, multi-tenant
 │   ├── catalog/             # Pipeline de processamento de PDF
-│   ├── orders/              # Esqueleto — Sprint 02
-│   ├── romaneio/            # Esqueleto — Sprint 02
-│   ├── stock/               # Esqueleto — Sprint 03+ (ERP)
-│   └── reservation/         # Esqueleto — Sprint 03+
+│   ├── orders/              # Extração de pedidos + persistência
+│   ├── romaneio/            # Geração do romaneio PDF (com fotos)
+│   ├── stock/               # Integração ERP — Adapter Pattern (Sprint 04)
+│   └── reservation/         # Esqueleto — Sprint 05+
 ├── shared/
 │   ├── errors.py            # DomainError + subclasses
 │   ├── responses.py         # StandardResponse[T] envelope
 │   ├── middleware.py        # RequestIdMiddleware
-│   └── jobs_router.py       # GET /api/v1/jobs/{id}
+│   ├── jobs_router.py       # GET /api/v1/jobs/{id}
+│   └── image_fetcher.py     # AMC QRCode scraping (UI + PDFs)
 ├── infra/
 │   ├── settings.py          # Pydantic BaseSettings
 │   ├── database.py          # SQLAlchemy 2.0 async

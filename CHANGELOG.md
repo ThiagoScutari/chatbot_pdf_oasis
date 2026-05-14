@@ -5,6 +5,287 @@ versionamento [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.0] — 2026-05-14 — Sprint 04: Integração ERP (estoque + envio)
+
+Adiciona dois fluxos de integração com ERP ao CatalogFlow:
+
+1. **Consulta de estoque** — ao receber um pedido extraído, o operador
+   dispara uma consulta que pergunta ao ERP a disponibilidade real por
+   `(sku, cor, tamanho)`. O resultado popula `order_items.stock_status`
+   / `available_qty` e renderiza, no detalhe do pedido, uma sub-linha
+   "Disponível" abaixo de cada cor com células coloridas conforme a
+   regra contábil (verde sábio = ok, âmbar = parcial, vermelho escuro
+   = zerado, muted = não pedido).
+2. **Envio do pedido ao ERP** — após a consulta de estoque, o operador
+   pode enviar o pedido ao ERP informando o `customer_code` (código da
+   lojista no Consistem). O envio é assíncrono, com idempotência por
+   `order_id` (UNIQUE) e estados terminais (`accepted`,
+   `partially_accepted`, `rejected`).
+
+Arquitetura: **Adapter Pattern**. `StockAdapter` é a interface única;
+implementações concretas (`MockStockAdapter`, `ConsistemAdapter`) são
+intercambiáveis via variável de ambiente `ERP_ADAPTER` em runtime, sem
+rebuild da imagem.
+
+Além disso: fotos dos produtos passam a aparecer nos PDFs de romaneio e
+relatório de pendências (reusando o scraping do AMC QRCode já usado nas
+thumbnails da UI web). Novo botão "Regenerar romaneio" no detalhe do
+pedido para reprocessar com dados novos sem mexer no banco.
+
+### Added — Schema & migrations (Fase A)
+
+- Migration `0005_erp_integration.py` reversível criando `stock_checks`
+  (registro de cada consulta de disponibilidade, JSONB `result` com
+  snapshot completo para auditoria histórica) e `erp_submissions`
+  (UNIQUE em `order_id` — um envio ativo por pedido). Índices
+  `idx_stock_checks_order` e `idx_erp_submissions_order` cobrem o
+  acesso por pedido. CHECK constraints alinhados aos status válidos.
+- `modules/stock/models.py` com `StockCheck` e `ErpSubmission` em
+  SQLAlchemy 2.0, FKs `ON DELETE CASCADE` para `orders` e `brands`.
+- `infra/settings.py` ganha bloco ERP_*: `erp_adapter` (`mock` |
+  `consistem`), `erp_base_url`, `erp_api_key` (SecretStr), `erp_empresa`
+  (default `"50"` = AMC Têxtil), `erp_cod_natureza` (default `505` =
+  estoque nacional), `erp_timeout`.
+- `migrations/env.py` importa `modules.stock.models` para o autogenerate
+  enxergar as novas tabelas.
+
+Nota: `order_items.stock_status` / `available_qty` já existiam desde a
+migration 0003 (Sprint 02 preparou) — esta migration não as toca.
+
+### Added — Adapter Pattern (Fase B)
+
+- `modules/stock/adapter.py` — ABC `StockAdapter` com `check_availability`
+  e `submit_order` async. Dataclasses `StockQuery` e `StockResult` frozen.
+  Contrato: falhas por item viram `status="unknown"` (não derrubam o
+  batch); `available_qty=None` apenas quando status é `unknown`.
+- `modules/stock/mock_adapter.py` — `MockStockAdapter` determinístico
+  via hash MD5 do `(sku, size, color_index)`. Distribuição 70/20/10
+  (available / partial / out_of_stock). `submit_order` aceita sempre e
+  devolve `MOCK-<8 hex>`. Delay simulado de 0.5s para a UI exercitar
+  spinners. Útil para demo, dev e CI sem dependência de rede.
+- `modules/stock/consistem_adapter.py` — Adapter HTTP real para o ERP
+  Consistem da AMC Têxtil. `check_availability`:
+  `GET /saldoEstoqueAtual/{codItem}/{codNatureza}` com header
+  `empresa`, fórmula contábil `disponivel = estoqueAtual -
+  estReservPedido - estReservProducao - estReservLotes`, paralelismo
+  via `asyncio.gather` + `Semaphore(5)`, timeout 3s por request. Erros
+  transitórios (5xx, timeout, payload corrupto) viram `unknown`.
+  `_build_cod_item(sku, size, color_index)` isolado como única função
+  a alterar quando a Oasis fornecer o mapeamento real — formato
+  provisório `"{sku}.{size}.{color_index}"`. `submit_order` levanta
+  `NotImplementedError` com mensagem explícita (endpoint do Consistem
+  ainda não definido).
+- 26 testes (10 mock + 16 consistem com `respx` mockando httpx)
+  cobrem determinismo, fórmula, classificação, timeouts, 5xx, payload
+  inválido, falha parcial não-derruba-batch.
+
+### Added — Service + tasks + API (Fase C)
+
+- `modules/stock/service.StockService`:
+  - `get_adapter()` lê `settings.erp_adapter` em **runtime** — trocar
+    `ERP_ADAPTER=mock` ↔ `ERP_ADAPTER=consistem` é só reiniciar o
+    container, sem rebuild.
+  - `enqueue_stock_check(order_id, brand_id)` cria StockCheck(pending)
+    + Job + enfileira `stock.check`. Multi-tenant: pedido de outra
+    brand → `NotFoundError` (`ORDER_NOT_FOUND`).
+  - `check_order_stock(...)` pipeline executado pela task: claim job
+    (race-safe via `UPDATE WHERE status='pending'`) → carrega
+    OrderItems → consulta adapter → atualiza `order_items` →
+    persiste snapshot completo no `stock_check.result` JSONB →
+    marca completed.
+  - `enqueue_submission(order_id, brand_id, customer_code)` — UNIQUE
+    `order_id` impede dois envios ativos; pedidos em estado terminal
+    (`accepted` / `partially_accepted` / `rejected`) levantam
+    `ConflictError` (409 `ORDER_ALREADY_SUBMITTED`); estados não-terminais
+    são reutilizados (retry manual).
+  - `submit_order_to_erp(...)` chama o adapter e mapeia o resultado
+    para `accepted` / `partially_accepted` / `rejected`.
+  - `get_stock_check` retorna a consulta mais recente; `get_submission`
+    retorna a (única) submissão.
+  - `summarize_stock_check(stock_check)` — função pura que agrega
+    contadores por status, reusada pelo router web e pelo JSON.
+- `modules/stock/tasks.py` — `check_stock_task` (`stock.check`) e
+  `submit_order_task` (`stock.submit`) com retry exponencial
+  `60s × 2^n` (max 3). `NotImplementedError` (do Consistem submit) é
+  tratado como **permanente** e não retry — o estado do job vai para
+  `error` direto.
+- `modules/stock/router.py` — 4 endpoints sob `/api/v1/orders/{id}/`:
+  - `POST /stock-check` (202) — dispara consulta.
+  - `GET /stock-check` (200) — summary + items com per-status.
+  - `POST /submit` (202, body `{customer_code}`) — dispara envio.
+  - `GET /submission` (200) — status + erp_reference.
+- `main.py` registra `stock_router`; `infra/celery_app.py` adiciona
+  routing `stock.* → queue "stock"` + autodiscover. `docker-compose`
+  worker consome a fila `stock` junto com as demais.
+- 31 testes (15 service + 16 router) cobrem happy path, isolamento
+  multi-tenant, `ConflictError`, `NotImplementedError` do Consistem,
+  validação de `customer_code`, 401/404/409/422/202/200.
+
+### Added — Web UI + relatório de pendências (Fase D)
+
+- `templates/orders/detail.html` **reestruturado**: cada `(sku, cor)`
+  agora ocupa duas linhas na tabela.
+  - **Linha 1 (pedido)**: foto, produto, cor, qtds por tamanho, total.
+  - **Linha 2 (disponível)**: label "Disponível" em muted, qtds por
+    tamanho coloridas (verde / âmbar / vermelho / muted-traço), total
+    da cor. Só renderiza quando há consulta concluída.
+  - **Mobile**: cards ganham mini-tabela de 3 linhas (tamanhos /
+    pedido / disponível) com a mesma regra de cores.
+  - Macros `avail_class` e `avail_text` centralizam a regra: `requested
+    == 0 → "-"` (muted); `requested > 0` + `available is None → "0"`
+    (out); valor numérico → cor segundo `available >= requested`.
+- `templates/orders/_stock_action.html` (novo) — fragmento HTMX com 4
+  estados: `absent` (botão "Consultar estoque"), `checking` (spinner +
+  polling 2s), `completed` (summary "N disponíveis / N parciais / N
+  zerados" + botão "Reconsultar"), `error` (mensagem + retry).
+  Resposta inclui header `HX-Trigger: stock-check-completed` ao
+  finalizar — handler client-side faz `location.reload()` pra exibir
+  a sub-linha "Disponível" nos itens (renderizada server-side).
+- `templates/orders/_submit_action.html` (novo) — fragmento com 5
+  estados: `absent` (form `customer_code` + botão), `submitting`
+  (spinner + polling), `accepted` (✓ + `erp_reference`),
+  `partially_accepted` (△ + ref), `rejected` (✕ + form de reenvio),
+  `error` (form com mensagem).
+- **Bloco "Pendências"** no detalhe — quando há itens com
+  `stock_status` em `partial` ou `out_of_stock`, aparece "N itens
+  com pendência de estoque" + botão **"↓ Gerar relatório de
+  pendências"** que abre o PDF em nova aba.
+- `web/data.py`:
+  - `OrderDetail` carrega `stock_check` (mais recente) e `submission`
+    eager.
+  - `build_stock_map(stock_check) -> dict[(sku, color, size),
+    int | None]` constrói o lookup que o template consulta por célula.
+  - `count_pendency_items(...)` agrega o contador para o bloco de
+    pendências.
+- `web/router.py` — 4 rotas web (`POST /stock-check-web`, `GET
+  /stock-check-poll`, `POST /submit-web`, `GET /submit-poll`) que
+  proxam para a API REST via httpx ASGI. Nova rota
+  **`GET /orders/{id}/pendency-report`** gera o PDF on-the-fly
+  (sem persistir no storage) usando `RomaneioBuilder` no modo
+  pendência.
+- `modules/romaneio/builder.py` ganha:
+  - Kwarg `available_map` em `build()` — quando set, cada cor recebe
+    uma sub-linha "Disponível" com qtds por tamanho coloridas.
+  - `RomaneioConfig.footer_note` — frase em itálico no rodapé
+    (relatório usa "Itens acima não puderam ser atendidos
+    integralmente.").
+  - Backward compat preservada: sem `available_map`, layout idêntico
+    ao original.
+
+### Added — Fotos de produtos nos PDFs
+
+- `shared/image_fetcher.py` (novo) centraliza scraping do AMC QRCode
+  (movido de `web/product_image.py`). Três helpers:
+  - `fetch_product_image_url(sku, *, timeout=3.0)` — URL via scraping.
+  - `fetch_product_image_bytes(sku, *, timeout=3.0)` — URL + GET dos
+    bytes.
+  - `fetch_product_images(skus, *, max_concurrent=5, timeout=3.0)` —
+    batch async com `asyncio.Semaphore`. SKUs sem foto são omitidos
+    do dict (sem entrada com None). Dedup automático.
+- `web/product_image.py` vira shim re-exportando do shared (preserva
+  imports e monkeypatch dos testes existentes).
+- `modules/romaneio/builder.py`:
+  - Kwarg `product_images: dict[str, bytes]` em `build()`.
+  - `_draw_product_image()` insere thumbnail 50×50pt à esquerda do
+    cabeçalho do bloco via `page.insert_image(stream=bytes,
+    keep_proportion=True)`. Texto desloca para `x=MARGIN_X+60`.
+  - Bytes inválidos / formato não suportado: pymupdf levanta,
+    capturamos e o PDF sai sem foto (best-effort).
+- `modules/romaneio/service.py`: `RomaneioService.__init__` aceita
+  `image_fetcher: ImageFetcher | None`. Default `None` — PDF sai sem
+  fotos (mantém testes existentes verdes sem mockar rede). Produção
+  injeta `fetch_product_images` via `tasks.py`.
+- `web/router.py /pendency-report` busca fotos dos SKUs pendentes
+  antes de chamar o builder (mesmo padrão best-effort).
+- Smoke test no container: backward compat (1587 bytes), com 1 foto
+  (4355 bytes), bytes inválidos (1587 bytes — sem crash), pendency +
+  foto (4488 bytes).
+
+### Added — Regenerar romaneio
+
+- `POST /orders/{id}/regenerate-romaneio` (web) — deleta o `Romaneio`
+  existente do storage (`output_key`) e do banco, então re-dispara o
+  fluxo de geração. Retorna o fragmento HTMX no estado `processing`,
+  com polling existente assumindo o restante. UX: spinner aparece
+  imediatamente, e quando o novo PDF fica pronto (`auto_download`),
+  ele abre na mesma aba — agora com as fotos embedadas.
+- Link discreto "Regenerar romaneio" no fragment
+  `_romaneio_action.html` (estado `ready`), com `hx-confirm` para
+  evitar regeneração acidental. CSS `.romaneio-regen-wrap` usa
+  `flex-basis: 100%` pra forçar quebra de linha dentro de
+  `.detail-actions` (flex-row wrap).
+
+### Fixed
+
+- `fix(web): show per-size stock row in order detail and fix ? in
+  pendency report` — dois bugs encontrados na revisão PMO:
+  1. **Linha "Disponível" não renderizava** — bug clássico de escopo
+     Jinja: `{% set color_has_stock = true %}` dentro de `{% for %}`
+     é local ao loop e não vaza para o escopo externo. Substituído
+     pelo padrão `{% set ns = namespace(has_stock=false) %}` + `{%
+     set ns.has_stock = true %}` no loop + `{% if ns.has_stock %}`
+     depois. Mesmo fix em desktop e mobile.
+  2. **PDF de pendências exibia "?" em células** — duas causas:
+     (a) Lógica errada: tratava `requested == 0` + `available is
+     None` como "?". Regra correta (PMO): `requested == 0 → "-"`
+     sempre; `requested > 0` + `available is None → "0"` vermelho.
+     (b) Font fallback — `helv` (Helvetica core PDF) não contém
+     em-dash (U+2014); pymupdf substituía por "?". Trocado por
+     hyphen ASCII, padrão do resto do builder.
+  3. **Footer note não aparecia** — `insert_textbox` com altura 14pt
+     vs fontsize 9 era rejeitada silenciosamente. Substituído por
+     `insert_text` com baseline calculado.
+
+### Tests
+
+- 57 testes novos na Sprint 04:
+  - 10 `stock/tests/test_mock_adapter.py` (determinismo, distribuição,
+    submit MOCK-*, idempotência por item).
+  - 16 `stock/tests/test_consistem_adapter.py` (com `respx`):
+    `_build_cod_item`, fórmula contábil, classificação, timeout,
+    HTTP 500, payload inválido, falha parcial, header `empresa`.
+  - 15 `stock/tests/test_service.py`: `get_adapter` por settings,
+    enqueue + execute, rejected/partially_accepted, `ConflictError`
+    em já-aceito, `NotImplementedError` do Consistem, isolamento
+    multi-tenant, summarize util.
+  - 16 `stock/tests/test_router.py`: 4 endpoints com auth, 401/404/
+    409/422/202/200, cross-tenant, customer_code validation.
+- Existing tests intocados — `RomaneioService(db)` sem `image_fetcher`
+  continua passando (PDF sem fotos, sem chamadas de rede em CI).
+
+### Decisões registradas
+
+- **`get_adapter()` lê settings em runtime** — não no construtor —
+  permite trocar `ERP_ADAPTER` sem rebuild da imagem. Override via
+  `adapter=` no `__init__` ganha precedência (testes).
+- **JSONB livre em `stock_check.result`** — snapshot completo do que
+  o adapter retornou no momento da consulta, enriquecido com
+  `product_name` / `color_hex` dos `order_items`. Auditoria histórica
+  preservada mesmo se o pedido for alterado depois.
+- **UNIQUE em `erp_submissions.order_id`** — força reutilização da
+  mesma linha em retries; estados terminais (`accepted` / `partially_
+  accepted` / `rejected`) bloqueiam novo envio (409 em vez de duplicar
+  pedido no ERP).
+- **`NotImplementedError` é permanente** — task não dispara retry;
+  retry só atrasaria o diagnóstico enquanto o contrato do Consistem
+  submit não chega.
+- **`image_fetcher` injetável (opcional)** — preserva contrato dos
+  testes existentes sem alterá-los. Produção plumba o real via
+  `tasks.py`; testes recebem `None` e geram PDFs offline.
+- **Bytes de imagem inválidos são best-effort** — pymupdf levanta com
+  format desconhecido; capturamos e seguimos sem a foto. Romaneio
+  não pode falhar por causa de uma foto.
+
+### Next (Sprint 05 — preview)
+
+- Implementar `ConsistemAdapter.submit_order` quando a Oasis definir
+  o endpoint de criação de pedido.
+- Reserva de estoque com TTL (Fase 3 do roadmap).
+- Webhook do ERP para o CatalogFlow (eventos de status do pedido).
+- Sincronização periódica de estoque via Celery Beat.
+
+---
+
 ## [0.3.0] — Sprint 03: Web UI para gerente comercial
 
 Fecha o ciclo da gerente comercial via navegador. Toda a Sprint 02 já
