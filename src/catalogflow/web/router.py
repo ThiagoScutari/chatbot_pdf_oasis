@@ -1,9 +1,10 @@
 """Rotas web — páginas HTML servidas pelo próprio FastAPI.
 
 Não vivem sob `/api/v1/` (não fazem parte do contrato público da API).
-Toda rota protegida usa o dependency `require_session`, que lê o cookie
-`cf_session` e devolve a API Key plaintext da gerente para chamadas
-internas à API REST.
+Sprint 03.5: o login passou a ser email+senha. O cookie `cf_session`
+agora carrega `(user_id, ephemeral_api_key)` — o `user_id` identifica
+o `WebUser`; a `api_key` é usada nas chamadas internas à API REST
+(`/api/v1/...`) que o web layer proxia.
 """
 
 from __future__ import annotations
@@ -22,20 +23,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalogflow.infra.database import get_db
 from catalogflow.infra.settings import get_settings
-from catalogflow.modules.auth import service as auth_service
-from catalogflow.modules.auth.models import Brand
-from catalogflow.shared.errors import AuthenticationError
+from catalogflow.modules.auth.models import Brand, WebUser
+from catalogflow.shared.errors import (
+    AuthenticationError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 from catalogflow.web import _helpers, data
 from catalogflow.web.auth import (
     SESSION_COOKIE,
     clear_session_cookie,
     create_session,
-    require_session,
+    mint_session_api_key,
+    require_admin,
+    require_session_api_key,
     require_session_brand,
+    revoke_session_api_key,
     set_session_cookie,
     verify_session,
 )
 from catalogflow.web.product_image import fetch_product_image_url
+from catalogflow.web.user_service import WebUserService
 
 logger = logging.getLogger(__name__)
 
@@ -75,62 +84,290 @@ async def root(request: Request) -> RedirectResponse:
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_get(request: Request) -> HTMLResponse:
-    """Renderiza a tela de login."""
+async def login_get(request: Request, notice: str | None = None) -> HTMLResponse:
+    """Renderiza a tela de login.
+
+    `notice` é um código simples para mostrar mensagens informativas
+    (ex: `magic_sent`, `password_reset`) após redirects.
+    """
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": None},
+        {"error": None, "notice": notice, "email": ""},
     )
 
 
 # ──────────────────────────────────────────────
-#  POST /login  →  valida e cria sessão
+#  POST /login  →  valida email+senha e cria sessão
 # ──────────────────────────────────────────────
+
+
+def _render_login_error(
+    request: Request,
+    *,
+    email: str,
+    error: str,
+    status_code: int = status.HTTP_200_OK,
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"error": error, "notice": None, "email": email},
+        status_code=status_code,
+    )
+
+
+async def _start_session_for(
+    request: Request,
+    user: WebUser,
+    db: AsyncSession,
+    *,
+    redirect_to: str = "/dashboard",
+) -> Response:
+    """Cria a sessão para `user`: mint da API Key + assinatura do cookie."""
+    api_key = await mint_session_api_key(db, user=user)
+    settings = get_settings()
+    token = create_session(user.id, api_key, settings.secret_key.get_secret_value())
+    response = RedirectResponse(url=redirect_to, status_code=status.HTTP_302_FOUND)
+    set_session_cookie(response, token, secure=settings.is_production)
+    return response
 
 
 @router.post("/login")
 async def login_post(
     request: Request,
-    api_key: str = Form(..., min_length=1),
+    email: str = Form(..., min_length=1),
+    password: str = Form(..., min_length=1),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Valida a API Key contra o auth service e cria a sessão.
+    """Login por email+senha com rate-limit por email."""
+    service = WebUserService(db)
 
-    Decisão de validação (Sprint 03 Fase B): a verificação acontece direto
-    no `auth_service.verify_api_key` — não roteamos por `GET /api/v1/health`
-    porque esse endpoint é público (não exige Bearer) e portanto não pode
-    diferenciar uma chave válida de uma inválida. Manter a verificação no
-    serviço evita uma indireção HTTP desnecessária para validar um segredo
-    que já temos em mãos.
-    """
-    try:
-        await auth_service.verify_api_key(db, api_key)
-    except AuthenticationError:
-        # Mensagem genérica — não vaza se a chave nunca existiu vs expirou.
-        return templates.TemplateResponse(
+    if not await service.check_rate_limit(email):
+        return _render_login_error(
             request,
-            "login.html",
-            {"error": "Chave de acesso inválida"},
-            status_code=status.HTTP_200_OK,
+            email=email,
+            error="Muitas tentativas. Tente novamente em alguns minutos.",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 
-    settings = get_settings()
-    token = create_session(api_key, settings.secret_key.get_secret_value())
+    try:
+        user = await service.authenticate(email, password)
+    except AuthenticationError as exc:
+        return _render_login_error(request, email=email, error=exc.message)
 
-    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
-    set_session_cookie(response, token, secure=settings.is_production)
-    return response
+    return await _start_session_for(request, user, db)
 
 
 # ──────────────────────────────────────────────
-#  GET /logout  →  limpa sessão
+#  GET /forgot-password  →  formulário p/ pedir magic-link
+# ──────────────────────────────────────────────
+
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_get(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "forgot.html",
+        {"error": None, "sent": False, "email": ""},
+    )
+
+
+@router.post("/forgot-password")
+async def forgot_password_post(
+    request: Request,
+    email: str = Form(..., min_length=1),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Envia magic-link para o email. Responde igual quer o email exista ou não."""
+    service = WebUserService(db)
+    await service.send_magic_link(email)
+    # UX: sempre mostra "se existir, enviamos" — evita oracle de existência.
+    return templates.TemplateResponse(
+        request,
+        "forgot.html",
+        {"error": None, "sent": True, "email": email},
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /magic-link/{token}  →  consome o link e loga
+# ──────────────────────────────────────────────
+
+
+@router.get("/magic-link/{token}")
+async def magic_link_consume(
+    request: Request,
+    token: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    service = WebUserService(db)
+    try:
+        user = await service.verify_magic_link(token)
+    except (AuthenticationError, NotFoundError) as exc:
+        return templates.TemplateResponse(
+            request,
+            "errors/magic_link.html",
+            {"message": exc.message},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return await _start_session_for(request, user, db)
+
+
+# ──────────────────────────────────────────────
+#  GET/POST /register  →  pedido de acesso (admin aprova depois)
+# ──────────────────────────────────────────────
+
+
+@router.get("/register", response_class=HTMLResponse)
+async def register_get(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "register.html",
+        {"error": None, "sent": False, "name": "", "email": ""},
+    )
+
+
+@router.post("/register")
+async def register_post(
+    request: Request,
+    name: str = Form(..., min_length=2, max_length=255),
+    email: str = Form(..., min_length=1),
+    password: str = Form(..., min_length=8),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Cria `WebUser` `is_active=False` e dispara notificação ao admin."""
+    # Resolve a brand padrão — primeira ordem de criação. Sprint inicial
+    # só tem uma brand seedada. Em multi-brand real, este endpoint exigirá
+    # invite token (TODO Sprint 04).
+    from sqlalchemy import select as _select
+
+    brand = await db.scalar(_select(Brand).order_by(Brand.created_at.asc()))
+    if brand is None:
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                "error": "Sistema ainda não configurado. Avise o administrador.",
+                "sent": False,
+                "name": name,
+                "email": email,
+            },
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    service = WebUserService(db)
+    try:
+        await service.request_access(
+            brand_id=brand.id,
+            name=name,
+            email=email,
+            password=password,
+        )
+    except (ValidationError, ConflictError) as exc:
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                "error": exc.message,
+                "sent": False,
+                "name": name,
+                "email": email,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "register.html",
+        {"error": None, "sent": True, "name": name, "email": email},
+    )
+
+
+# ──────────────────────────────────────────────
+#  Admin: lista + aprovação
+# ──────────────────────────────────────────────
+
+
+@router.get("/admin/users", response_class=HTMLResponse)
+async def admin_users_list(
+    request: Request,
+    admin: WebUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    service = WebUserService(db)
+    pending = await service.list_pending_users(admin.brand_id)
+    active = await service.list_active_users(admin.brand_id)
+    return templates.TemplateResponse(
+        request,
+        "admin/users.html",
+        {"admin": admin, "pending": pending, "active": active},
+    )
+
+
+@router.post("/admin/users/{user_id}/approve")
+async def admin_users_approve(
+    request: Request,
+    user_id: UUID,
+    admin: WebUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    service = WebUserService(db)
+    try:
+        user = await service.approve_user(user_id)
+    except NotFoundError:
+        return _render_not_found(
+            request,
+            title="Usuário não encontrado",
+            message="Este pedido pode ter sido removido.",
+        )
+    if user.brand_id != admin.brand_id:
+        return _render_not_found(
+            request,
+            title="Sem permissão",
+            message="Você não pode aprovar usuários de outra marca.",
+        )
+    return RedirectResponse(url="/admin/users", status_code=status.HTTP_302_FOUND)
+
+
+@router.post("/admin/users/{user_id}/deny")
+async def admin_users_deny(
+    request: Request,
+    user_id: UUID,
+    admin: WebUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    service = WebUserService(db)
+    # Validar tenant antes de remover.
+    target = await service.get_by_id(user_id)
+    if target is None or target.brand_id != admin.brand_id:
+        return _render_not_found(
+            request,
+            title="Usuário não encontrado",
+            message="Este pedido pode ter sido removido.",
+        )
+    try:
+        await service.deny_user(user_id)
+    except (NotFoundError, ConflictError):
+        pass
+    return RedirectResponse(url="/admin/users", status_code=status.HTTP_302_FOUND)
+
+
+# ──────────────────────────────────────────────
+#  GET /logout  →  limpa sessão + revoga API Key da sessão
 # ──────────────────────────────────────────────
 
 
 @router.get("/logout")
-async def logout(request: Request) -> RedirectResponse:
-    """Encerra a sessão: apaga o cookie e volta para o login."""
+async def logout(request: Request, db: AsyncSession = Depends(get_db)) -> RedirectResponse:
+    """Encerra a sessão: revoga a ApiKey da sessão e apaga o cookie."""
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        secret = get_settings().secret_key.get_secret_value()
+        decoded = verify_session(token, secret)
+        if decoded is not None:
+            _user_id, api_key = decoded
+            await revoke_session_api_key(db, api_key=api_key)
     response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     clear_session_cookie(response)
     return response
@@ -259,7 +496,7 @@ async def catalog_upload_submit(
     file: UploadFile = File(...),
     name: str = Form(..., min_length=1, max_length=255),
     collection: str | None = Form(default=None, max_length=128),
-    api_key: str = Depends(require_session),
+    api_key: str = Depends(require_session_api_key),
 ) -> JSONResponse:
     """Encaminha o upload para a API REST e devolve um JSON enxuto
     para o Alpine consumir (job_id + catalog_id, ou erro estruturado).
@@ -489,7 +726,7 @@ async def catalog_actions_strip(
 async def catalog_download(
     request: Request,
     catalog_id: UUID,
-    api_key: str = Depends(require_session),
+    api_key: str = Depends(require_session_api_key),
 ) -> Response:
     """Encaminha o download do PDF editável.
 
@@ -595,6 +832,56 @@ def _classify_romaneio_state(detail: data.OrderDetail) -> str:
     return "processing"
 
 
+def _classify_stock_state(detail: data.OrderDetail) -> str:
+    """`absent | checking | completed | error` para o fragmento _stock_action."""
+    sc = detail.stock_check
+    if sc is None:
+        return "absent"
+    if sc.status in ("pending", "checking"):
+        return "checking"
+    if sc.status == "completed":
+        return "completed"
+    return "error"
+
+
+def _classify_submission_state(detail: data.OrderDetail) -> str:
+    """Mapeia ErpSubmission.status para o estado do fragmento de envio.
+
+    Estado `error` permite re-submeter; `accepted`/`partially_accepted`
+    são terminais e não mostram o form de novo. `rejected` mostra o
+    form de reenvio (operador pode corrigir o customer_code).
+    """
+    sub = detail.submission
+    if sub is None:
+        return "absent"
+    if sub.status in ("pending", "submitting"):
+        return "submitting"
+    if sub.status in ("accepted", "partially_accepted", "rejected", "error"):
+        return sub.status
+    return "absent"
+
+
+def _stock_summary_from(detail: data.OrderDetail) -> dict[str, int] | None:
+    """Conta itens por status no `stock_check.result` (None se não houver)."""
+    if detail.stock_check is None or detail.stock_check.status != "completed":
+        return None
+    items: list[dict[str, Any]] = (
+        detail.stock_check.result.get("items", []) if detail.stock_check.result else []
+    )
+    summary = {
+        "total_items": len(items),
+        "available": 0,
+        "partial": 0,
+        "out_of_stock": 0,
+        "unknown": 0,
+    }
+    for item in items:
+        status = item.get("status")
+        if status in summary:
+            summary[status] += 1
+    return summary
+
+
 @router.get("/orders/{order_id}", response_class=HTMLResponse)
 async def order_detail(
     request: Request,
@@ -611,7 +898,10 @@ async def order_detail(
             message="Este pedido pode ter sido removido ou nunca existiu.",
         )
 
-    grouped = data.group_items_by_sku(list(detail.order.items))
+    items_list = list(detail.order.items)
+    grouped = data.group_items_by_sku(items_list)
+    stock_map = data.build_stock_map(detail.stock_check)
+    pendency_count = data.count_pendency_items(stock_map, items_list)
     return templates.TemplateResponse(
         request,
         "orders/detail.html",
@@ -620,6 +910,18 @@ async def order_detail(
             "grouped": grouped,
             "romaneio_state": _classify_romaneio_state(detail),
             "auto_download": False,
+            "stock_state": _classify_stock_state(detail),
+            "stock_summary": _stock_summary_from(detail),
+            "stock_checked_at": (
+                detail.stock_check.checked_at if detail.stock_check else None
+            ),
+            "stock_error": (
+                detail.stock_check.error_message if detail.stock_check else None
+            ),
+            "submission_state": _classify_submission_state(detail),
+            "submission": detail.submission,
+            "stock_map": stock_map,
+            "pendency_count": pendency_count,
         },
     )
 
@@ -675,7 +977,7 @@ async def _render_romaneio_fragment(
 async def order_romaneio_kick(
     request: Request,
     order_id: UUID,
-    api_key: str = Depends(require_session),
+    api_key: str = Depends(require_session_api_key),
     brand: Brand = Depends(require_session_brand),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
@@ -720,7 +1022,7 @@ async def order_romaneio_poll(
 async def order_romaneio_download(
     request: Request,
     order_id: UUID,
-    api_key: str = Depends(require_session),
+    api_key: str = Depends(require_session_api_key),
 ) -> Response:
     """Proxy do download do romaneio.
 
@@ -750,6 +1052,288 @@ async def order_romaneio_download(
         request,
         title="Romaneio indisponível",
         message="O romaneio ainda não está pronto para download.",
+    )
+
+
+# ──────────────────────────────────────────────
+#  Stock check + ERP submission (HTMX, Sprint 04)
+# ──────────────────────────────────────────────
+
+
+async def _hit_stock_check_post(
+    request: Request,
+    order_id: UUID,
+    api_key: str,
+) -> httpx.Response:
+    """Chama POST /api/v1/orders/{id}/stock-check (enfileira consulta)."""
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://internal",
+        headers={"Authorization": f"Bearer {api_key}"},
+    ) as client:
+        return await client.post(
+            f"/api/v1/orders/{order_id}/stock-check",
+            timeout=30.0,
+        )
+
+
+async def _hit_submit_post(
+    request: Request,
+    order_id: UUID,
+    api_key: str,
+    customer_code: str,
+) -> httpx.Response:
+    """Chama POST /api/v1/orders/{id}/submit (enfileira envio ao ERP)."""
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://internal",
+        headers={"Authorization": f"Bearer {api_key}"},
+    ) as client:
+        return await client.post(
+            f"/api/v1/orders/{order_id}/submit",
+            json={"customer_code": customer_code},
+            timeout=30.0,
+        )
+
+
+async def _render_stock_fragment(
+    request: Request,
+    order_id: UUID,
+    brand: Brand,
+    db: AsyncSession,
+) -> HTMLResponse:
+    """Renderiza `_stock_action.html` com o estado atual do StockCheck."""
+    detail = await data.get_order_detail(db, order_id, brand.id)
+    if detail is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+
+    state = _classify_stock_state(detail)
+    response = templates.TemplateResponse(
+        request,
+        "orders/_stock_action.html",
+        {
+            "order": detail.order,
+            "stock_state": state,
+            "stock_summary": _stock_summary_from(detail),
+            "stock_checked_at": detail.stock_check.checked_at if detail.stock_check else None,
+            "stock_error": detail.stock_check.error_message if detail.stock_check else None,
+        },
+    )
+    # Quando a consulta terminou, sinaliza o HTMX para recarregar a página
+    # de items (badges precisam refletir os novos stock_status). Header
+    # HX-Trigger dispara um evento custom no client.
+    if state == "completed":
+        response.headers["HX-Trigger"] = "stock-check-completed"
+    return response
+
+
+async def _render_submit_fragment(
+    request: Request,
+    order_id: UUID,
+    brand: Brand,
+    db: AsyncSession,
+) -> HTMLResponse:
+    """Renderiza `_submit_action.html` com o estado atual da submission."""
+    detail = await data.get_order_detail(db, order_id, brand.id)
+    if detail is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+    return templates.TemplateResponse(
+        request,
+        "orders/_submit_action.html",
+        {
+            "order": detail.order,
+            "submission_state": _classify_submission_state(detail),
+            "submission": detail.submission,
+        },
+    )
+
+
+@router.post("/orders/{order_id}/stock-check-web", response_class=HTMLResponse)
+async def order_stock_check_kick(
+    request: Request,
+    order_id: UUID,
+    api_key: str = Depends(require_session_api_key),
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Dispara consulta de estoque via API e devolve o fragmento de polling."""
+    api_resp = await _hit_stock_check_post(request, order_id, api_key)
+    if api_resp.status_code not in (200, 202):
+        logger.warning(
+            "stock-check kick: API respondeu %s para order=%s",
+            api_resp.status_code,
+            order_id,
+        )
+    return await _render_stock_fragment(request, order_id, brand, db)
+
+
+@router.get("/orders/{order_id}/stock-check-poll", response_class=HTMLResponse)
+async def order_stock_check_poll(
+    request: Request,
+    order_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Fragmento de polling — HTMX chama a cada 2s enquanto `checking`."""
+    return await _render_stock_fragment(request, order_id, brand, db)
+
+
+@router.post("/orders/{order_id}/submit-web", response_class=HTMLResponse)
+async def order_submit_kick(
+    request: Request,
+    order_id: UUID,
+    customer_code: str = Form(..., min_length=1, max_length=64),
+    api_key: str = Depends(require_session_api_key),
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Dispara envio ao ERP via API e devolve o fragmento de polling."""
+    api_resp = await _hit_submit_post(request, order_id, api_key, customer_code)
+    if api_resp.status_code not in (200, 202):
+        logger.warning(
+            "submit kick: API respondeu %s para order=%s",
+            api_resp.status_code,
+            order_id,
+        )
+    return await _render_submit_fragment(request, order_id, brand, db)
+
+
+@router.get("/orders/{order_id}/submit-poll", response_class=HTMLResponse)
+async def order_submit_poll(
+    request: Request,
+    order_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Fragmento de polling do envio — HTMX chama a cada 2s enquanto submitting."""
+    return await _render_submit_fragment(request, order_id, brand, db)
+
+
+# ──────────────────────────────────────────────
+#  GET /orders/{order_id}/pendency-report  — PDF on-the-fly
+# ──────────────────────────────────────────────
+
+
+@router.get("/orders/{order_id}/pendency-report")
+async def order_pendency_report(
+    request: Request,
+    order_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Gera relatório de pendências em PDF on-the-fly.
+
+    Filtra itens com stock_status em {partial, out_of_stock} e gera um
+    PDF usando o RomaneioBuilder com a sub-linha "Disponível" populada
+    a partir do último StockCheck. Não persiste no storage — é um
+    documento descartável para a lojista.
+
+    Cross-tenant: 404 (via get_order_detail). Pedido sem pendências: 404
+    com mensagem amigável (botão não deveria nem estar visível, mas
+    protege contra link copiado/marcado).
+    """
+    from decimal import Decimal
+
+    from catalogflow.modules.auth.models import Brand as _BrandModel
+    from catalogflow.modules.orders.normalizer import (
+        NormalizedOrderData,
+        NormalizedOrderItem,
+        NormalizedTotals,
+    )
+    from catalogflow.modules.romaneio.builder import (
+        RomaneioBuilder,
+        RomaneioConfig,
+    )
+
+    detail = await data.get_order_detail(db, order_id, brand.id)
+    if detail is None:
+        return _render_not_found(
+            request,
+            title="Pedido não encontrado",
+            message="Este pedido pode ter sido removido ou nunca existiu.",
+        )
+
+    items_list = list(detail.order.items)
+    stock_map = data.build_stock_map(detail.stock_check)
+    pendency_items = [
+        item for item in items_list if item.stock_status in ("partial", "out_of_stock")
+    ]
+    if not pendency_items:
+        return _render_not_found(
+            request,
+            title="Sem pendências",
+            message="Este pedido não tem itens com pendência de estoque.",
+        )
+
+    # Reusa o brand record para popular o cabeçalho do relatório com a
+    # mesma identidade visual do romaneio.
+    brand_record = await db.get(_BrandModel, brand.id)
+    brand_name = brand_record.name if brand_record else brand.name
+
+    # Carrega a logo (best-effort — se falhar, o builder segue sem logo).
+    logo_bytes: bytes | None = None
+    if brand_record and brand_record.logo_key:
+        try:
+            from catalogflow.infra.storage import get_storage_client
+
+            storage = get_storage_client()
+            logo_bytes = await storage.download(brand_record.logo_key)
+        except Exception:
+            logger.warning("pendency-report: falha ao baixar logo")
+            logo_bytes = None
+
+    # Constrói NormalizedOrderData apenas com os itens em pendência.
+    normalized_items = [
+        NormalizedOrderItem(
+            sku=it.sku,
+            product_name=it.product_name,
+            color_index=it.color_index,
+            color_hex=it.color_hex,
+            size=it.size,
+            quantity=it.quantity,
+            unit_price=it.unit_price,
+        )
+        for it in pendency_items
+    ]
+    totals = NormalizedTotals(
+        total_items=len(normalized_items),
+        total_pecas=sum(i.quantity for i in normalized_items),
+        valor_total=Decimal("0"),  # relatório de pendências não mostra preços
+        n_skus=len({i.sku for i in normalized_items}),
+    )
+    order_data = NormalizedOrderData(
+        items=normalized_items,
+        totals=totals,
+        source_format="v2",
+        warnings=[],
+    )
+
+    config = RomaneioConfig(
+        brand_name=brand_name,
+        logo_bytes=logo_bytes,
+        lojista_name=detail.order.lojista_name or "—",
+        emitted_at=None,  # now
+        title="RELATÓRIO DE PENDÊNCIAS",
+        show_prices=False,
+        footer_note="Itens acima não puderam ser atendidos integralmente.",
+    )
+
+    pdf_bytes = RomaneioBuilder().build(
+        order_data,
+        config,
+        available_map=stock_map,
+    )
+
+    filename = f"pendencias-{order_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
     )
 
 
@@ -808,7 +1392,7 @@ def _placeholder_svg_response(sku: str, name: str) -> Response:
 async def product_image(
     sku: str,
     name: str = "",
-    api_key: str = Depends(require_session),
+    api_key: str = Depends(require_session_api_key),
 ) -> Response:
     """Devolve thumbnail do produto: foto do AMC ou SVG placeholder.
 

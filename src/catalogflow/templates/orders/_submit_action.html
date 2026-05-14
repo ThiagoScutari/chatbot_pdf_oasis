@@ -1,0 +1,142 @@
+{# Fragmento — bloco "Enviar pedido ao ERP".
+
+   Estados:
+   - "absent"             → form com input customer_code + botão "Enviar"
+   - "submitting"         → spinner + polling HTMX a cada 2s
+   - "accepted"           → "✓ Pedido aceito — Ref: XYZ"
+   - "partially_accepted" → "△ Parcialmente aceito — Ref: XYZ"
+   - "rejected"           → "✕ Pedido rejeitado — motivo"
+   - "error"              → erro transitório + botão "Tentar de novo"
+
+   Variáveis:
+     order             (Order)
+     submission_state  (str — um dos acima; "absent" se submission is None)
+     submission        (ErpSubmission | None)
+#}
+
+{% if submission_state == "accepted" %}
+<div class="submit-action submit-action--accepted" id="submit-action">
+  <p class="submit-result submit-result--ok">
+    ✓ Pedido aceito pelo ERP.
+  </p>
+  {% if submission.erp_reference %}
+  <p class="submit-ref">
+    Referência: <code>{{ submission.erp_reference }}</code>
+  </p>
+  {% endif %}
+  {% if submission.submitted_at %}
+  <p class="stock-meta">Enviado {{ humanize_when(submission.submitted_at) }}.</p>
+  {% endif %}
+</div>
+
+{% elif submission_state == "partially_accepted" %}
+<div class="submit-action submit-action--partial" id="submit-action">
+  <p class="submit-result submit-result--partial">
+    △ Pedido parcialmente aceito.
+  </p>
+  {% if submission.erp_reference %}
+  <p class="submit-ref">
+    Referência: <code>{{ submission.erp_reference }}</code>
+  </p>
+  {% endif %}
+  {% if submission.error_message %}
+  <p class="submit-detail">{{ submission.error_message }}</p>
+  {% endif %}
+</div>
+
+{% elif submission_state == "rejected" %}
+<div class="submit-action submit-action--rejected" id="submit-action">
+  <p class="submit-result submit-result--err">✕ Pedido rejeitado pelo ERP.</p>
+  {% if submission.error_message %}
+  <p class="submit-detail">{{ submission.error_message }}</p>
+  {% endif %}
+  <form
+    class="submit-form"
+    hx-post="/orders/{{ order.id }}/submit-web"
+    hx-target="#submit-action"
+    hx-swap="outerHTML"
+  >
+    <label class="submit-label" for="customer-code-{{ order.id }}">
+      Código do cliente no ERP
+    </label>
+    <input
+      class="submit-input"
+      type="text"
+      name="customer_code"
+      id="customer-code-{{ order.id }}"
+      placeholder="ex: 12345"
+      required
+      maxlength="64"
+    >
+    <button type="submit" class="btn-primary">Reenviar ao ERP →</button>
+  </form>
+</div>
+
+{% elif submission_state == "submitting" %}
+<div
+  class="submit-action submit-action--submitting"
+  id="submit-action"
+  hx-get="/orders/{{ order.id }}/submit-poll"
+  hx-trigger="every 2s"
+  hx-swap="outerHTML"
+>
+  <p class="processing-meta">
+    <span class="spinner" aria-hidden="true"></span>
+    Enviando pedido ao ERP…
+  </p>
+</div>
+
+{% elif submission_state == "error" %}
+<div class="submit-action submit-action--error" id="submit-action">
+  <p class="submit-result submit-result--err">
+    ✕ Erro ao enviar pedido.
+  </p>
+  {% if submission and submission.error_message %}
+  <p class="submit-detail">{{ submission.error_message }}</p>
+  {% endif %}
+  <form
+    class="submit-form"
+    hx-post="/orders/{{ order.id }}/submit-web"
+    hx-target="#submit-action"
+    hx-swap="outerHTML"
+  >
+    <label class="submit-label" for="customer-code-{{ order.id }}">
+      Código do cliente no ERP
+    </label>
+    <input
+      class="submit-input"
+      type="text"
+      name="customer_code"
+      id="customer-code-{{ order.id }}"
+      placeholder="ex: 12345"
+      required
+      maxlength="64"
+    >
+    <button type="submit" class="btn-primary">Tentar de novo</button>
+  </form>
+</div>
+
+{% else %}
+<div class="submit-action submit-action--absent" id="submit-action">
+  <form
+    class="submit-form"
+    hx-post="/orders/{{ order.id }}/submit-web"
+    hx-target="#submit-action"
+    hx-swap="outerHTML"
+  >
+    <label class="submit-label" for="customer-code-{{ order.id }}">
+      Código do cliente no ERP
+    </label>
+    <input
+      class="submit-input"
+      type="text"
+      name="customer_code"
+      id="customer-code-{{ order.id }}"
+      placeholder="ex: 12345"
+      required
+      maxlength="64"
+    >
+    <button type="submit" class="btn-primary">Enviar ao ERP →</button>
+  </form>
+</div>
+{% endif %}

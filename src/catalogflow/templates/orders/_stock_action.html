@@ -1,0 +1,95 @@
+{# Fragmento — bloco "Disponibilidade em estoque".
+
+   Quatro estados:
+   - "absent"     → botão "Consultar estoque" (dispara o flow)
+   - "checking"   → spinner + polling HTMX a cada 2s
+   - "completed"  → summary "N disponíveis · N parciais · N zerados · N ?"
+   - "error"      → mensagem amigável + botão "Tentar de novo"
+
+   Variáveis:
+     order            (Order)
+     stock_state      ("absent" | "checking" | "completed" | "error")
+     stock_summary    (dict | None) — populado quando completed
+     stock_checked_at (datetime | None) — opcional, para legenda
+     stock_error      (str | None)
+#}
+
+{% if stock_state == "completed" %}
+<div class="stock-action stock-action--done" id="stock-action">
+  <div class="stock-summary">
+    <span class="stock-summary-item stock-summary-item--available">
+      <span class="stock-dot stock-dot--available" aria-hidden="true"></span>
+      {{ stock_summary.available }} disponíve{{ "l" if stock_summary.available == 1 else "is" }}
+    </span>
+    {% if stock_summary.partial > 0 %}
+    <span class="stock-summary-item stock-summary-item--partial">
+      <span class="stock-dot stock-dot--partial" aria-hidden="true"></span>
+      {{ stock_summary.partial }} parci{{ "al" if stock_summary.partial == 1 else "ais" }}
+    </span>
+    {% endif %}
+    {% if stock_summary.out_of_stock > 0 %}
+    <span class="stock-summary-item stock-summary-item--out">
+      <span class="stock-dot stock-dot--out" aria-hidden="true"></span>
+      {{ stock_summary.out_of_stock }} {{ "zerado" if stock_summary.out_of_stock == 1 else "zerados" }}
+    </span>
+    {% endif %}
+    {% if stock_summary.unknown and stock_summary.unknown > 0 %}
+    <span class="stock-summary-item stock-summary-item--unknown">
+      <span class="stock-dot stock-dot--unknown" aria-hidden="true"></span>
+      {{ stock_summary.unknown }} sem retorno
+    </span>
+    {% endif %}
+  </div>
+  <div class="stock-actions-row">
+    {% if stock_checked_at %}
+    <span class="stock-meta">Consultado {{ humanize_when(stock_checked_at) }}.</span>
+    {% endif %}
+    <button
+      type="button"
+      class="btn-link"
+      hx-post="/orders/{{ order.id }}/stock-check-web"
+      hx-target="#stock-action"
+      hx-swap="outerHTML"
+    >Reconsultar estoque</button>
+  </div>
+</div>
+
+{% elif stock_state == "checking" %}
+<div
+  class="stock-action stock-action--checking"
+  id="stock-action"
+  hx-get="/orders/{{ order.id }}/stock-check-poll"
+  hx-trigger="every 2s"
+  hx-swap="outerHTML"
+>
+  <p class="processing-meta">
+    <span class="spinner" aria-hidden="true"></span>
+    Consultando estoque no ERP…
+  </p>
+</div>
+
+{% elif stock_state == "error" %}
+<div class="stock-action stock-action--error" id="stock-action">
+  <p class="stock-error">✕ Não foi possível consultar o estoque.</p>
+  {% if stock_error %}<p class="stock-error-detail">{{ stock_error }}</p>{% endif %}
+  <button
+    type="button"
+    class="btn-primary"
+    hx-post="/orders/{{ order.id }}/stock-check-web"
+    hx-target="#stock-action"
+    hx-swap="outerHTML"
+  >Tentar de novo</button>
+</div>
+
+{% else %}
+<div class="stock-action stock-action--absent" id="stock-action">
+  <p class="stock-meta">Disponibilidade no ERP ainda não consultada.</p>
+  <button
+    type="button"
+    class="btn-primary"
+    hx-post="/orders/{{ order.id }}/stock-check-web"
+    hx-target="#stock-action"
+    hx-swap="outerHTML"
+  >Consultar estoque →</button>
+</div>
+{% endif %}

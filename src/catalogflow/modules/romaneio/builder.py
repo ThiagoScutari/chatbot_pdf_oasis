@@ -48,6 +48,13 @@ C_FUNDO_ZEBRA: Final[tuple[float, float, float]] = (0.95, 0.94, 0.92)
 C_HEADER_GRADE: Final[tuple[float, float, float]] = (0.88, 0.86, 0.83)
 C_BRAND_ACCENT_T: Final[tuple[float, float, float]] = (0.80, 0.75, 0.65)
 
+# Cores específicas para a linha "Disponível" do relatório de pendências.
+# Espelham as cores do CSS (--color-stock-ok / partial / out).
+C_STOCK_OK: Final[tuple[float, float, float]] = (0.18, 0.36, 0.24)
+C_STOCK_PARTIAL: Final[tuple[float, float, float]] = (0.44, 0.31, 0.07)
+C_STOCK_OUT: Final[tuple[float, float, float]] = (0.54, 0.16, 0.13)
+C_PENDENCY_BG: Final[tuple[float, float, float]] = (0.97, 0.965, 0.96)
+
 # ──────────────────────────────────────────────
 #  Dimensões (A4 portrait — PRD margem 40pt)
 # ──────────────────────────────────────────────
@@ -89,6 +96,11 @@ class RomaneioConfig:
     Mescla branding (brand_name, logo_bytes, currency_symbol) e metadata
     por pedido (lojista_name, emitted_at, collection). PRD especifica
     `build(order_data, config)` — dois argumentos.
+
+    `footer_note` (Sprint 04) é uma frase em itálico colocada abaixo do
+    totalizador — usada pelo relatório de pendências para a mensagem
+    "Itens acima não puderam ser atendidos integralmente." Vazio nos
+    romaneios normais (default None).
     """
 
     brand_name: str
@@ -99,6 +111,7 @@ class RomaneioConfig:
     title: str = "ROMANEIO DE PEDIDO"
     show_prices: bool = True
     currency_symbol: str = "R$"
+    footer_note: str | None = None
 
 
 def format_currency(value: Decimal | float | int, symbol: str = "R$") -> str:
@@ -118,6 +131,9 @@ def format_date_pt_br(dt: datetime) -> str:
 # ──────────────────────────────────────────────
 
 
+AvailableMap = dict[tuple[str, int, str], int | None]
+
+
 class RomaneioBuilder:
     """Gera o PDF do romaneio. Zero I/O — input bytes/dataclasses, output bytes."""
 
@@ -125,8 +141,17 @@ class RomaneioBuilder:
         self,
         order_data: NormalizedOrderData,
         config: RomaneioConfig,
+        *,
+        available_map: AvailableMap | None = None,
     ) -> bytes:
-        """Retorna o PDF em bytes. Suporta pedido vazio (gera apenas cabeçalho)."""
+        """Retorna o PDF em bytes. Suporta pedido vazio (gera apenas cabeçalho).
+
+        Quando `available_map` é fornecido, cada cor de cada SKU ganha uma
+        sub-linha "Disponível" diretamente abaixo da linha de pedido, com
+        a quantidade disponível por tamanho colorida conforme a regra
+        contábil (verde / âmbar / vermelho). Usado pelo relatório de
+        pendências da Sprint 04.
+        """
         doc = pymupdf.open()
         try:
             emitted_at = config.emitted_at or datetime.now()
@@ -135,7 +160,10 @@ class RomaneioBuilder:
             grouped = self._group_by_sku(order_data.items)
 
             for sku, items_sku in grouped.items():
-                block_h = self._estimate_block_height(items_sku)
+                block_h = self._estimate_block_height(
+                    items_sku,
+                    include_pendency_row=available_map is not None,
+                )
                 if y + block_h > PAGE_H - FOOTER_RESERVE:
                     page, y = self._start_page(doc, config, emitted_at)
                 y = self._draw_product_block(
@@ -144,12 +172,16 @@ class RomaneioBuilder:
                     items=items_sku,
                     y_start=y,
                     config=config,
+                    available_map=available_map,
                 )
 
             # Totalizador — se não couber, nova página apenas para ele.
             if y + 70.0 > PAGE_H - MARGIN_Y:
                 page, y = self._start_page(doc, config, emitted_at)
             self._draw_totalizer(page, order_data.totals, y, config)
+
+            if config.footer_note:
+                self._draw_footer_note(page, config.footer_note)
 
             data: bytes = doc.tobytes(clean=True, garbage=4, deflate=True)
         finally:
@@ -179,10 +211,16 @@ class RomaneioBuilder:
             grouped[item.sku].append(item)
         return grouped
 
-    def _estimate_block_height(self, items: list[NormalizedOrderItem]) -> float:
+    def _estimate_block_height(
+        self,
+        items: list[NormalizedOrderItem],
+        *,
+        include_pendency_row: bool = False,
+    ) -> float:
         n_colors = len({item.color_index for item in items})
+        per_color = ROW_H_DADOS * (2 if include_pendency_row else 1)
         return (
-            ROW_H_SKU + ROW_H_HEADER + n_colors * ROW_H_DADOS + BLOCO_PADDING_BOTTOM
+            ROW_H_SKU + ROW_H_HEADER + n_colors * per_color + BLOCO_PADDING_BOTTOM
         )
 
     # ── Cabeçalho ─────────────────────────────
@@ -324,6 +362,7 @@ class RomaneioBuilder:
         items: list[NormalizedOrderItem],
         y_start: float,
         config: RomaneioConfig,
+        available_map: AvailableMap | None = None,
     ) -> float:
         """Desenha um bloco SKU: linha de cabeçalho + grade cor x tamanho. Retorna y após."""
         product_name = items[0].product_name or sku
@@ -450,6 +489,28 @@ class RomaneioBuilder:
             )
             y += ROW_H_DADOS
 
+            # Sub-linha "Disponível" — só aparece quando o caller pediu
+            # (available_map is not None) e há ao menos um size deste
+            # (sku, cor) no mapa. Caso contrário a linha é omitida.
+            if available_map is not None:
+                qtys_for_color = by_color[color_index]
+                color_has_stock = any(
+                    (sku, color_index, tam) in available_map
+                    for tam in COLS_TAMANHOS
+                )
+                if color_has_stock:
+                    y = self._draw_pendency_row(
+                        page=page,
+                        y=y,
+                        sku=sku,
+                        color_index=color_index,
+                        qtys_for_color=qtys_for_color,
+                        available_map=available_map,
+                        x_cor=x_cor,
+                        x_tams=x_tams,
+                        x_total=x_total,
+                    )
+
         # Separador entre blocos
         page.draw_line(
             pymupdf.Point(MARGIN_X, y + 4),
@@ -458,6 +519,120 @@ class RomaneioBuilder:
             width=0.5,
         )
         return y + BLOCO_PADDING_BOTTOM
+
+    # ── Sub-linha "Disponível" (relatório de pendências) ──
+
+    def _draw_pendency_row(
+        self,
+        *,
+        page: pymupdf.Page,
+        y: float,
+        sku: str,
+        color_index: int,
+        qtys_for_color: dict[str, int],
+        available_map: AvailableMap,
+        x_cor: float,
+        x_tams: float,
+        x_total: float,
+    ) -> float:
+        """Desenha a sub-linha com a quantidade disponível por tamanho.
+
+        Layout: mesmas colunas da linha de pedido. Background levemente
+        diferente para diferenciar visualmente, sem borda superior — fica
+        visualmente "grudada" na linha de pedido.
+        """
+        page.draw_rect(
+            pymupdf.Rect(
+                MARGIN_X + 2,
+                y,
+                PAGE_W - MARGIN_X - 2,
+                y + ROW_H_DADOS,
+            ),
+            color=None,
+            fill=C_PENDENCY_BG,
+            width=0,
+        )
+
+        # Label "Disponível" na coluna de cor
+        page.insert_textbox(
+            pymupdf.Rect(
+                x_cor + 2,
+                y + 2,
+                x_cor + COL_COR_W - 2,
+                y + ROW_H_DADOS,
+            ),
+            "Disponível",
+            fontname=FONT,
+            fontsize=7,
+            color=C_MUTED,
+            align=pymupdf.TEXT_ALIGN_LEFT,
+        )
+
+        avail_total = 0
+        avail_any = False
+        for ti, tam in enumerate(COLS_TAMANHOS):
+            requested = qtys_for_color.get(tam, 0)
+            available = available_map.get((sku, color_index, tam))
+            x_cel = x_tams + ti * COL_TAM_W
+
+            # Regra (PMO):
+            #   requested == 0                  → "-" muted (não pedido)
+            #   requested  > 0, available None  → "0" out  (tratar ausência
+            #                                     como zero — sem retorno do
+            #                                     ERP equivale a zerado para
+            #                                     o relatório de pendências)
+            #   requested  > 0, available valor → str(available) colorido
+            # `helv` (Helvetica core PDF font) NÃO contém em-dash (U+2014) —
+            # pymupdf cai no fallback "?". Por isso usamos hyphen ASCII "-",
+            # idêntico ao padrão do resto do builder.
+            if requested == 0:
+                text = "-"
+                color = C_MUTED
+                fontname = FONT
+            elif available is None:
+                text = "0"
+                color = C_STOCK_OUT
+                fontname = FONT_B
+            else:
+                avail_any = True
+                avail_total += available
+                text = str(available)
+                fontname = FONT_B
+                if available <= 0:
+                    color = C_STOCK_OUT
+                elif available >= requested:
+                    color = C_STOCK_OK
+                else:
+                    color = C_STOCK_PARTIAL
+
+            page.insert_textbox(
+                pymupdf.Rect(
+                    x_cel,
+                    y + 2,
+                    x_cel + COL_TAM_W,
+                    y + ROW_H_DADOS,
+                ),
+                text,
+                fontname=fontname,
+                fontsize=9,
+                color=color,
+                align=pymupdf.TEXT_ALIGN_CENTER,
+            )
+
+        page.insert_textbox(
+            pymupdf.Rect(
+                x_total,
+                y + 2,
+                x_total + COL_TOTAL_W,
+                y + ROW_H_DADOS,
+            ),
+            str(avail_total) if avail_any else "-",
+            fontname=FONT_B if avail_any else FONT,
+            fontsize=9,
+            color=C_MUTED if not avail_any else (C_STOCK_OK if avail_total > 0 else C_MUTED),
+            align=pymupdf.TEXT_ALIGN_CENTER,
+        )
+        return y + ROW_H_DADOS
 
     def _build_resumo_text(
         self,
@@ -523,3 +698,28 @@ class RomaneioBuilder:
                 fontsize=16,
                 color=C_ACENTO,
             )
+
+    # ── Footer note (relatório de pendências) ──
+
+    def _draw_footer_note(self, page: pymupdf.Page, note: str) -> None:
+        """Frase informativa centralizada no rodapé da última página.
+
+        Usado pelo relatório de pendências ("Itens acima não puderam ser
+        atendidos integralmente."). Posicionada perto da margem inferior.
+
+        `insert_textbox` precisa de altura suficiente para a linha; com
+        14pt vs fontsize 9 o pymupdf às vezes recusa silenciosamente.
+        Usamos `insert_text` com baseline calculado — mais previsível.
+        """
+        text_size = 9
+        # Centro horizontal: calcula largura e posiciona.
+        text_w = pymupdf.get_text_length(note, fontname=FONT, fontsize=text_size)
+        x = (PAGE_W - text_w) / 2
+        y = PAGE_H - MARGIN_Y / 2  # baseline a meio da margem inferior
+        page.insert_text(
+            (x, y),
+            note,
+            fontname=FONT,
+            fontsize=text_size,
+            color=C_MUTED,
+        )

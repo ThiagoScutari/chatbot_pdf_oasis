@@ -23,6 +23,7 @@ from sqlalchemy.orm import selectinload
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
 from catalogflow.modules.orders.models import Order, OrderItem
 from catalogflow.modules.romaneio.models import Romaneio
+from catalogflow.modules.stock.models import ErpSubmission, StockCheck
 
 # ──────────────────────────────────────────────
 #  Dashboard
@@ -424,6 +425,8 @@ class OrderDetail:
     order: Order
     catalog_name: str | None
     romaneio: Romaneio | None
+    stock_check: StockCheck | None
+    submission: ErpSubmission | None
 
 
 async def get_order_detail(
@@ -431,7 +434,7 @@ async def get_order_detail(
     order_id: UUID,
     brand_id: UUID,
 ) -> OrderDetail | None:
-    """Carrega o Order com items + romaneio (1:1) eager e o nome do catálogo."""
+    """Carrega o Order com items + romaneio + última stock_check + submission."""
     stmt = (
         select(Order)
         .where(Order.id == order_id, Order.brand_id == brand_id)
@@ -450,10 +453,33 @@ async def get_order_detail(
             select(Catalog.name).where(Catalog.id == order.catalog_id)
         )
 
+    stock_check = (
+        await db.execute(
+            select(StockCheck)
+            .where(
+                StockCheck.order_id == order_id,
+                StockCheck.brand_id == brand_id,
+            )
+            .order_by(StockCheck.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    submission = (
+        await db.execute(
+            select(ErpSubmission).where(
+                ErpSubmission.order_id == order_id,
+                ErpSubmission.brand_id == brand_id,
+            )
+        )
+    ).scalar_one_or_none()
+
     return OrderDetail(
         order=order,
         catalog_name=catalog_name,
         romaneio=order.romaneio,
+        stock_check=stock_check,
+        submission=submission,
     )
 
 
@@ -464,12 +490,20 @@ async def get_order_detail(
 
 @dataclass(slots=True)
 class ColorRow:
-    """Uma linha (SKU x cor) com quantidades por tamanho."""
+    """Uma linha (SKU x cor) com quantidades por tamanho.
+
+    A disponibilidade por tamanho é consultada via `stock_map` no template
+    — não duplicamos a info aqui. `stock_status_worst` e `available_total`
+    são agregações úteis (worst-case + soma) que evitam recomputar no
+    Jinja; mantidas para o template e para o gerador de relatórios.
+    """
 
     color_index: int
     color_hex: str | None
     qty_by_size: dict[str, int]
     total: int
+    stock_status_worst: str | None = None
+    available_total: int | None = None
 
 
 @dataclass(slots=True)
@@ -483,6 +517,69 @@ class GroupedProduct:
     sizes_seen: list[str]
     total_pecas: int
     subtotal: object  # Decimal | None
+
+
+# Ordem de severidade — define o pior status entre vários itens.
+# Quanto MENOR o índice, mais grave. Usado em _worst_status.
+_STATUS_SEVERITY: dict[str, int] = {
+    "out_of_stock": 0,
+    "partial": 1,
+    "unknown": 2,
+    "available": 3,
+}
+
+
+def _worst_status(statuses: list[str | None]) -> str | None:
+    """Retorna o status mais grave da lista (None ignorado)."""
+    valid = [s for s in statuses if s is not None]
+    if not valid:
+        return None
+    return min(valid, key=lambda s: _STATUS_SEVERITY.get(s, 4))
+
+
+# Tipo do lookup: (sku, color_index, size) -> available_qty (None = unknown).
+StockMap = dict[tuple[str, int, str], int | None]
+
+
+def build_stock_map(stock_check: StockCheck | None) -> StockMap:
+    """Constrói o mapa `(sku, color_index, size) -> available_qty` a partir
+    do snapshot JSONB do último `StockCheck`.
+
+    Vazio quando não há consulta concluída. Inclui também os itens com
+    `status="unknown"` — nesses casos `available_qty` vem `None`, e o
+    template trata como "consulta falhou para esse item" (mostra "?").
+    """
+    if stock_check is None or stock_check.status != "completed":
+        return {}
+    items = stock_check.result.get("items", []) if stock_check.result else []
+    result: StockMap = {}
+    for entry in items:
+        try:
+            key = (
+                str(entry["sku"]),
+                int(entry["color_index"]),
+                str(entry["size"]),
+            )
+        except (KeyError, ValueError, TypeError):
+            continue
+        available = entry.get("available")
+        result[key] = (
+            int(available) if isinstance(available, (int, float)) else None
+        )
+    return result
+
+
+def count_pendency_items(stock_map: StockMap, items: list[OrderItem]) -> int:
+    """Conta items do pedido cujo status no último check é partial ou out_of_stock.
+
+    Lê de `OrderItem.stock_status` (atualizado pelo service no fim de cada
+    consulta) — não precisa olhar o JSONB. `stock_map` é passado apenas para
+    deixar claro o contrato; aqui usamos a coluna mais barata.
+    """
+    del stock_map  # contrato — não precisa nesta implementação
+    return sum(
+        1 for item in items if item.stock_status in ("partial", "out_of_stock")
+    )
 
 
 def group_items_by_sku(
@@ -524,12 +621,27 @@ def group_items_by_sku(
             qty_by_size = dict.fromkeys(ordered_sizes, 0)
             for it in color_items:
                 qty_by_size[it.size] = qty_by_size.get(it.size, 0) + it.quantity
+
+            # Agregação de estoque por cor — pior status entre os tamanhos.
+            statuses = [it.stock_status for it in color_items]
+            stock_status = _worst_status(statuses)
+            # `available_total` só faz sentido quando todos os tamanhos
+            # têm disponibilidade conhecida — caso contrário fica None
+            # (o template trata como "consulta parcial / incompleta").
+            availables = [it.available_qty for it in color_items]
+            if stock_status is not None and all(a is not None for a in availables):
+                available_total = sum(a for a in availables if a is not None)
+            else:
+                available_total = None
+
             color_rows.append(
                 ColorRow(
                     color_index=color_index,
                     color_hex=color_items[0].color_hex,
                     qty_by_size=qty_by_size,
                     total=sum(qty_by_size.values()),
+                    stock_status_worst=stock_status,
+                    available_total=available_total,
                 )
             )
 

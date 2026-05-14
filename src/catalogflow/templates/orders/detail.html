@@ -2,10 +2,41 @@
 
 {% block title %}{{ detail.order.lojista_name or "Pedido" }} — CatalogFlow{% endblock %}
 
+{#
+  Macros — classificação e texto da célula de "Disponível".
+
+  Regra (decisão da PMO):
+    - requested == 0                          → "—" (muted)
+    - requested  > 0 e available is None      → "0"  (out)
+    - requested  > 0 e available <= 0         → str(available)  (out)
+    - requested  > 0 e 0 < available < req    → str(available)  (partial)
+    - requested  > 0 e available >= req       → str(available)  (ok)
+
+  `requested == 0` SEMPRE prevalece — mesmo que available tenha valor
+  numérico (ex.: tamanho não pedido neste pedido), exibimos "—" para
+  não poluir a tabela com qtds de tamanhos que o lojista não comprou.
+#}
+{% macro avail_class(requested, available) %}
+  {%- if requested == 0 -%}muted
+  {%- elif available is none -%}out
+  {%- elif available <= 0 -%}out
+  {%- elif available >= requested -%}ok
+  {%- else -%}partial
+  {%- endif -%}
+{% endmacro %}
+
+{% macro avail_text(requested, available) %}
+  {%- if requested == 0 -%}—
+  {%- elif available is none -%}0
+  {%- else -%}{{ available }}
+  {%- endif -%}
+{% endmacro %}
+
 {% block content %}
 {% set order = detail.order %}
 {% set order_id = order.id %}
 {% set status = order.status %}
+{% set has_stock = stock_state == "completed" and stock_map %}
 
 <nav class="breadcrumb"><a href="/orders">← Pedidos</a></nav>
 
@@ -59,21 +90,63 @@
         </div>
         {% endif %}
         <div class="size-grid">
+          {# Linha de tamanhos #}
           <div class="size-row">
             {% for size in prod.sizes_seen %}
               <div class="size-cell head">{{ size }}</div>
             {% endfor %}
           </div>
+          {# Linha de quantidades pedidas #}
           <div class="size-row">
             {% for size in prod.sizes_seen %}
-              <div class="size-cell">{{ color.qty_by_size.get(size, 0) }}</div>
+              <div class="size-cell">{{ color.qty_by_size.get(size, 0) or "—" }}</div>
             {% endfor %}
           </div>
+          {# Linha de disponibilidade — só quando consultado.
+             O `namespace` é obrigatório porque Jinja `{% set %}` dentro
+             de `for` não vaza para o escopo de fora (decisão da Jinja
+             desde 2.10). Sem ele, `color_has_stock` ficaria sempre False
+             após o loop e a sub-linha nunca renderizaria. #}
+          {% if has_stock %}
+            {% set ns_m = namespace(has_stock=false) %}
+            {% for size in prod.sizes_seen %}
+              {% if (prod.sku, color.color_index, size) in stock_map %}
+                {% set ns_m.has_stock = true %}
+              {% endif %}
+            {% endfor %}
+            {% if ns_m.has_stock %}
+            <div class="size-row size-row--stock">
+              {% for size in prod.sizes_seen %}
+                {% set requested = color.qty_by_size.get(size, 0) %}
+                {% set available = stock_map.get((prod.sku, color.color_index, size)) %}
+                <div class="size-cell size-cell--stock size-cell--{{ avail_class(requested, available) }}">
+                  {{ avail_text(requested, available) }}
+                </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          {% endif %}
         </div>
         {% endfor %}
 
         <div class="item-totals">
-          <span class="pecas">{{ prod.total_pecas }} peças</span>
+          <span class="pecas">Pedido: {{ prod.total_pecas }} peças</span>
+          {% if has_stock %}
+            {# Soma a disponibilidade conhecida em todos os (cor, size) deste SKU. #}
+            {% set ns = namespace(avail_total=0, avail_any=false) %}
+            {% for color in prod.color_rows %}
+              {% for size in prod.sizes_seen %}
+                {% set v = stock_map.get((prod.sku, color.color_index, size)) %}
+                {% if v is not none %}
+                  {% set ns.avail_total = ns.avail_total + v %}
+                  {% set ns.avail_any = true %}
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+            {% if ns.avail_any %}
+              <span class="pecas pecas--stock">Disponível: {{ ns.avail_total }} peças</span>
+            {% endif %}
+          {% endif %}
           {% if prod.subtotal is not none %}
           <span class="value">
             R$ {{ "%.2f"|format(prod.subtotal)|replace(",", "X")|replace(".", ",")|replace("X", ".") }}
@@ -107,7 +180,8 @@
         <tbody>
           {% for prod in grouped %}
             {% for color in prod.color_rows %}
-            <tr>
+            {# Linha 1: pedido #}
+            <tr class="order-row">
               <td class="product-thumb-cell">
                 {% if loop.first %}
                 <img
@@ -131,6 +205,44 @@
               {% endfor %}
               <td><strong>{{ color.total }}</strong></td>
             </tr>
+
+            {# Linha 2: disponibilidade — só quando há consulta concluída
+               para esta cor. Usamos `namespace` porque `{% set %}` dentro
+               de `for` é local ao loop (escopo Jinja 2.10+) — sem isso o
+               sinalizador `has_stock` ficaria sempre False. O mesmo
+               `namespace` carrega o total acumulado de disponível. #}
+            {% if has_stock %}
+              {% set ns = namespace(has_stock=false, avail_total=0, avail_any=false) %}
+              {% for size in all_sizes %}
+                {% if (prod.sku, color.color_index, size) in stock_map %}
+                  {% set ns.has_stock = true %}
+                {% endif %}
+              {% endfor %}
+              {% if ns.has_stock %}
+              <tr class="stock-row">
+                <td class="product-thumb-cell"></td>
+                <td class="stock-row-label" colspan="2">Disponível</td>
+                {% for size in all_sizes %}
+                  {% set requested = color.qty_by_size.get(size, 0) %}
+                  {% set available = stock_map.get((prod.sku, color.color_index, size)) %}
+                  <td class="stock-cell stock-cell--{{ avail_class(requested, available) }}">
+                    {{ avail_text(requested, available) }}
+                  </td>
+                  {# Só soma no total quando a célula realmente foi pedida —
+                     senão somaríamos qtds de tamanhos que o lojista não
+                     comprou, inflando o "Disponível" total da cor. #}
+                  {% if requested > 0 and available is not none %}
+                    {% set ns.avail_total = ns.avail_total + available %}
+                    {% set ns.avail_any = true %}
+                  {% endif %}
+                {% endfor %}
+                <td class="stock-cell-total">
+                  {%- if ns.avail_any -%}<strong>{{ ns.avail_total }}</strong>{%- else -%}—{%- endif -%}
+                </td>
+              </tr>
+              {% endif %}
+            {% endif %}
+
             {% endfor %}
           {% endfor %}
         </tbody>
@@ -162,4 +274,44 @@
 
   {% endif %}
 </section>
+
+{# ── Disponibilidade em estoque ── #}
+{% if grouped %}
+<section class="erp-section">
+  <h2 class="section-title">Disponibilidade em estoque</h2>
+  {% include "orders/_stock_action.html" %}
+
+  {# Bloco "Pendências" — só quando há partial ou out_of_stock #}
+  {% if has_stock and pendency_count and pendency_count > 0 %}
+  <div class="pendency-block">
+    <p class="pendency-headline">
+      {{ pendency_count }} {{ "item" if pendency_count == 1 else "itens" }}
+      com pendência de estoque
+    </p>
+    <p class="pendency-body">
+      Relatório para enviar à lojista com os itens
+      que não puderam ser atendidos integralmente.
+    </p>
+    <a class="btn-primary" href="/orders/{{ order.id }}/pendency-report" target="_blank" rel="noopener">
+      ↓ Gerar relatório de pendências
+    </a>
+  </div>
+  {% endif %}
+</section>
+
+{# ── Envio ao ERP ── #}
+<section class="erp-section">
+  <h2 class="section-title">Envio ao ERP</h2>
+  {% include "orders/_submit_action.html" %}
+</section>
+
+{# Quando o polling do estoque conclui, a API responde com header
+   HX-Trigger: stock-check-completed. Recarregamos para atualizar a
+   tabela de itens com a coluna de disponibilidade. #}
+<script>
+  document.body.addEventListener("stock-check-completed", function () {
+    setTimeout(function () { window.location.reload(); }, 400);
+  });
+</script>
+{% endif %}
 {% endblock %}
