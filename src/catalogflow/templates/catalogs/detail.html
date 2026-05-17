@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ catalog.name }} — CatalogFlow{% endblock %}
+{% block title %}{{ catalog.name }} — Oasis{% endblock %}
 
 {% block content %}
 <nav class="breadcrumb"><a href="/catalogs">← Catálogos</a></nav>
@@ -116,35 +116,51 @@
   {% endif %}
 </section>
 
-{# ── Exclusão (soft-delete com retenção de 60 dias) ── #}
+{# ── Exclusão (soft-delete com retenção de 60 dias) ──
+
+  Por que `<template x-teleport="body">`:
+    A página vive dentro de `<main class="page"><div class="container">…</div></main>`
+    e de um wrapper Alpine externo (modal de foto). Em alguns navegadores
+    qualquer ancestor com `transform`, `filter` ou `contain` cria um
+    containing-block para `position: fixed`, fazendo o overlay calcular
+    `inset: 0` em relação ao container em vez do viewport — efeito é
+    o overlay sumir / aparecer escondido. Teleporting o modal para
+    `<body>` elimina toda essa classe de bug; o `x-data` do `<section>`
+    permanece sendo o scope do teleported content (Alpine cuida disso).
+
+  `x-cloak` impede o flash inicial enquanto o Alpine ainda não bootou.
+#}
 <section class="danger-zone" x-data="{ confirmOpen: false }">
   <button
     type="button"
     class="link-danger"
-    @click="confirmOpen = true"
+    @click.prevent="confirmOpen = true"
   >Excluir catálogo</button>
 
-  <div
-    class="modal-overlay"
-    x-show="confirmOpen"
-    x-transition.opacity.duration.200ms
-    @click.self="confirmOpen = false"
-    @keydown.escape.window="confirmOpen = false"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="confirm-delete-title"
-  >
-    <div class="modal-content modal-confirm" @click.stop>
-      <h2 id="confirm-delete-title" class="modal-title">Excluir catálogo?</h2>
-      <p class="modal-body">
-        Tem certeza que deseja excluir este catálogo?<br>
-        Os dados serão removidos permanentemente após 60 dias.
-      </p>
-      <form method="post" action="/catalogs/{{ catalog.id }}/delete" class="modal-actions">
-        <button type="button" class="btn-secondary" @click="confirmOpen = false">Cancelar</button>
-        <button type="submit" class="btn-danger">Excluir</button>
-      </form>
+  <template x-teleport="body">
+    <div
+      x-show="confirmOpen"
+      x-cloak
+      class="modal-overlay"
+      x-transition.opacity.duration.200ms
+      @click.self="confirmOpen = false"
+      @keydown.escape.window="confirmOpen = false"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-delete-title"
+    >
+      <div class="modal-content modal-confirm" @click.stop>
+        <h2 id="confirm-delete-title" class="modal-title">Excluir catálogo?</h2>
+        <p class="modal-body">
+          Tem certeza que deseja excluir este catálogo?<br>
+          Os dados serão removidos permanentemente após 60 dias.
+        </p>
+        <form method="post" action="/catalogs/{{ catalog.id }}/delete" class="modal-actions">
+          <button type="button" class="btn-secondary" @click="confirmOpen = false">Cancelar</button>
+          <button type="submit" class="btn-danger">Excluir</button>
+        </form>
+      </div>
     </div>
-  </div>
+  </template>
 </section>
 {% endblock %}

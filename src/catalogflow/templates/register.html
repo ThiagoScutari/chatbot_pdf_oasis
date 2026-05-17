@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Pedir acesso — Oasis{% endblock %}
+
+{% block shell %}{% endblock %}
+
+{% block content %}
+<div class="login-screen">
+  <div class="login-card">
+    <h1 class="login-title">Pedir acesso</h1>
+
+    {% if sent %}
+    <p class="field-notice" role="status">
+      Recebemos seu pedido. Um administrador revisará e te avisaremos
+      por email quando o acesso for liberado.
+    </p>
+    <p class="login-hint">
+      <a href="/login">← Voltar para o login</a>
+    </p>
+    {% else %}
+    <form
+      method="post"
+      action="/register"
+      novalidate
+      x-data="{
+        name: '{{ name or '' }}',
+        email: '{{ email or '' }}',
+        password: '',
+        confirm: '',
+        get strong() { return this.password.length >= 8; },
+        get matches() { return this.password && this.password === this.confirm; }
+      }"
+    >
+      <div class="field">
+        <label for="name">Nome completo</label>
+        <input
+          id="name"
+          name="name"
+          type="text"
+          autocomplete="name"
+          required
+          autofocus
+          minlength="2"
+          maxlength="255"
+          x-model="name"
+        >
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          spellcheck="false"
+          autocapitalize="off"
+          placeholder="voce@oasis.com.br"
+          required
+          x-model="email"
+        >
+      </div>
+
+      <div class="field">
+        <label for="password">Senha (mín. 8 caracteres)</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="new-password"
+          minlength="8"
+          required
+          x-model="password"
+        >
+        <p
+          class="field-hint"
+          x-show="password.length > 0 && !strong"
+          x-transition.opacity
+        >Senha precisa ter ao menos 8 caracteres.</p>
+      </div>
+
+      <div class="field">
+        <label for="confirm">Confirme a senha</label>
+        <input
+          id="confirm"
+          type="password"
+          autocomplete="new-password"
+          minlength="8"
+          required
+          x-model="confirm"
+        >
+        <p
+          class="field-hint"
+          x-show="confirm.length > 0 && !matches"
+          x-transition.opacity
+        >As senhas não conferem.</p>
+      </div>
+
+      {% if error %}
+      <p class="field-error" role="alert">{{ error }}</p>
+      {% endif %}
+
+      <button
+        type="submit"
+        class="btn-primary btn-block"
+        :disabled="!strong || !matches"
+      >Pedir acesso &rarr;</button>
+    </form>
+
+    <p class="login-hint">
+      Já tem conta? <a href="/login">Entrar</a>
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Usuários — Oasis{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb"><a href="/dashboard">← Dashboard</a></nav>
+
+<section class="detail-header">
+  <div>
+    <h1>Usuários</h1>
+    <p class="metadata-strip">Gerencie pedidos de acesso e contas ativas.</p>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">Pedidos pendentes</h2>
+
+  {% if pending %}
+
+    <!-- Mobile -->
+    <ul class="card-list mobile-list" aria-label="Pedidos pendentes">
+      {% for u in pending %}
+      <li class="card-list-item">
+        <div class="title-row">
+          <span class="name">{{ u.name }}</span>
+        </div>
+        <div class="meta">{{ u.email }}</div>
+        <div class="meta">Solicitado em {{ format_date_short_pt(u.created_at) }}</div>
+        <div class="item-totals">
+          <form method="post" action="/admin/users/{{ u.id }}/approve" style="display:inline;">
+            <button type="submit" class="btn-primary">Aprovar</button>
+          </form>
+          <form method="post" action="/admin/users/{{ u.id }}/deny" style="display:inline;">
+            <button type="submit" class="btn-ghost">Recusar</button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <!-- Desktop -->
+    <div class="desktop-table">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>Solicitado</th>
+            <th class="num">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in pending %}
+          <tr>
+            <td>{{ u.name }}</td>
+            <td>{{ u.email }}</td>
+            <td>{{ format_date_short_pt(u.created_at) }}</td>
+            <td class="num">
+              <form method="post" action="/admin/users/{{ u.id }}/approve" style="display:inline;">
+                <button type="submit" class="btn-primary">Aprovar</button>
+              </form>
+              <form method="post" action="/admin/users/{{ u.id }}/deny" style="display:inline;">
+                <button type="submit" class="btn-ghost">Recusar</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% else %}
+    <div class="empty-state">
+      <p class="empty-body">Nenhum pedido aguardando aprovação.</p>
+    </div>
+  {% endif %}
+</section>
+
+<section>
+  <h2 class="section-title">Usuários ativos</h2>
+
+  {% if active %}
+
+    <ul class="card-list mobile-list" aria-label="Usuários ativos">
+      {% for u in active %}
+      <li class="card-list-item">
+        <div class="title-row">
+          <span class="name">{{ u.name }}</span>
+          <span class="text-muted text-sm">{{ u.role }}</span>
+        </div>
+        <div class="meta">{{ u.email }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <div class="desktop-table">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>Papel</th>
+            <th>Desde</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in active %}
+          <tr>
+            <td>{{ u.name }}</td>
+            <td>{{ u.email }}</td>
+            <td>{{ u.role }}</td>
+            <td>{{ format_date_short_pt(u.created_at) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% else %}
+    <div class="empty-state">
+      <p class="empty-body">Nenhum usuário ativo ainda.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

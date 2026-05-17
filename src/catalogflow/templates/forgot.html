@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Recuperar acesso — Oasis{% endblock %}
+
+{% block shell %}{% endblock %}
+
+{% block content %}
+<div class="login-screen">
+  <div class="login-card">
+    <h1 class="login-title">Recuperar acesso</h1>
+
+    {% if sent %}
+    <p class="field-notice" role="status">
+      Se houver uma conta com este email, enviamos um link de acesso
+      válido por 15 minutos.
+    </p>
+    <p class="login-hint">
+      <a href="/login">← Voltar para o login</a>
+    </p>
+    {% else %}
+    <form method="post" action="/forgot-password" novalidate>
+      <div class="field">
+        <label for="email">Email da sua conta</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="username"
+          spellcheck="false"
+          autocapitalize="off"
+          placeholder="voce@oasis.com.br"
+          required
+          autofocus
+          value="{{ email or '' }}"
+        >
+      </div>
+
+      {% if error %}
+      <p class="field-error" role="alert">{{ error }}</p>
+      {% endif %}
+
+      <button type="submit" class="btn-primary btn-block">Enviar link &rarr;</button>
+    </form>
+
+    <p class="login-hint">
+      <a href="/login">← Voltar para o login</a>
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
