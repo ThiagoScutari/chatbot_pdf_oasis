@@ -32,6 +32,75 @@ logger = logging.getLogger(__name__)
 _BASE_URL = "https://qrcode.amctextil.com.br"
 _DEFAULT_TIMEOUT_SECONDS = 3.0
 
+# Cache no Redis — chaves com prefixo (mesmo DB do resto da app, sem colisão).
+# TTLs por nível:
+#   - URL (scraping da página HTML do AMC): 7d. O CDN do AMC mantém URLs
+#     estáveis; vale só re-validar quando o cache "amadurece".
+#   - Bytes da imagem em si: 1d. O conteúdo pode ser regerado pelo CDN, mas
+#     2 níveis evitam o segundo round-trip (download) na maioria dos hits.
+_CACHE_KEY_URL_PREFIX = "img_url:"
+_CACHE_KEY_BYTES_PREFIX = "img_bytes:"
+_URL_CACHE_TTL_SECONDS = 7 * 24 * 3600
+_BYTES_CACHE_TTL_SECONDS = 24 * 3600
+
+
+async def _cache_get_url(sku: str) -> str | None:
+    """Lê `img_url:{sku}` do Redis. Fail-soft — exceção vira `None`."""
+    try:
+        from catalogflow.infra.cache import get_redis_client
+
+        client = get_redis_client()
+        value = await client.get(f"{_CACHE_KEY_URL_PREFIX}{sku}")
+        return value if value else None
+    except Exception:
+        logger.debug("img-cache: GET url falhou para sku=%s", sku, exc_info=False)
+        return None
+
+
+async def _cache_set_url(sku: str, url: str) -> None:
+    """Salva `img_url:{sku}` com TTL de 7 dias. Fail-soft."""
+    try:
+        from catalogflow.infra.cache import get_redis_client
+
+        client = get_redis_client()
+        await client.set(
+            f"{_CACHE_KEY_URL_PREFIX}{sku}",
+            url,
+            ex=_URL_CACHE_TTL_SECONDS,
+        )
+    except Exception:
+        logger.debug("img-cache: SET url falhou para sku=%s", sku, exc_info=False)
+
+
+async def cache_get_image_bytes(sku: str) -> bytes | None:
+    """Lê `img_bytes:{sku}` do Redis (binário). Fail-soft. Público — o web
+    handler usa diretamente para devolver Response sem passar pelo helper
+    do bytes (que descarta content-type)."""
+    try:
+        from catalogflow.infra.cache import get_redis_binary_client
+
+        client = get_redis_binary_client()
+        value = await client.get(f"{_CACHE_KEY_BYTES_PREFIX}{sku}")
+        return value if value else None
+    except Exception:
+        logger.debug("img-cache: GET bytes falhou para sku=%s", sku, exc_info=False)
+        return None
+
+
+async def cache_set_image_bytes(sku: str, data: bytes) -> None:
+    """Salva `img_bytes:{sku}` com TTL de 24h. Fail-soft."""
+    try:
+        from catalogflow.infra.cache import get_redis_binary_client
+
+        client = get_redis_binary_client()
+        await client.set(
+            f"{_CACHE_KEY_BYTES_PREFIX}{sku}",
+            data,
+            ex=_BYTES_CACHE_TTL_SECONDS,
+        )
+    except Exception:
+        logger.debug("img-cache: SET bytes falhou para sku=%s", sku, exc_info=False)
+
 
 def _normalize_sku(sku: str) -> str | None:
     """Converte `0142500001-0` no código canônico do AMC (`142500001`).
@@ -54,12 +123,16 @@ async def fetch_product_image_url(
 ) -> str | None:
     """Retorna a URL da foto de catálogo do produto, ou `None`.
 
-    Nunca levanta. Qualquer falha de rede, parse ou ausência da imagem
-    cai silenciosamente no `None`.
+    Cache: `img_url:{sku}` no Redis (TTL 7d). Lookup é fail-soft — se o
+    Redis estiver fora, o caminho segue para o scraping. Nunca levanta.
     """
     codigo = _normalize_sku(sku)
     if codigo is None:
         return None
+
+    cached_url = await _cache_get_url(sku)
+    if cached_url is not None:
+        return cached_url
 
     page_url = f"{_BASE_URL}/{codigo}"
 
@@ -89,6 +162,8 @@ async def fetch_product_image_url(
     src = target.get("src")
     if not isinstance(src, str) or not src:
         return None
+
+    await _cache_set_url(sku, src)
     return src
 
 
@@ -99,10 +174,14 @@ async def fetch_product_image_bytes(
 ) -> bytes | None:
     """Resolve a URL via `fetch_product_image_url` e baixa os bytes.
 
-    Combina os dois passos (HTML parse + GET da imagem) num só helper —
-    usado para embedar a foto em PDFs (romaneio, pendências). Nunca
-    levanta — falhas viram `None`.
+    Cache: `img_bytes:{sku}` no Redis (TTL 24h). Combina HTML parse +
+    GET da imagem num helper — usado para embedar foto em PDFs (romaneio,
+    pendências). Nunca levanta — falhas viram `None`.
     """
+    cached_bytes = await cache_get_image_bytes(sku)
+    if cached_bytes is not None:
+        return cached_bytes
+
     url = await fetch_product_image_url(sku, timeout=timeout)
     if url is None:
         return None
@@ -117,6 +196,8 @@ async def fetch_product_image_bytes(
         return None
     if resp.status_code != 200:
         return None
+
+    await cache_set_image_bytes(sku, resp.content)
     return resp.content
 
 

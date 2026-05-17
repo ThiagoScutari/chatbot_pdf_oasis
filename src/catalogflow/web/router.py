@@ -48,6 +48,10 @@ from catalogflow.web.auth import (
     set_session_cookie,
     verify_session,
 )
+from catalogflow.shared.image_fetcher import (
+    cache_get_image_bytes,
+    cache_set_image_bytes,
+)
 from catalogflow.web.product_image import fetch_product_image_url
 from catalogflow.web.user_service import WebUserService
 
@@ -1724,12 +1728,28 @@ async def product_image(
 ) -> Response:
     """Devolve thumbnail do produto: foto do AMC ou SVG placeholder.
 
-    O endpoint é protegido por sessão pra que SKUs aleatórios de
-    terceiros não usem o servidor como proxy genérico de scraping.
-    O parâmetro `name` é opcional — quando presente, dá iniciais
-    bonitas para o placeholder; sem ele, caímos no SKU.
+    Cache em duas camadas:
+    - `img_bytes:{sku}` no Redis (TTL 24h): se hit, devolve direto sem
+      bater no AMC. O content-type assumido aqui é `image/jpeg` porque
+      o AMC entrega JPEGs; é o mesmo default que o caminho não cacheado
+      usa quando o upstream omite o header.
+    - `img_url:{sku}` no Redis (TTL 7d): aplicado dentro de
+      `fetch_product_image_url`, pula o scraping HTML.
+
+    Falha de Redis é silenciosa (fail-soft) — o handler volta ao caminho
+    completo scraping+download. Endpoint protegido por sessão para não
+    virar proxy genérico de scraping.
     """
     del api_key  # gate de sessão; não usado pelo handler
+
+    # Atalho de cache: se já temos os bytes, devolvemos no ato.
+    cached = await cache_get_image_bytes(sku)
+    if cached is not None:
+        return Response(
+            content=cached,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     image_url = await fetch_product_image_url(sku)
     if image_url:
@@ -1741,6 +1761,7 @@ async def product_image(
             upstream = None
 
         if upstream is not None and upstream.status_code == 200:
+            await cache_set_image_bytes(sku, upstream.content)
             return Response(
                 content=upstream.content,
                 media_type=upstream.headers.get("content-type", "image/jpeg"),

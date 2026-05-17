@@ -16,12 +16,15 @@ from redis.asyncio import Redis, from_url
 from catalogflow.infra.settings import get_settings
 
 _redis: Redis | None = None
+_redis_binary: Redis | None = None
 
 
 def get_redis_client() -> Redis:
     """Retorna o cliente Redis, criando-o na primeira chamada.
 
-    Mantém um único `ConnectionPool` por processo.
+    Mantém um único `ConnectionPool` por processo. Os valores retornados
+    são strings (decode_responses=True) — para cachear payloads binários
+    (imagens etc.) use `get_redis_binary_client()`.
     """
     global _redis
     if _redis is None:
@@ -35,6 +38,24 @@ def get_redis_client() -> Redis:
     return _redis
 
 
+def get_redis_binary_client() -> Redis:
+    """Cliente Redis binário (`decode_responses=False`).
+
+    Usado pelo cache de fotos de produto — `redis-py` por padrão decodifica
+    GETs em UTF-8, o que falha para bytes JPEG. Mantemos um pool separado
+    para esses casos, evitando misturar text/bytes no mesmo cliente.
+    """
+    global _redis_binary
+    if _redis_binary is None:
+        settings = get_settings()
+        _redis_binary = from_url(
+            settings.redis_url,
+            decode_responses=False,
+            max_connections=10,
+        )
+    return _redis_binary
+
+
 async def get_redis() -> AsyncIterator[Redis]:
     """Dependency FastAPI: injeta cliente Redis."""
     client = get_redis_client()
@@ -46,11 +67,14 @@ async def get_redis() -> AsyncIterator[Redis]:
 
 
 async def close_redis() -> None:
-    """Fecha o pool global. Chamado no shutdown da aplicação."""
-    global _redis
+    """Fecha os pools globais. Chamado no shutdown da aplicação."""
+    global _redis, _redis_binary
     if _redis is not None:
         await _redis.aclose()
         _redis = None
+    if _redis_binary is not None:
+        await _redis_binary.aclose()
+        _redis_binary = None
 
 
 async def check_connection() -> dict[str, Any]:
