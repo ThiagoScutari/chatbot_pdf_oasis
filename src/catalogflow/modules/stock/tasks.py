@@ -21,7 +21,7 @@ from uuid import UUID
 from celery import Task
 
 from catalogflow.infra.celery_app import celery_app
-from catalogflow.infra.database import get_session_factory
+from catalogflow.infra.database import dispose_engine, get_session_factory
 from catalogflow.modules.stock.service import StockService
 
 logger = logging.getLogger(__name__)
@@ -37,22 +37,29 @@ async def _run_check(
     stock_check_id: UUID,
     job_id: UUID,
 ) -> dict[str, Any]:
+    """Mesma proteção contra event-loop conflict de `catalog.tasks`,
+    `romaneio.tasks` e `orders.tasks`: ver docstring deles para o motivo.
+    """
+    await dispose_engine()
     factory = get_session_factory()
-    async with factory() as session:
-        service = StockService(session)
-        try:
-            result = await service.check_order_stock(
-                order_id=order_id,
-                stock_check_id=stock_check_id,
-                job_id=job_id,
-            )
-            await session.commit()
-            return result
-        except Exception:
-            # `check_order_stock` já gravou estado de erro via _mark_job_error;
-            # commit para persistir mesmo na exceção.
-            await session.commit()
-            raise
+    try:
+        async with factory() as session:
+            service = StockService(session)
+            try:
+                result = await service.check_order_stock(
+                    order_id=order_id,
+                    stock_check_id=stock_check_id,
+                    job_id=job_id,
+                )
+                await session.commit()
+                return result
+            except Exception:
+                # `check_order_stock` já gravou estado de erro via _mark_job_error;
+                # commit para persistir mesmo na exceção.
+                await session.commit()
+                raise
+    finally:
+        await dispose_engine()
 
 
 async def _run_submit(
@@ -60,20 +67,25 @@ async def _run_submit(
     customer_code: str,
     job_id: UUID,
 ) -> dict[str, Any]:
+    """Mesma proteção contra event-loop conflict — ver `_run_check`."""
+    await dispose_engine()
     factory = get_session_factory()
-    async with factory() as session:
-        service = StockService(session)
-        try:
-            result = await service.submit_order_to_erp(
-                order_id=order_id,
-                customer_code=customer_code,
-                job_id=job_id,
-            )
-            await session.commit()
-            return result
-        except Exception:
-            await session.commit()
-            raise
+    try:
+        async with factory() as session:
+            service = StockService(session)
+            try:
+                result = await service.submit_order_to_erp(
+                    order_id=order_id,
+                    customer_code=customer_code,
+                    job_id=job_id,
+                )
+                await session.commit()
+                return result
+            except Exception:
+                await session.commit()
+                raise
+    finally:
+        await dispose_engine()
 
 
 @celery_app.task(
