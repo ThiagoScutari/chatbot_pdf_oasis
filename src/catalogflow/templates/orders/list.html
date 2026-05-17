@@ -3,6 +3,11 @@
 {% block title %}Pedidos — CatalogFlow{% endblock %}
 
 {% block content %}
+{% if notice == "order_deleted" %}
+{# Toast pós-redirect — vide comentário equivalente em catalogs/list.html. #}
+<div x-data x-init="$store.toasts.show('Pedido excluído', 'success')" hidden></div>
+{% endif %}
+
 <section class="page-header">
   <div class="page-header-row">
     <h1>Pedidos recebidos</h1>

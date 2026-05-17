@@ -252,6 +252,7 @@ class RomaneioService:
         stmt = select(Order).where(
             Order.id == order_id,
             Order.brand_id == brand_id,
+            Order.deleted_at.is_(None),
         )
         result = await self.db.execute(stmt)
         order = result.scalar_one_or_none()
@@ -295,7 +296,10 @@ class RomaneioService:
         return order, brand
 
     async def _find_romaneio(self, order_id: UUID) -> Romaneio | None:
-        stmt = select(Romaneio).where(Romaneio.order_id == order_id)
+        stmt = select(Romaneio).where(
+            Romaneio.order_id == order_id,
+            Romaneio.deleted_at.is_(None),
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -307,6 +311,7 @@ class RomaneioService:
         stmt = select(Romaneio).where(
             Romaneio.order_id == order_id,
             Romaneio.brand_id == brand_id,
+            Romaneio.deleted_at.is_(None),
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

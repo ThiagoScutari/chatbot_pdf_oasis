@@ -7,17 +7,26 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.models import Catalog
 from catalogflow.modules.orders.models import Order, OrderItem
+from catalogflow.modules.romaneio.models import Romaneio
 from catalogflow.web.auth import SESSION_COOKIE
+from catalogflow.web.tests.conftest import SAMPLE_USER_EMAIL, SAMPLE_USER_PASSWORD
 
 
-async def _login(client: AsyncClient, api_key: str) -> None:
-    """Faz POST /login e deixa o cookie assinado no cookie jar do client."""
-    resp = await client.post("/login", data={"api_key": api_key})
+async def _login(client: AsyncClient, _api_key: str | None = None) -> None:
+    """Faz POST /login com email+senha e popula o cookie de sessão.
+
+    Aceita um `_api_key` por compat retroativa com a assinatura antiga.
+    """
+    resp = await client.post(
+        "/login",
+        data={"email": SAMPLE_USER_EMAIL, "password": SAMPLE_USER_PASSWORD},
+    )
     assert resp.status_code == 302
     assert SESSION_COOKIE in client.cookies
 
@@ -455,6 +464,188 @@ class TestProductImage:
         assert ">VJ<" in body
         # Cor de fundo conforme paleta da marca.
         assert "#E8E0D5" in body
+
+
+class TestSoftDeleteCatalog:
+    """Soft-delete de catálogo via POST /catalogs/{id}/delete (Sprint 04+).
+
+    Regras:
+    - Marca `deleted_at` + `deleted_by` no registro, NÃO remove do banco.
+    - Redireciona para /catalogs?notice=catalog_deleted.
+    - Catálogo excluído some da lista e do dashboard.
+    - Catálogo de outra brand → 404 (não vaza existência).
+    """
+
+    async def test_delete_marks_deleted_at_and_redirects(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_catalog: Catalog,
+        db_session: AsyncSession,
+    ) -> None:
+        await _login(client, sample_api_key)
+        resp = await client.post(f"/catalogs/{sample_catalog.id}/delete")
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/catalogs?notice=catalog_deleted"
+
+        await db_session.refresh(sample_catalog)
+        assert sample_catalog.deleted_at is not None
+        assert sample_catalog.deleted_by is not None
+
+    async def test_deleted_catalog_hidden_from_list(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_catalog: Catalog,
+    ) -> None:
+        await _login(client, sample_api_key)
+        # Antes da exclusão aparece.
+        before = await client.get("/catalogs")
+        assert sample_catalog.name in before.text
+
+        await client.post(f"/catalogs/{sample_catalog.id}/delete")
+        after = await client.get("/catalogs")
+        assert sample_catalog.name not in after.text
+        # Estado vazio reaparece.
+        assert "Nenhum catálogo ainda" in after.text
+
+    async def test_deleted_catalog_excluded_from_dashboard_counts(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_catalog: Catalog,
+    ) -> None:
+        """Catálogo deletado some dos contadores do /dashboard."""
+        await _login(client, sample_api_key)
+        # Estado inicial: 1 catálogo ready (sample_catalog).
+        before = await client.get("/dashboard")
+        assert before.status_code == 200
+
+        await client.post(f"/catalogs/{sample_catalog.id}/delete")
+        after = await client.get("/dashboard")
+        assert after.status_code == 200
+        # Heurística: o nome do catálogo apareceria como atividade recente.
+        # Como o sample_catalog é a única atividade da brand, soft-delete o
+        # remove e o dashboard volta a mostrar o estado vazio das atividades.
+        assert sample_catalog.name not in after.text
+
+    async def test_delete_other_brand_returns_404(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        db_session: AsyncSession,
+    ) -> None:
+        from catalogflow.modules.auth import service as auth_service
+
+        other = await auth_service.create_brand(
+            db_session, slug="outra3", name="Outra Marca 3"
+        )
+        await db_session.commit()
+        foreign = Catalog(brand_id=other.id, name="Catálogo alheio", status="ready")
+        db_session.add(foreign)
+        await db_session.commit()
+        await db_session.refresh(foreign)
+
+        await _login(client, sample_api_key)
+        resp = await client.post(f"/catalogs/{foreign.id}/delete")
+        assert resp.status_code == 404
+        # Garante que NÃO foi marcado como excluído.
+        await db_session.refresh(foreign)
+        assert foreign.deleted_at is None
+
+
+class TestSoftDeleteOrder:
+    """Soft-delete de pedido via POST /orders/{id}/delete.
+
+    Marca o Order e o Romaneio associado (se houver). Pedido excluído
+    some da lista; pedido de outra brand → 404.
+    """
+
+    async def test_delete_marks_deleted_at_and_redirects(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_order: Order,
+        db_session: AsyncSession,
+    ) -> None:
+        await _login(client, sample_api_key)
+        resp = await client.post(f"/orders/{sample_order.id}/delete")
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/orders?notice=order_deleted"
+
+        await db_session.refresh(sample_order)
+        assert sample_order.deleted_at is not None
+        assert sample_order.deleted_by is not None
+
+    async def test_delete_cascades_to_romaneio(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_order: Order,
+        db_session: AsyncSession,
+    ) -> None:
+        """Pedido com Romaneio: ambos ficam com deleted_at preenchido."""
+        romaneio = Romaneio(
+            order_id=sample_order.id,
+            brand_id=sample_order.brand_id,
+            output_key=f"{sample_order.brand_id}/orders/{sample_order.id}/romaneio.pdf",
+        )
+        db_session.add(romaneio)
+        await db_session.commit()
+        await db_session.refresh(romaneio)
+        assert romaneio.deleted_at is None
+
+        await _login(client, sample_api_key)
+        await client.post(f"/orders/{sample_order.id}/delete")
+
+        # Reler o romaneio do banco pela chave primária.
+        rom = await db_session.scalar(
+            select(Romaneio).where(Romaneio.id == romaneio.id)
+        )
+        assert rom is not None
+        assert rom.deleted_at is not None
+
+    async def test_deleted_order_hidden_from_list(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_order: Order,
+    ) -> None:
+        await _login(client, sample_api_key)
+        before = await client.get("/orders")
+        assert sample_order.lojista_name is not None
+        assert sample_order.lojista_name in before.text
+
+        await client.post(f"/orders/{sample_order.id}/delete")
+        after = await client.get("/orders")
+        assert sample_order.lojista_name not in after.text
+
+    async def test_delete_other_brand_returns_404(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        db_session: AsyncSession,
+    ) -> None:
+        from catalogflow.modules.auth import service as auth_service
+
+        other = await auth_service.create_brand(
+            db_session, slug="outra4", name="Outra Marca 4"
+        )
+        await db_session.commit()
+        foreign = Order(
+            brand_id=other.id,
+            lojista_name="Loja Secreta 2",
+            status="extracted",
+        )
+        db_session.add(foreign)
+        await db_session.commit()
+        await db_session.refresh(foreign)
+
+        await _login(client, sample_api_key)
+        resp = await client.post(f"/orders/{foreign.id}/delete")
+        assert resp.status_code == 404
+        await db_session.refresh(foreign)
+        assert foreign.deleted_at is None
 
 
 class TestWebErrorPages:

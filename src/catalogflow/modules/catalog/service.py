@@ -155,7 +155,11 @@ class CatalogService:
         """
         stmt = (
             select(Catalog)
-            .where(Catalog.id == catalog_id, Catalog.brand_id == brand_id)
+            .where(
+                Catalog.id == catalog_id,
+                Catalog.brand_id == brand_id,
+                Catalog.deleted_at.is_(None),
+            )
             .options(selectinload(Catalog.products))
         )
         result = await self.db.execute(stmt)

@@ -3,6 +3,12 @@
 {% block title %}Catálogos — CatalogFlow{% endblock %}
 
 {% block content %}
+{% if notice == "catalog_deleted" %}
+{# Toast pós-redirect: a página de detalhe redireciona para cá com
+   ?notice=catalog_deleted depois de marcar o registro como excluído. #}
+<div x-data x-init="$store.toasts.show('Catálogo excluído', 'success')" hidden></div>
+{% endif %}
+
 <section class="page-header">
   <div class="page-header-row">
     <h1>Catálogos</h1>

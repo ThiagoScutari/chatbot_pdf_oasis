@@ -115,4 +115,36 @@
     </div>
   {% endif %}
 </section>
+
+{# ── Exclusão (soft-delete com retenção de 60 dias) ── #}
+<section class="danger-zone" x-data="{ confirmOpen: false }">
+  <button
+    type="button"
+    class="link-danger"
+    @click="confirmOpen = true"
+  >Excluir catálogo</button>
+
+  <div
+    class="modal-overlay"
+    x-show="confirmOpen"
+    x-transition.opacity.duration.200ms
+    @click.self="confirmOpen = false"
+    @keydown.escape.window="confirmOpen = false"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="confirm-delete-title"
+  >
+    <div class="modal-content modal-confirm" @click.stop>
+      <h2 id="confirm-delete-title" class="modal-title">Excluir catálogo?</h2>
+      <p class="modal-body">
+        Tem certeza que deseja excluir este catálogo?<br>
+        Os dados serão removidos permanentemente após 60 dias.
+      </p>
+      <form method="post" action="/catalogs/{{ catalog.id }}/delete" class="modal-actions">
+        <button type="button" class="btn-secondary" @click="confirmOpen = false">Cancelar</button>
+        <button type="submit" class="btn-danger">Excluir</button>
+      </form>
+    </div>
+  </div>
+</section>
 {% endblock %}

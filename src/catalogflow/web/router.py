@@ -10,7 +10,7 @@ o `WebUser`; a `api_key` é usada nas chamadas internas à API REST
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -19,11 +19,15 @@ import httpx
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalogflow.infra.database import get_db
 from catalogflow.infra.settings import get_settings
 from catalogflow.modules.auth.models import Brand, WebUser
+from catalogflow.modules.catalog.models import Catalog
+from catalogflow.modules.orders.models import Order
+from catalogflow.modules.romaneio.models import Romaneio
 from catalogflow.shared.errors import (
     AuthenticationError,
     ConflictError,
@@ -37,6 +41,7 @@ from catalogflow.web.auth import (
     create_session,
     mint_session_api_key,
     require_admin,
+    require_session,
     require_session_api_key,
     require_session_brand,
     revoke_session_api_key,
@@ -408,10 +413,15 @@ async def dashboard(
 async def catalogs_list(
     request: Request,
     page: int = 1,
+    notice: str | None = None,
     brand: Brand = Depends(require_session_brand),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    """Lista paginada de catálogos da brand."""
+    """Lista paginada de catálogos da brand.
+
+    `notice` é um código curto opcional que dispara um toast no carregamento
+    (ex.: `catalog_deleted` após soft-delete).
+    """
     catalog_page = await data.list_catalogs(db, brand.id, page=page)
     return templates.TemplateResponse(
         request,
@@ -419,6 +429,7 @@ async def catalogs_list(
         {
             "brand": brand,
             "page": catalog_page,
+            "notice": notice,
         },
     )
 
@@ -777,6 +788,44 @@ async def catalog_download(
     )
 
 
+# ──────────────────────────────────────────────
+#  POST /catalogs/{id}/delete  — soft-delete
+# ──────────────────────────────────────────────
+
+
+@router.post("/catalogs/{catalog_id}/delete")
+async def catalog_delete(
+    request: Request,
+    catalog_id: UUID,
+    user: WebUser = Depends(require_session),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Marca o catálogo como excluído (soft-delete).
+
+    Retenção 60 dias: os bytes em S3 NÃO são removidos aqui — um job de
+    limpeza periódica (futuro) é quem materializa a exclusão definitiva.
+    Cross-tenant: catálogo de outra brand → 404 elegante.
+    """
+    stmt = select(Catalog).where(
+        Catalog.id == catalog_id,
+        Catalog.brand_id == user.brand_id,
+        Catalog.deleted_at.is_(None),
+    )
+    catalog = (await db.execute(stmt)).scalar_one_or_none()
+    if catalog is None:
+        return _render_not_found(request)
+
+    catalog.deleted_at = datetime.now(UTC)
+    catalog.deleted_by = user.id
+    await db.flush()
+    await db.commit()
+
+    return RedirectResponse(
+        url="/catalogs?notice=catalog_deleted",
+        status_code=status.HTTP_302_FOUND,
+    )
+
+
 # ═════════════════════════════════════════════════════════════
 #  ORDERS — lista, detalhe e ação do romaneio
 # ═════════════════════════════════════════════════════════════
@@ -786,15 +835,76 @@ async def catalog_download(
 async def orders_list(
     request: Request,
     page: int = 1,
+    notice: str | None = None,
     brand: Brand = Depends(require_session_brand),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    """Lista paginada de pedidos da brand."""
+    """Lista paginada de pedidos da brand.
+
+    `notice` (ex.: `order_deleted`) dispara um toast pós-redirect.
+    """
     order_page = await data.list_orders(db, brand.id, page=page)
     return templates.TemplateResponse(
         request,
         "orders/list.html",
-        {"brand": brand, "page": order_page},
+        {"brand": brand, "page": order_page, "notice": notice},
+    )
+
+
+# ──────────────────────────────────────────────
+#  POST /orders/{id}/delete  — soft-delete + cascade no romaneio
+# ──────────────────────────────────────────────
+
+
+@router.post("/orders/{order_id}/delete")
+async def order_delete(
+    request: Request,
+    order_id: UUID,
+    user: WebUser = Depends(require_session),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Marca o pedido (e o romaneio associado, se houver) como excluído.
+
+    Sem período de retenção visível para pedidos — somem da UI imediatamente.
+    Cross-tenant: pedido de outra brand → 404 elegante.
+    """
+    stmt = select(Order).where(
+        Order.id == order_id,
+        Order.brand_id == user.brand_id,
+        Order.deleted_at.is_(None),
+    )
+    order = (await db.execute(stmt)).scalar_one_or_none()
+    if order is None:
+        return _render_not_found(
+            request,
+            title="Pedido não encontrado",
+            message="Este pedido pode ter sido removido ou nunca existiu.",
+        )
+
+    now = datetime.now(UTC)
+    order.deleted_at = now
+    order.deleted_by = user.id
+
+    # Cascade lógico no romaneio (1:1). Não há FK ondelete que ajude aqui
+    # — esta linha é o que esconde o romaneio da UI.
+    romaneio = (
+        await db.execute(
+            select(Romaneio).where(
+                Romaneio.order_id == order.id,
+                Romaneio.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if romaneio is not None:
+        romaneio.deleted_at = now
+        romaneio.deleted_by = user.id
+
+    await db.flush()
+    await db.commit()
+
+    return RedirectResponse(
+        url="/orders?notice=order_deleted",
+        status_code=status.HTTP_302_FOUND,
     )
 
 

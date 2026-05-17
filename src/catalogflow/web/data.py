@@ -52,21 +52,35 @@ class ActivityItem:
 
 
 async def get_dashboard_counts(db: AsyncSession, brand_id: UUID) -> DashboardCounts:
-    """Retorna as quatro contagens do dashboard em paralelo (single round-trip por query)."""
+    """Retorna as quatro contagens do dashboard em paralelo (single round-trip por query).
+
+    Soft-deletes ficam fora — quem foi excluído pela UI não aparece no
+    dashboard mesmo enquanto o registro ainda existir no banco.
+    """
     catalogs_total = await db.scalar(
-        select(func.count(Catalog.id)).where(Catalog.brand_id == brand_id)
+        select(func.count(Catalog.id)).where(
+            Catalog.brand_id == brand_id,
+            Catalog.deleted_at.is_(None),
+        )
     )
     catalogs_ready = await db.scalar(
         select(func.count(Catalog.id)).where(
             Catalog.brand_id == brand_id,
             Catalog.status == "ready",
+            Catalog.deleted_at.is_(None),
         )
     )
     orders_total = await db.scalar(
-        select(func.count(Order.id)).where(Order.brand_id == brand_id)
+        select(func.count(Order.id)).where(
+            Order.brand_id == brand_id,
+            Order.deleted_at.is_(None),
+        )
     )
     romaneios_total = await db.scalar(
-        select(func.count(Romaneio.id)).where(Romaneio.brand_id == brand_id)
+        select(func.count(Romaneio.id)).where(
+            Romaneio.brand_id == brand_id,
+            Romaneio.deleted_at.is_(None),
+        )
     )
     return DashboardCounts(
         catalogs_total=int(catalogs_total or 0),
@@ -90,13 +104,13 @@ async def get_recent_activity(
     """
     cat_stmt = (
         select(Catalog.id, Catalog.name, Catalog.status, Catalog.created_at)
-        .where(Catalog.brand_id == brand_id)
+        .where(Catalog.brand_id == brand_id, Catalog.deleted_at.is_(None))
         .order_by(Catalog.created_at.desc())
         .limit(limit)
     )
     ord_stmt = (
         select(Order.id, Order.lojista_name, Order.status, Order.created_at)
-        .where(Order.brand_id == brand_id)
+        .where(Order.brand_id == brand_id, Order.deleted_at.is_(None))
         .order_by(Order.created_at.desc())
         .limit(limit)
     )
@@ -177,7 +191,10 @@ async def list_catalogs(
     offset = (page - 1) * page_size
 
     total = await db.scalar(
-        select(func.count(Catalog.id)).where(Catalog.brand_id == brand_id)
+        select(func.count(Catalog.id)).where(
+            Catalog.brand_id == brand_id,
+            Catalog.deleted_at.is_(None),
+        )
     )
 
     stmt = (
@@ -189,7 +206,7 @@ async def list_catalogs(
             Catalog.status,
             Catalog.created_at,
         )
-        .where(Catalog.brand_id == brand_id)
+        .where(Catalog.brand_id == brand_id, Catalog.deleted_at.is_(None))
         .order_by(Catalog.created_at.desc())
         .limit(page_size)
         .offset(offset)
@@ -236,7 +253,11 @@ async def list_ready_catalog_options(
     """
     stmt = (
         select(Catalog.id, Catalog.name)
-        .where(Catalog.brand_id == brand_id, Catalog.status == "ready")
+        .where(
+            Catalog.brand_id == brand_id,
+            Catalog.status == "ready",
+            Catalog.deleted_at.is_(None),
+        )
         .order_by(Catalog.created_at.desc())
         .limit(limit)
     )
@@ -253,6 +274,7 @@ async def get_catalog_status(
     stmt = select(Catalog.status).where(
         Catalog.id == catalog_id,
         Catalog.brand_id == brand_id,
+        Catalog.deleted_at.is_(None),
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -272,6 +294,7 @@ async def get_catalog(
     stmt = select(Catalog).where(
         Catalog.id == catalog_id,
         Catalog.brand_id == brand_id,
+        Catalog.deleted_at.is_(None),
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -392,7 +415,10 @@ async def list_orders(
     offset = (page - 1) * page_size
 
     total = await db.scalar(
-        select(func.count(Order.id)).where(Order.brand_id == brand_id)
+        select(func.count(Order.id)).where(
+            Order.brand_id == brand_id,
+            Order.deleted_at.is_(None),
+        )
     )
 
     stmt = (
@@ -405,7 +431,7 @@ async def list_orders(
             Catalog.name.label("catalog_name"),
         )
         .outerjoin(Catalog, Order.catalog_id == Catalog.id)
-        .where(Order.brand_id == brand_id)
+        .where(Order.brand_id == brand_id, Order.deleted_at.is_(None))
         .order_by(Order.created_at.desc())
         .limit(page_size)
         .offset(offset)
@@ -437,7 +463,9 @@ async def get_order_status(
 ) -> str | None:
     """Status atual de um pedido (None se outro tenant / inexistente)."""
     stmt = select(Order.status).where(
-        Order.id == order_id, Order.brand_id == brand_id
+        Order.id == order_id,
+        Order.brand_id == brand_id,
+        Order.deleted_at.is_(None),
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -467,7 +495,11 @@ async def get_order_detail(
     """Carrega o Order com items + romaneio + última stock_check + submission."""
     stmt = (
         select(Order)
-        .where(Order.id == order_id, Order.brand_id == brand_id)
+        .where(
+            Order.id == order_id,
+            Order.brand_id == brand_id,
+            Order.deleted_at.is_(None),
+        )
         .options(
             selectinload(Order.items),
             selectinload(Order.romaneio),
@@ -477,10 +509,19 @@ async def get_order_detail(
     if order is None:
         return None
 
+    # Romaneio carregado via selectinload pode estar soft-deleted: a UI
+    # de pedido excluído nem chega aqui, mas se um pedido vivo tiver um
+    # romaneio marcado como excluído, escondemos da UI.
+    if order.romaneio is not None and order.romaneio.deleted_at is not None:
+        order.romaneio = None
+
     catalog_name: str | None = None
     if order.catalog_id is not None:
         catalog_name = await db.scalar(
-            select(Catalog.name).where(Catalog.id == order.catalog_id)
+            select(Catalog.name).where(
+                Catalog.id == order.catalog_id,
+                Catalog.deleted_at.is_(None),
+            )
         )
 
     stock_check = (

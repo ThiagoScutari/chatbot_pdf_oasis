@@ -149,7 +149,11 @@ class OrderService:
         """Eager load `items` via `selectinload` (lição de Sprint 01)."""
         stmt = (
             select(Order)
-            .where(Order.id == order_id, Order.brand_id == brand_id)
+            .where(
+                Order.id == order_id,
+                Order.brand_id == brand_id,
+                Order.deleted_at.is_(None),
+            )
             .options(selectinload(Order.items))
         )
         result = await self.db.execute(stmt)
@@ -242,6 +246,7 @@ class OrderService:
         stmt = select(Catalog.id).where(
             Catalog.id == catalog_id,
             Catalog.brand_id == brand_id,
+            Catalog.deleted_at.is_(None),
         )
         result = await self.db.execute(stmt)
         if result.scalar_one_or_none() is None:

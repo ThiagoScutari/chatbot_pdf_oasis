@@ -96,6 +96,15 @@ class Catalog(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    deleted_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("web_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     products: Mapped[list[CatalogProduct]] = relationship(
         back_populates="catalog",
