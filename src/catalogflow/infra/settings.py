@@ -9,9 +9,9 @@ Ver `.env.example` para a lista completa de variáveis suportadas.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["development", "staging", "production"]
@@ -46,9 +46,13 @@ class Settings(BaseSettings):
     database_echo: bool = False
 
     # ── Redis / Celery ────────────────────────
+    # Default derivado de REDIS_URL (DB 1/broker, DB 2/result) — assim basta
+    # apontar REDIS_URL para a infra correta (ex.: hostname do compose) e o
+    # broker/backend seguem junto. Defina CELERY_BROKER_URL / CELERY_RESULT_BACKEND
+    # explicitamente apenas para override (ex.: Redis separado pra fila).
     redis_url: str = "redis://localhost:6379/0"
-    celery_broker_url: str = "redis://localhost:6379/1"
-    celery_result_backend: str = "redis://localhost:6379/2"
+    celery_broker_url: str = Field(default="")
+    celery_result_backend: str = Field(default="")
     celery_result_ttl_seconds: int = 86_400
 
     # ── Storage (S3 / R2) ─────────────────────
@@ -116,6 +120,25 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _derive_celery_urls(self) -> Self:
+        """Preenche broker/backend a partir do REDIS_URL quando não fornecidos.
+
+        Mantém a override explícita: se CELERY_BROKER_URL / CELERY_RESULT_BACKEND
+        vierem do .env / env do processo, são usados literalmente. Só quando
+        vazios é que derivamos de REDIS_URL (DBs 1 e 2 por convenção ADR-002).
+        """
+        if not self.celery_broker_url:
+            self.celery_broker_url = self._redis_db_url(1)
+        if not self.celery_result_backend:
+            self.celery_result_backend = self._redis_db_url(2)
+        return self
+
+    def _redis_db_url(self, db: int) -> str:
+        """Substitui o trecho `/<db>` final do REDIS_URL pelo db pedido."""
+        base = self.redis_url.rsplit("/", 1)[0]
+        return f"{base}/{db}"
 
     @property
     def max_pdf_size_bytes(self) -> int:
