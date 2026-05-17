@@ -22,7 +22,7 @@ from uuid import UUID
 from celery import Task
 
 from catalogflow.infra.celery_app import celery_app
-from catalogflow.infra.database import get_session_factory
+from catalogflow.infra.database import dispose_engine, get_session_factory
 from catalogflow.modules.orders.service import OrderService
 from catalogflow.shared.errors import (
     PDFCorruptError,
@@ -40,22 +40,38 @@ _PERMANENT_ERRORS: tuple[type[Exception], ...] = (
 
 
 async def _run_process_order(order_id: UUID, job_id: UUID) -> dict[str, Any]:
-    """Executa o pipeline em uma sessão dedicada do worker."""
+    """Executa o pipeline em uma sessão dedicada do worker.
+
+    `asyncio.run()` em `extract_order_task` cria um event loop novo a cada
+    execução. O singleton de engine asyncpg em `infra.database` é cacheado
+    entre tasks, então o pool retorna conexões atreladas a loops já
+    fechados e SQLAlchemy quebra com
+    `RuntimeError: got Future attached to a different loop` da 2ª task
+    em diante no mesmo worker process.
+
+    Solução (mesma de `catalog.tasks` e `romaneio.tasks`): dispor o engine
+    global antes e depois. O próximo `get_session_factory()` recria engine
+    + pool atrelados ao loop atual.
+    """
+    await dispose_engine()
     factory = get_session_factory()
-    async with factory() as session:
-        service = OrderService(session)
-        try:
-            result = await service.process_order(
-                order_id=order_id,
-                job_id=job_id,
-            )
-            await session.commit()
-            return result
-        except Exception:
-            # `process_order` já gravou o estado de erro via `_mark_error`;
-            # commit é necessário para persistir o estado mesmo na exceção.
-            await session.commit()
-            raise
+    try:
+        async with factory() as session:
+            service = OrderService(session)
+            try:
+                result = await service.process_order(
+                    order_id=order_id,
+                    job_id=job_id,
+                )
+                await session.commit()
+                return result
+            except Exception:
+                # `process_order` já gravou o estado de erro via `_mark_error`;
+                # commit é necessário para persistir o estado mesmo na exceção.
+                await session.commit()
+                raise
+    finally:
+        await dispose_engine()
 
 
 @celery_app.task(
