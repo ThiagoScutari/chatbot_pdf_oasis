@@ -13,14 +13,16 @@ import pytest_asyncio
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from catalogflow.infra.database import get_db
 from catalogflow.modules.auth import service as auth_service
-from catalogflow.modules.auth.models import Brand
+from catalogflow.modules.auth.models import Brand, WebUser
 from catalogflow.shared.errors import DomainError
 from catalogflow.web.router import router as web_router
+from catalogflow.web.user_service import hash_password
 
 
 def _domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -79,11 +81,78 @@ async def sample_brand(db_session: AsyncSession) -> Brand:
 async def sample_api_key(
     db_session: AsyncSession, sample_brand: Brand
 ) -> str:
-    """Cria uma API key para a brand e retorna o raw token."""
+    """Cria uma API key + um WebUser ativo para a brand.
+
+    Sprint 03.5: o login passou a ser email+senha. Mantemos esta fixture
+    porque ela ainda é referenciada pelos testes do web — agora ela
+    garante que existe um operador `SAMPLE_USER_EMAIL` ativo. O `raw`
+    devolvido continua sendo uma API key real (útil para testes que
+    chamam diretamente a API REST).
+    """
     _, raw = await auth_service.create_api_key(
         db_session,
         brand_id=sample_brand.id,
         name="web-login-test",
     )
+    # Garante que existe operador ativo para o _login(email+senha) funcionar.
+    existing = await db_session.scalar(
+        select(WebUser).where(WebUser.email == SAMPLE_USER_EMAIL)
+    )
+    if existing is None:
+        db_session.add(
+            WebUser(
+                brand_id=sample_brand.id,
+                email=SAMPLE_USER_EMAIL,
+                name="Operadora Teste",
+                password_hash=hash_password(SAMPLE_USER_PASSWORD),
+                role="operator",
+                is_active=True,
+            )
+        )
     await db_session.commit()
     return raw
+
+
+SAMPLE_USER_EMAIL = "operadora@oasis.com.br"
+SAMPLE_USER_PASSWORD = "senha-teste-123"
+SAMPLE_ADMIN_EMAIL = "admin@oasis.com.br"
+SAMPLE_ADMIN_PASSWORD = "admin-teste-123"
+
+
+@pytest_asyncio.fixture
+async def sample_user(db_session: AsyncSession, sample_brand: Brand) -> WebUser:
+    """Operador ativo já aprovado — login pronto por email/senha."""
+    existing = await db_session.scalar(
+        select(WebUser).where(WebUser.email == SAMPLE_USER_EMAIL)
+    )
+    if existing is not None:
+        return existing
+    user = WebUser(
+        brand_id=sample_brand.id,
+        email=SAMPLE_USER_EMAIL,
+        name="Operadora Teste",
+        password_hash=hash_password(SAMPLE_USER_PASSWORD),
+        role="operator",
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def sample_admin(db_session: AsyncSession, sample_brand: Brand) -> WebUser:
+    """Admin ativo para testar painel `/admin/users`."""
+    user = WebUser(
+        brand_id=sample_brand.id,
+        email=SAMPLE_ADMIN_EMAIL,
+        name="Admin Teste",
+        password_hash=hash_password(SAMPLE_ADMIN_PASSWORD),
+        role="admin",
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user

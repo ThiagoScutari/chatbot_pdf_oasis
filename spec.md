@@ -175,7 +175,7 @@ Plataforma SaaS que transforma catálogos PDF visuais em instrumentos de captura
 | PDF Fallback | PyPDFForm | 4.x | MIT license, AcroForm |
 | QR Code | qrcode[pil] | 8.x | Geração de QR por produto |
 | File Storage | boto3 (S3/R2) | latest | Upload/download de PDFs |
-| Auth | python-jose + passlib | latest | JWT + API keys |
+| Auth | python-jose + bcrypt | latest | JWT + API keys |
 | HTTP Client | httpx | latest | Async requests para ERP (Fase 2) |
 | Testes | pytest + pytest-asyncio | latest | Suite completa |
 | Fixtures | factory-boy | latest | Dados de teste reproduzíveis |

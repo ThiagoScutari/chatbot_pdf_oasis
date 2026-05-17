@@ -43,6 +43,9 @@ _TABLES_TO_TRUNCATE: tuple[str, ...] = (
     "orders",
     "catalog_products",
     "catalogs",
+    "login_attempts",
+    "magic_links",
+    "web_users",
     "api_keys",
     "brands",
 )
