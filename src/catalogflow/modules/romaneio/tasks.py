@@ -16,7 +16,7 @@ from uuid import UUID
 from celery import Task
 
 from catalogflow.infra.celery_app import celery_app
-from catalogflow.infra.database import get_session_factory
+from catalogflow.infra.database import dispose_engine, get_session_factory
 from catalogflow.modules.romaneio.service import RomaneioService
 from catalogflow.shared.image_fetcher import fetch_product_images
 
@@ -27,22 +27,39 @@ async def _run_process_romaneio(
     romaneio_id: UUID,
     job_id: UUID,
 ) -> dict[str, Any]:
+    """Executa o pipeline em uma sessão dedicada do worker.
+
+    `asyncio.run()` em `generate_romaneio_task` cria um event loop novo a
+    cada execução. O singleton de engine em `infra.database`, porém, é
+    cacheado entre tasks — então o pool retorna conexões asyncpg ligadas
+    a loops já fechados, e SQLAlchemy quebra com
+    `RuntimeError: got Future attached to a different loop` na segunda
+    task em diante do mesmo worker process.
+
+    Solução (mesma de `catalog.tasks._run_process_catalog`): dispor o
+    engine global antes e depois. O próximo `get_session_factory()`
+    recria engine + pool atrelados ao loop atual.
+    """
+    await dispose_engine()
     factory = get_session_factory()
-    async with factory() as session:
-        # Em produção, injetamos o fetcher real — o PDF sai com fotos.
-        # Em testes, RomaneioService(db_session) sem `image_fetcher` mantém
-        # o PDF gerado offline (sem chamadas ao AMC).
-        service = RomaneioService(session, image_fetcher=fetch_product_images)
-        try:
-            result = await service.process_romaneio(
-                romaneio_id=romaneio_id,
-                job_id=job_id,
-            )
-            await session.commit()
-            return result
-        except Exception:
-            await session.commit()
-            raise
+    try:
+        async with factory() as session:
+            # Em produção, injetamos o fetcher real — o PDF sai com fotos.
+            # Em testes, RomaneioService(db_session) sem `image_fetcher` mantém
+            # o PDF gerado offline (sem chamadas ao AMC).
+            service = RomaneioService(session, image_fetcher=fetch_product_images)
+            try:
+                result = await service.process_romaneio(
+                    romaneio_id=romaneio_id,
+                    job_id=job_id,
+                )
+                await session.commit()
+                return result
+            except Exception:
+                await session.commit()
+                raise
+    finally:
+        await dispose_engine()
 
 
 @celery_app.task(
