@@ -1,0 +1,53 @@
+{# Fragmento de polling do upload de pedido — substitui o innerHTML de
+   #upload-poll-target a cada 2s enquanto o job está pending/running.
+
+   `job` é o objeto Job carregado do banco.
+   `friendly_error` é uma mensagem amigável já mapeada por código.
+#}
+
+{% if job.status in ("pending", "running") %}
+<div
+  class="processing-block"
+  hx-get="/orders/upload/poll/{{ job.id }}"
+  hx-trigger="every 2s"
+  hx-target="#upload-poll-target"
+  hx-swap="innerHTML"
+>
+  <h2 class="processing-title">Extraindo pedido…</h2>
+  <div class="progress-bar">
+    <div class="progress-bar-fill" style="width: {{ job.progress }}%"></div>
+  </div>
+  <p class="processing-meta">
+    {% if job.progress < 40 %}
+      <span aria-hidden="true">⟳</span> Lendo campos preenchidos…
+    {% elif job.progress < 80 %}
+      <span aria-hidden="true">⟳</span> Normalizando itens…
+    {% else %}
+      <span aria-hidden="true">⟳</span> Gerando romaneio…
+    {% endif %}
+  </p>
+</div>
+
+{% elif job.status == "success" %}
+<div class="result-tile success">
+  <p class="glyph" aria-hidden="true">✓</p>
+  <h2 class="result-title">Pedido extraído</h2>
+  <p class="result-meta">
+    {{ job.result.n_skus or 0 }} SKUs · {{ job.result.total_pecas or 0 }} peças
+  </p>
+  <div class="result-actions">
+    <a class="btn-primary" href="/orders/{{ job.result.order_id }}">Ver pedido</a>
+    <a class="btn-secondary" href="/orders/{{ job.result.order_id }}/romaneio/download">↓ Baixar romaneio</a>
+  </div>
+</div>
+
+{% else %}
+<div class="result-tile error">
+  <p class="glyph" aria-hidden="true">✕</p>
+  <h2 class="result-title">Não foi possível extrair o pedido</h2>
+  <p class="result-meta">{{ friendly_error }}</p>
+  <div class="result-actions">
+    <a class="btn-secondary" href="/orders/upload">Tentar novamente</a>
+  </div>
+</div>
+{% endif %}

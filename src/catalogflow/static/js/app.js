@@ -81,9 +81,19 @@ document.addEventListener("alpine:init", () => {
    * Estados: idle → uploading → polling | error
    * Em sucesso, deixa o HTMX (no fragmento de polling) renderizar
    * o estado final. Em erro de upload (pre-job), mostra mensagem.
+   *
+   * Parametrizado: passe `(endpoint, pollEndpoint)` para reutilizar
+   * a mesma máquina em /catalogs/upload e /orders/upload. Defaults
+   * apontam para catálogos por compat — `x-data="uploadFlow"` sem
+   * args continua funcionando.
    * ────────────────────────────────────────────────────────── */
   // eslint-disable-next-line no-undef
-  Alpine.data("uploadFlow", () => ({
+  Alpine.data("uploadFlow", (
+    endpoint = "/catalogs/upload",
+    pollEndpoint = "/catalogs/upload/poll/",
+  ) => ({
+    endpoint,
+    pollEndpoint,
     state: "idle",
     pct: 0,
     jobId: null,
@@ -129,7 +139,7 @@ document.addEventListener("alpine:init", () => {
       this.state = "uploading";
       this.pct = 0;
       try {
-        const resp = await window.uploadProgress("/catalogs/upload", fd, (p) => {
+        const resp = await window.uploadProgress(this.endpoint, fd, (p) => {
           this.pct = p;
         });
         this.jobId = resp.job_id;
@@ -141,7 +151,7 @@ document.addEventListener("alpine:init", () => {
           if (target && window.htmx) {
             target.setAttribute(
               "hx-get",
-              "/catalogs/upload/poll/" + this.jobId,
+              this.pollEndpoint + this.jobId,
             );
             target.setAttribute("hx-trigger", "load, every 2s");
             target.setAttribute("hx-swap", "innerHTML");
@@ -165,8 +175,9 @@ document.addEventListener("alpine:init", () => {
         INVALID_FILE_TYPE: "O arquivo não é um PDF válido.",
         PDF_NO_PRODUCTS: "Nenhum produto detectado no catálogo.",
         PDF_CORRUPT: "Arquivo PDF inválido ou corrompido.",
+        PDF_FLATTENED: "PDF foi achatado (impresso). Reenvie o original editável.",
       };
-      return map[code] || fallback || "Não foi possível enviar o catálogo.";
+      return map[code] || fallback || "Não foi possível enviar o arquivo.";
     },
 
     reset() {

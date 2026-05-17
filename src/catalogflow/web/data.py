@@ -214,6 +214,36 @@ async def list_catalogs(
     )
 
 
+@dataclass(slots=True)
+class CatalogOption:
+    """Catálogo enxuto para popular o `<select>` de origem no upload de pedido."""
+
+    id: UUID
+    name: str
+
+
+async def list_ready_catalog_options(
+    db: AsyncSession,
+    brand_id: UUID,
+    *,
+    limit: int = 200,
+) -> list[CatalogOption]:
+    """Catálogos com status=ready da brand, mais recentes primeiro.
+
+    Usado pelo dropdown "Catálogo de origem" na página de upload de pedido.
+    Limit alto e sem paginação — em escala média de brand textil (dezenas
+    de catálogos/ano), cabe num combo simples.
+    """
+    stmt = (
+        select(Catalog.id, Catalog.name)
+        .where(Catalog.brand_id == brand_id, Catalog.status == "ready")
+        .order_by(Catalog.created_at.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [CatalogOption(id=r.id, name=r.name) for r in rows]
+
+
 async def get_catalog_status(
     db: AsyncSession,
     catalog_id: UUID,

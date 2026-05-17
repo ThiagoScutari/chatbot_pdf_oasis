@@ -798,6 +798,169 @@ async def orders_list(
     )
 
 
+# ──────────────────────────────────────────────
+#  GET /orders/upload  — formulário
+# ──────────────────────────────────────────────
+
+
+@router.get("/orders/upload", response_class=HTMLResponse)
+async def order_upload_form(
+    request: Request,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Renderiza o formulário de envio de pedido preenchido.
+
+    Carrega a lista de catálogos com status=ready da brand para popular
+    o dropdown "Catálogo de origem". Quando vazio, o select ainda aparece
+    com a opção "Detectar automaticamente" — a API tenta inferir pelo
+    título embutido no PDF.
+    """
+    catalog_options = await data.list_ready_catalog_options(db, brand.id)
+    return templates.TemplateResponse(
+        request,
+        "orders/upload.html",
+        {"catalog_options": catalog_options},
+    )
+
+
+# ──────────────────────────────────────────────
+#  POST /orders/upload  — proxy para /api/v1/orders/extract
+# ──────────────────────────────────────────────
+
+
+_ORDER_FRIENDLY_ERROR_MESSAGES: dict[str, str] = {
+    "FILE_TOO_LARGE": "Arquivo maior que 50 MB.",
+    "PDF_ENCRYPTED": "PDF protegido com senha.",
+    "INVALID_FILE_TYPE": "O arquivo não é um PDF válido.",
+    "PDF_FLATTENED": "PDF foi achatado (impresso). Reenvie o original editável.",
+    "PDF_CORRUPT": "Arquivo PDF inválido ou corrompido.",
+}
+
+
+def _friendly_for_order(code: str | None, fallback: str) -> str:
+    if code and code in _ORDER_FRIENDLY_ERROR_MESSAGES:
+        return _ORDER_FRIENDLY_ERROR_MESSAGES[code]
+    return fallback or "Não foi possível extrair o pedido."
+
+
+def _order_error_code_from_message(message: str | None) -> str | None:
+    """Best-effort: descobre o code a partir do `Job.error` salvo em texto."""
+    if not message:
+        return None
+    lower = message.lower()
+    if "50mb" in lower or "file_too_large" in lower:
+        return "FILE_TOO_LARGE"
+    if "encrypt" in lower or "senha" in lower:
+        return "PDF_ENCRYPTED"
+    if "flatten" in lower or "pdf_flattened" in lower or "achatado" in lower:
+        return "PDF_FLATTENED"
+    if "invalid_file_type" in lower or "não é um pdf" in lower:
+        return "INVALID_FILE_TYPE"
+    return None
+
+
+@router.post("/orders/upload")
+async def order_upload_submit(
+    request: Request,
+    file: UploadFile = File(...),
+    catalog_id: str | None = Form(default=None),
+    lojista_name: str | None = Form(default=None, max_length=255),
+    api_key: str = Depends(require_session_api_key),
+) -> JSONResponse:
+    """Encaminha o upload para a API REST `/api/v1/orders/extract` via
+    ASGITransport in-process e devolve JSON enxuto (order_id + job_id)
+    para o Alpine consumir, ou erro estruturado.
+    """
+    pdf_bytes = await file.read()
+    files = {
+        "file": (file.filename or "pedido.pdf", pdf_bytes, "application/pdf"),
+    }
+    form_data: dict[str, str] = {}
+    if catalog_id:
+        form_data["catalog_id"] = catalog_id
+    if lojista_name:
+        form_data["lojista_name"] = lojista_name
+
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://internal",
+        headers={"Authorization": f"Bearer {api_key}"},
+    ) as client:
+        try:
+            api_resp = await client.post(
+                "/api/v1/orders/extract",
+                data=form_data,
+                files=files,
+                timeout=60.0,
+            )
+        except httpx.HTTPError as exc:
+            logger.exception("order upload: erro de transporte para a API")
+            return JSONResponse(
+                {"success": False, "error": {"code": "UPSTREAM_ERROR", "message": str(exc)}},
+                status_code=status.HTTP_502_BAD_GATEWAY,
+            )
+
+    if api_resp.status_code in (200, 201, 202):
+        envelope = api_resp.json()
+        return JSONResponse(envelope.get("data", {}), status_code=200)
+
+    try:
+        body = api_resp.json()
+    except ValueError:
+        body = {"error": {"code": "UNKNOWN", "message": api_resp.text[:300]}}
+    err = body.get("error", {}) if isinstance(body, dict) else {}
+    friendly = _friendly_for_order(err.get("code"), err.get("message", ""))
+    return JSONResponse(
+        {
+            "success": False,
+            "error": {
+                "code": err.get("code", "UNKNOWN"),
+                "message": friendly,
+            },
+        },
+        status_code=api_resp.status_code,
+    )
+
+
+# ──────────────────────────────────────────────
+#  GET /orders/upload/poll/{job_id}  — fragmento HTMX
+# ──────────────────────────────────────────────
+
+
+@router.get(
+    "/orders/upload/poll/{job_id}",
+    response_class=HTMLResponse,
+)
+async def order_upload_poll(
+    request: Request,
+    job_id: UUID,
+    brand: Brand = Depends(require_session_brand),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Estado atual do job de extração — fragmento HTML para HTMX."""
+    job = await data.get_job_for_brand(db, job_id, brand.id)
+    if job is None:
+        return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
+
+    friendly_error: str | None = None
+    if job.status not in ("pending", "running", "success"):
+        friendly_error = _friendly_for_order(
+            _order_error_code_from_message(job.error),
+            job.error or "Ocorreu um erro durante o processamento.",
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "orders/_upload_progress.html",
+        {
+            "job": job,
+            "friendly_error": friendly_error,
+        },
+    )
+
+
 @router.get("/orders/{order_id}/_badge", response_class=HTMLResponse)
 async def order_badge(
     request: Request,
