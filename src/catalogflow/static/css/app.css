@@ -548,8 +548,15 @@ p {
   font-size: 2rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-7);
   color: var(--color-text);
+  text-align: center;
+  /* Compensa o letter-spacing acumulado no fim de cada linha — sem isso,
+     o miolo visual cai à esquerda do centro geométrico. */
+  text-indent: 0.16em;
+  /* Em telas estreitas, equilibra a largura das duas linhas em vez de
+     deixar uma curta e outra longa. */
+  text-wrap: balance;
 }
 
 .login-sub {
