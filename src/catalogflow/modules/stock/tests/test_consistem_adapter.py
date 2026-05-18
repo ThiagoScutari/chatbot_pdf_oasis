@@ -204,8 +204,7 @@ class TestCheckAvailability:
             )
 
         queries = [
-            StockQuery(sku=f"SKU-{i}", size="M", color_index=1, requested_qty=2)
-            for i in range(8)
+            StockQuery(sku=f"SKU-{i}", size="M", color_index=1, requested_qty=2) for i in range(8)
         ]
         results = await adapter.check_availability(queries)
 

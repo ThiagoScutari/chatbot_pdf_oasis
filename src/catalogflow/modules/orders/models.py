@@ -173,7 +173,4 @@ class OrderItem(Base):
     order: Mapped[Order] = relationship(back_populates="items")
 
     def __repr__(self) -> str:  # pragma: no cover
-        return (
-            f"<OrderItem sku={self.sku} cor{self.color_index} "
-            f"{self.size}={self.quantity}>"
-        )
+        return f"<OrderItem sku={self.sku} cor{self.color_index} {self.size}={self.quantity}>"

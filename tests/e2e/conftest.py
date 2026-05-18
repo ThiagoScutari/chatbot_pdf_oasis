@@ -110,11 +110,7 @@ async def brand_with_key(
     db_session: AsyncSession,
 ) -> tuple[Brand, str]:
     """Cria brand + API key. Retorna `(brand, raw_key)`."""
-    brand = await auth_service.create_brand(
-        db_session, slug="e2e", name="E2E Brand"
-    )
-    _, raw = await auth_service.create_api_key(
-        db_session, brand_id=brand.id, name="e2e-test"
-    )
+    brand = await auth_service.create_brand(db_session, slug="e2e", name="E2E Brand")
+    _, raw = await auth_service.create_api_key(db_session, brand_id=brand.id, name="e2e-test")
     await db_session.commit()
     return brand, raw

@@ -7,7 +7,7 @@ Contrato (ADR-001, CLAUDE.md):
 Lógica migrada de `oasis_form_v2.py`:
     - `detectar_swatches`: drawings vetoriais na zona inferior (y0 ≥ 92% da altura),
        largura < 45pt e altura < 45pt, com fill != branco.
-    - `extrair_blocos_legenda`: regex de SKU (`\\d{10,13}-\\d`) e grade (PP-M..PP-GG)
+    - `extrair_blocos_legenda`: regex de SKU (`\\d{9,13}-\\d`) e grade (PP-M..PP-GG)
        sobre o texto da página; classificação `single` / `left` / `right` por
        posição relativa ao meio horizontal.
     - `swatches_para`: filtra swatches pertencentes a cada bloco via x_mid.
@@ -16,6 +16,7 @@ Lógica migrada de `oasis_form_v2.py`:
 from __future__ import annotations
 
 import io
+import logging
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -29,6 +30,8 @@ from catalogflow.shared.errors import (
     PDFEncryptedError,
     PDFNoProductsError,
 )
+
+logger = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────
 #  Dataclasses de saída
@@ -100,10 +103,11 @@ class PDFAnalyzer:
     """Analisa o conteúdo bruto de um PDF de catálogo de moda."""
 
     # Regex idênticas ao POC oasis_form_v2.py
-    SKU_RE: ClassVar[re.Pattern[str]] = re.compile(r"\b(\d{10,13}-\d)\b")
+    SKU_RE: ClassVar[re.Pattern[str]] = re.compile(r"\b(\d{9,13}-\d)\b")
     GRADE_RE: ClassVar[re.Pattern[str]] = re.compile(r"\b(PP-GG|PP-G|PP-M|P-GG|P-G|P-M)\b")
     NAME_RE: ClassVar[re.Pattern[str]] = re.compile(
-        r"\b(JAQUETA|CAL[ÇC]A|VESTIDO|CONJUNTO|BLUSA|BODY|SHORT|BLAZER|SAIA|TOP)\b",
+        r"\b((?:JAQUETA|CAL[ÇC]A|VESTIDO|CONJUNTO|BLUSA|BODY|SHORT|BLAZER|SAIA|TOP)"
+        r"(?:\s+[A-Za-zÀ-Ýà-ý]{2,})*)\b",
         re.IGNORECASE,
     )
     # Preço no padrão "R$ 3.488,00" — ponto = milhar, vírgula = decimal.
@@ -264,23 +268,66 @@ class PDFAnalyzer:
             int(round(rgb[2] * 255)),
         )
 
+    def _assign_name_zones(
+        self,
+        sku_rects: list[tuple[str, pymupdf.Rect]],
+        page_width: float,
+        page_height: float,
+    ) -> dict[str, pymupdf.Rect]:
+        """Calcula a zona de busca de texto para cada SKU.
+
+        As fronteiras são os pontos médios entre as coordenadas X dos SKUs
+        vizinhos detectados na página — nenhum valor de posição hardcoded.
+        Funciona para 1, 2, 3 ou N produtos por página. Para 1 SKU, a zona
+        é a página inteira (comportamento idêntico ao anterior). Para
+        layouts assimétricos, a fronteira segue os dados, não o centro
+        geométrico da página.
+
+        Edge case: se dois SKUs compartilharem o mesmo `x0` (layout
+        degenerado, improvável em catálogos reais), registra warning e
+        atribui a página inteira como zona para todos. Não levanta exceção.
+        """
+        sorted_skus = sorted(sku_rects, key=lambda item: item[1].x0)
+
+        x0_values = [rect.x0 for _, rect in sorted_skus]
+        if len(set(x0_values)) < len(x0_values):
+            logger.warning(
+                "Dois ou mais SKUs compartilham o mesmo x0 na mesma página; "
+                "usando página inteira como zona para todos. SKUs: %s",
+                [sku for sku, _ in sorted_skus],
+            )
+            full_page = pymupdf.Rect(0.0, 0.0, page_width, page_height)
+            return {sku: full_page for sku, _ in sorted_skus}
+
+        zones: dict[str, pymupdf.Rect] = {}
+        for i, (sku, rect) in enumerate(sorted_skus):
+            x_left = 0.0 if i == 0 else (sorted_skus[i - 1][1].x0 + rect.x0) / 2.0
+            x_right = (
+                page_width
+                if i == len(sorted_skus) - 1
+                else (rect.x0 + sorted_skus[i + 1][1].x0) / 2.0
+            )
+            zones[sku] = pymupdf.Rect(x_left, 0.0, x_right, page_height)
+        return zones
+
     def _extract_legend_blocks(
         self,
         page_p: pdfplumber.page.Page,
         page_w: float,
     ) -> list[dict[str, Any]]:
-        """Extrai blocos de legenda (SKU + grade + bounding box) da página.
+        """Extrai blocos de legenda (SKU + nome + preço + grade) da página.
 
-        Replica `extrair_blocos_legenda` do POC.
+        Refatorado em S05-02 (ADR-007): em vez do split `page_w / 2.0` para
+        páginas com múltiplos produtos, calcula zonas dinâmicas via
+        `_assign_name_zones()` a partir das posições reais dos SKUs. As
+        buscas de nome, preço, grade, bounding box e swatches são todas
+        restritas à zona do respectivo SKU — eliminando o vazamento de
+        nome entre produtos vizinhos.
         """
         text = page_p.extract_text() or ""
         skus = self.SKU_RE.findall(text)
         if not skus:
             return []
-
-        grades = self.GRADE_RE.findall(text)
-        names = self.NAME_RE.findall(text)
-        prices = self.PRICE_RE.findall(text)
 
         words = page_p.extract_words()
         h = float(page_p.height)
@@ -289,29 +336,61 @@ class PDFAnalyzer:
         if not bot_words:
             return []
 
+        # STEP A — localiza cada SKU detectado no fluxo de palavras para
+        # obter seu rect (x0, top, x1, bottom). SKUs que não puderem ser
+        # mapeados a uma palavra (caso raro) são descartados.
+        sku_rects: list[tuple[str, pymupdf.Rect]] = []
+        for sku in skus:
+            sku_word = next((w for w in words if w["text"] == sku), None)
+            if sku_word is None:
+                sku_word = next((w for w in words if sku in w["text"]), None)
+            if sku_word is None:
+                continue
+            sku_rects.append(
+                (
+                    sku,
+                    pymupdf.Rect(
+                        float(sku_word["x0"]),
+                        float(sku_word["top"]),
+                        float(sku_word["x1"]),
+                        float(sku_word["bottom"]),
+                    ),
+                ),
+            )
+        if not sku_rects:
+            return []
+
+        # STEP B — zonas de busca via midpoints (Voronoi horizontal).
+        zones = self._assign_name_zones(sku_rects, page_w, h)
+
+        sorted_skus = sorted(sku_rects, key=lambda item: item[1].x0)
+        n = len(sorted_skus)
+
         blocks: list[dict[str, Any]] = []
-        n = len(skus)
-        x_mid = page_w / 2.0
+        for i, (sku, _sku_rect) in enumerate(sorted_skus):
+            zone = zones[sku]
 
-        for i, sku in enumerate(skus):
-            if grades:
-                grade = grades[i] if i < len(grades) else grades[0]
-            else:
-                grade = self.DEFAULT_GRADE
+            # STEP C — filtra palavras para a zona deste SKU e roda regex
+            # apenas no texto da zona (sem vazamento entre vizinhos).
+            zone_words = [
+                w for w in words if float(w["x0"]) >= zone.x0 and float(w["x1"]) <= zone.x1
+            ]
+            zone_text = " ".join(w["text"] for w in zone_words)
+
+            zone_grades = self.GRADE_RE.findall(zone_text)
+            zone_names = self.NAME_RE.findall(zone_text)
+            zone_prices = self.PRICE_RE.findall(zone_text)
+
+            grade = zone_grades[0] if zone_grades else self.DEFAULT_GRADE
             sizes = self.SIZE_MAP.get(grade, self.DEFAULT_SIZES)
-            name = names[0].upper() if names else None
-            price = self._parse_price(prices[i]) if i < len(prices) else None
+            name = zone_names[0].upper() if zone_names else None
+            price = self._parse_price(zone_prices[0]) if zone_prices else None
 
-            if n == 1:
-                side = "single"
-                subset = bot_words
-            elif i == 0:
-                side = "left"
-                subset = [w for w in bot_words if float(w["x0"]) < x_mid]
-            else:
-                side = "right"
-                subset = [w for w in bot_words if float(w["x0"]) >= x_mid]
-
+            # STEP D — bot_words restritos à zona (usados pelo bounding box
+            # do painel de pedido em `field_injector`).
+            subset = [
+                w for w in bot_words if float(w["x0"]) >= zone.x0 and float(w["x1"]) <= zone.x1
+            ]
             if not subset:
                 continue
 
@@ -319,6 +398,13 @@ class PDFAnalyzer:
             xe = [float(w["x1"]) for w in subset]
             ys = [float(w["top"]) for w in subset]
             ye = [float(w["bottom"]) for w in subset]
+
+            if n == 1:
+                side = "single"
+            elif i == 0:
+                side = "left"
+            else:
+                side = "right"
 
             blocks.append(
                 {
@@ -333,6 +419,7 @@ class PDFAnalyzer:
                     "y_fim": max(ye),
                     "side": side,
                     "n_prods": n,
+                    "zone": zone,
                 },
             )
         return blocks
@@ -343,16 +430,13 @@ class PDFAnalyzer:
         all_swatches: list[SwatchInfo],
         page_w: float,
     ) -> list[SwatchInfo]:
-        """Filtra os swatches que pertencem ao bloco corrente.
+        """Filtra os swatches dentro da zona horizontal do bloco.
 
-        Replica `swatches_para` do POC.
+        S05-02 (ADR-007): substitui o split `page_w / 2.0` por filtro
+        baseado na zona dinâmica calculada em `_extract_legend_blocks`.
         """
-        n = int(block["n_prods"])
-        side = str(block["side"])
-        if n == 1 or side == "single":
+        if int(block["n_prods"]) == 1 or str(block["side"]) == "single":
             return list(all_swatches)
 
-        x_mid = page_w / 2.0
-        if side == "left":
-            return [s for s in all_swatches if s.x0 < x_mid]
-        return [s for s in all_swatches if s.x0 >= x_mid]
+        zone: pymupdf.Rect = block["zone"]
+        return [s for s in all_swatches if zone.x0 <= s.x0 < zone.x1]

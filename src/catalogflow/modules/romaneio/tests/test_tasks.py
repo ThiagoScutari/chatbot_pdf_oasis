@@ -41,14 +41,17 @@ class TestRomaneioGenerateTaskAllErrorsRetry:
         async def boom(*args: Any, **kwargs: Any) -> dict[str, Any]:
             raise ConnectionError("storage blip")
 
-        with patch(
-            "catalogflow.modules.romaneio.tasks._run_process_romaneio",
-            new=boom,
-        ), patch.object(
-            generate_romaneio_task,
-            "retry",
-            side_effect=Retry("retry-scheduled"),
-        ) as mock_retry:
+        with (
+            patch(
+                "catalogflow.modules.romaneio.tasks._run_process_romaneio",
+                new=boom,
+            ),
+            patch.object(
+                generate_romaneio_task,
+                "retry",
+                side_effect=Retry("retry-scheduled"),
+            ) as mock_retry,
+        ):
             generate_romaneio_task.apply(args=[rid, jid])
         assert mock_retry.called
         assert mock_retry.call_args.kwargs.get("countdown") == 60

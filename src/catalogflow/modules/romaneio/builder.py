@@ -524,9 +524,7 @@ class RomaneioBuilder:
 
             # Label da cor (com hex se disponível)
             color_hex = color_hex_by_idx.get(color_index)
-            cor_label = (
-                f"Cor {color_index}  {color_hex}" if color_hex else f"Cor {color_index}"
-            )
+            cor_label = f"Cor {color_index}  {color_hex}" if color_hex else f"Cor {color_index}"
             page.insert_textbox(
                 pymupdf.Rect(
                     x_cor + 2,
@@ -582,8 +580,7 @@ class RomaneioBuilder:
             if available_map is not None:
                 qtys_for_color = by_color[color_index]
                 color_has_stock = any(
-                    (sku, color_index, tam) in available_map
-                    for tam in COLS_TAMANHOS
+                    (sku, color_index, tam) in available_map for tam in COLS_TAMANHOS
                 )
                 if color_has_stock:
                     y = self._draw_pendency_row(

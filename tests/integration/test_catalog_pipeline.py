@@ -146,9 +146,7 @@ class TestCatalogPipelineEndToEnd:
         brand: Brand,
     ) -> None:
         """Catálogo da brand A não é visível para a brand B."""
-        other = await auth_service.create_brand(
-            db_session, slug="pipeline-other", name="Other"
-        )
+        other = await auth_service.create_brand(db_session, slug="pipeline-other", name="Other")
         await db_session.commit()
 
         service_a = CatalogService(
@@ -175,9 +173,7 @@ class TestCatalogPipelineEndToEnd:
         brand: Brand,
     ) -> None:
         """Mesmo princípio aplicado à tabela `jobs`."""
-        other = await auth_service.create_brand(
-            db_session, slug="jobs-other", name="Other"
-        )
+        other = await auth_service.create_brand(db_session, slug="jobs-other", name="Other")
         await db_session.commit()
         # Cria jobs para ambas as brands manualmente
         job_a = Job(brand_id=brand.id, job_type="catalog.process", status="pending")

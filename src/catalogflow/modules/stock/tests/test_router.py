@@ -202,7 +202,9 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
 @pytest_asyncio.fixture
 async def auth_headers(db_session: AsyncSession, brand: Brand) -> dict[str, str]:
     _, raw = await auth_service.create_api_key(
-        db_session, brand_id=brand.id, name="test",
+        db_session,
+        brand_id=brand.id,
+        name="test",
     )
     await db_session.commit()
     return {"Authorization": f"Bearer {raw}"}
@@ -214,7 +216,9 @@ async def other_brand_headers(
     other_brand: Brand,
 ) -> dict[str, str]:
     _, raw = await auth_service.create_api_key(
-        db_session, brand_id=other_brand.id, name="other",
+        db_session,
+        brand_id=other_brand.id,
+        name="other",
     )
     await db_session.commit()
     return {"Authorization": f"Bearer {raw}"}
@@ -328,7 +332,9 @@ class TestGetStockCheck:
         sc, job = await service.enqueue_stock_check(order.id, brand.id)
         await db_session.commit()
         await service.check_order_stock(
-            order_id=order.id, stock_check_id=sc.id, job_id=job.id,
+            order_id=order.id,
+            stock_check_id=sc.id,
+            job_id=job.id,
         )
         await db_session.commit()
 
@@ -487,11 +493,15 @@ class TestGetSubmission:
             dispatch_submit=submit_dispatch,
         )
         submission, job = await service.enqueue_submission(
-            order.id, brand.id, "LOJA-42",
+            order.id,
+            brand.id,
+            "LOJA-42",
         )
         await db_session.commit()
         await service.submit_order_to_erp(
-            order_id=order.id, customer_code="LOJA-42", job_id=job.id,
+            order_id=order.id,
+            customer_code="LOJA-42",
+            job_id=job.id,
         )
         await db_session.commit()
 

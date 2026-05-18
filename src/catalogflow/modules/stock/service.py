@@ -432,14 +432,8 @@ class StockService:
         results: list[StockResult],
     ) -> dict[str, Any]:
         """Empacota o snapshot para JSONB com enriquecimento de product_name."""
-        names = {
-            (item.sku, item.size, item.color_index): item.product_name
-            for item in order.items
-        }
-        hexes = {
-            (item.sku, item.size, item.color_index): item.color_hex
-            for item in order.items
-        }
+        names = {(item.sku, item.size, item.color_index): item.product_name for item in order.items}
+        hexes = {(item.sku, item.size, item.color_index): item.color_hex for item in order.items}
         return {
             "items": [
                 {

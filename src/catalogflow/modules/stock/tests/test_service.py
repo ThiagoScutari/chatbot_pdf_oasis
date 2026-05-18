@@ -250,9 +250,7 @@ class TestCheckOrderStock:
         # order_items foram atualizados.
         items = list(
             (
-                await db_session.execute(
-                    select(OrderItem).where(OrderItem.order_id == order.id)
-                )
+                await db_session.execute(select(OrderItem).where(OrderItem.order_id == order.id))
             ).scalars(),
         )
         assert all(item.stock_status is not None for item in items)
@@ -439,7 +437,9 @@ class TestSubmission:
         submission, job = await service.enqueue_submission(order.id, brand.id, "C1")
         await db_session.commit()
         await service.submit_order_to_erp(
-            order_id=order.id, customer_code="C1", job_id=job.id,
+            order_id=order.id,
+            customer_code="C1",
+            job_id=job.id,
         )
         await db_session.commit()
 
@@ -461,7 +461,9 @@ class TestSubmission:
         submission, job = await service.enqueue_submission(order.id, brand.id, "C1")
         await db_session.commit()
         await service.submit_order_to_erp(
-            order_id=order.id, customer_code="C1", job_id=job.id,
+            order_id=order.id,
+            customer_code="C1",
+            job_id=job.id,
         )
         await db_session.commit()
         await db_session.refresh(submission)
@@ -488,7 +490,9 @@ class TestSubmission:
 
         with pytest.raises(NotImplementedError):
             await service.submit_order_to_erp(
-                order_id=order.id, customer_code="C1", job_id=job.id,
+                order_id=order.id,
+                customer_code="C1",
+                job_id=job.id,
             )
         await db_session.commit()
         await db_session.refresh(submission)

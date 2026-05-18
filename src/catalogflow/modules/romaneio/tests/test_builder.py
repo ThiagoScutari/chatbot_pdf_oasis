@@ -285,8 +285,7 @@ class TestPagination:
     ) -> None:
         # Cada bloco ~60pt; ~10 SKUs por página → 30 SKUs cria 3+ páginas.
         items = [
-            make_item(f"SKU{i:03d}", 1, "PP", 2, product_name=f"Produto {i}")
-            for i in range(30)
+            make_item(f"SKU{i:03d}", 1, "PP", 2, product_name=f"Produto {i}") for i in range(30)
         ]
         data = make_order_data(items)
         pdf = builder.build(data, basic_config)
@@ -302,8 +301,7 @@ class TestPagination:
         basic_config: RomaneioConfig,
     ) -> None:
         items = [
-            make_item(f"SKU{i:03d}", 1, "PP", 1, product_name=f"Produto {i}")
-            for i in range(30)
+            make_item(f"SKU{i:03d}", 1, "PP", 1, product_name=f"Produto {i}") for i in range(30)
         ]
         data = make_order_data(items)
         pdf = builder.build(data, basic_config)

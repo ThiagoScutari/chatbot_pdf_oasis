@@ -34,8 +34,7 @@ def _load(name: str) -> bytes:
     path = FIXTURES_DIR / name
     if not path.exists():
         pytest.skip(
-            f"fixture {name} ausente — rode "
-            "`python -m tests.fixtures.generate_order_fixtures`",
+            f"fixture {name} ausente — rode `python -m tests.fixtures.generate_order_fixtures`",
         )
     return path.read_bytes()
 

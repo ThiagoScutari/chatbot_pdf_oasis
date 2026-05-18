@@ -116,11 +116,7 @@ class FieldInjector:
 
             for product in metadata.product_pages:
                 page = doc[product.page_index]
-                siblings = [
-                    p
-                    for p in metadata.product_pages
-                    if p.page_index == product.page_index
-                ]
+                siblings = [p for p in metadata.product_pages if p.page_index == product.page_index]
                 rect = self._calculate_panel_rect(
                     product,
                     page_w=float(page.rect.width),
@@ -387,6 +383,4 @@ def count_fields(metadata: CatalogMetadata) -> int:
     Calculado a partir dos metadados, sem abrir o PDF — útil para o service
     persistir `Catalog.n_fields` antes mesmo da injeção.
     """
-    return sum(
-        max(1, p.n_colors) * len(p.sizes) for p in metadata.product_pages
-    )
+    return sum(max(1, p.n_colors) * len(p.sizes) for p in metadata.product_pages)

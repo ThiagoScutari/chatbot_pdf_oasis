@@ -78,14 +78,17 @@ class TestOrderExtractTaskTransientErrors:
         async def boom(*args: Any, **kwargs: Any) -> dict[str, Any]:
             raise ConnectionError("network blip")
 
-        with patch(
-            "catalogflow.modules.orders.tasks._run_process_order",
-            new=boom,
-        ), patch.object(
-            extract_order_task,
-            "retry",
-            side_effect=Retry("retry-scheduled"),
-        ) as mock_retry:
+        with (
+            patch(
+                "catalogflow.modules.orders.tasks._run_process_order",
+                new=boom,
+            ),
+            patch.object(
+                extract_order_task,
+                "retry",
+                side_effect=Retry("retry-scheduled"),
+            ) as mock_retry,
+        ):
             extract_order_task.apply(args=[oid, jid])
         assert mock_retry.called
         assert mock_retry.call_args.kwargs.get("countdown") == 60

@@ -67,9 +67,7 @@ class TestLoginSubmission:
         assert "incorret" in resp.text.lower()
         assert SESSION_COOKIE not in resp.cookies
 
-    async def test_unknown_email_renders_error_inline(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_unknown_email_renders_error_inline(self, client: AsyncClient) -> None:
         resp = await client.post(
             "/login",
             data={"email": "ninguem@nada.com", "password": "qualquer"},
@@ -120,16 +118,12 @@ class TestLoginSubmission:
 
 
 class TestRootRedirect:
-    async def test_root_without_session_redirects_to_login(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_root_without_session_redirects_to_login(self, client: AsyncClient) -> None:
         resp = await client.get("/")
         assert resp.status_code == 302
         assert resp.headers["location"] == "/login"
 
-    async def test_root_with_invalid_cookie_redirects_to_login(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_root_with_invalid_cookie_redirects_to_login(self, client: AsyncClient) -> None:
         client.cookies.set(SESSION_COOKIE, "obviously-not-a-valid-token")
         resp = await client.get("/")
         assert resp.status_code == 302
@@ -189,9 +183,7 @@ class TestForgotPassword:
         assert 'name="email"' in resp.text
         assert "Recuperar acesso" in resp.text
 
-    async def test_post_forgot_always_returns_confirmation(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_post_forgot_always_returns_confirmation(self, client: AsyncClient) -> None:
         """Mesma resposta para email existente vs inexistente — sem oracle."""
         resp = await client.post(
             "/forgot-password",
@@ -215,17 +207,13 @@ class TestForgotPassword:
             data={"email": SAMPLE_USER_EMAIL},
         )
         assert resp.status_code == 200
-        link = await db_session.scalar(
-            select(MagicLink).where(MagicLink.user_id == sample_user.id)
-        )
+        link = await db_session.scalar(select(MagicLink).where(MagicLink.user_id == sample_user.id))
         assert link is not None
         assert link.used_at is None
 
 
 class TestMagicLinkConsume:
-    async def test_invalid_token_renders_error_page(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_invalid_token_renders_error_page(self, client: AsyncClient) -> None:
         resp = await client.get("/magic-link/totally-invalid")
         assert resp.status_code == 400
         assert "Link inválido" in resp.text
@@ -247,9 +235,7 @@ class TestMagicLinkConsume:
 
         from catalogflow.modules.auth.models import MagicLink
 
-        link = await db_session.scalar(
-            select(MagicLink).where(MagicLink.user_id == sample_user.id)
-        )
+        link = await db_session.scalar(select(MagicLink).where(MagicLink.user_id == sample_user.id))
         assert link is not None
         token = link.token
 
@@ -287,9 +273,7 @@ class TestRegister:
 
         from sqlalchemy import select
 
-        user = await db_session.scalar(
-            select(WebUser).where(WebUser.email == "nova@oasis.com.br")
-        )
+        user = await db_session.scalar(select(WebUser).where(WebUser.email == "nova@oasis.com.br"))
         assert user is not None
         assert user.is_active is False
         assert user.role == "operator"

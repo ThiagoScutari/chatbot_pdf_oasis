@@ -105,9 +105,7 @@ class WebUserService:
                 code="WEAK_PASSWORD",
             )
 
-        existing = await self._session.scalar(
-            select(WebUser).where(WebUser.email == norm)
-        )
+        existing = await self._session.scalar(select(WebUser).where(WebUser.email == norm))
         if existing is not None:
             raise ConflictError(
                 "Já existe um cadastro com este email.",
@@ -211,9 +209,7 @@ class WebUserService:
         "senha errada" e "usuário inativo".
         """
         norm = _normalize_email(email)
-        user = await self._session.scalar(
-            select(WebUser).where(WebUser.email == norm)
-        )
+        user = await self._session.scalar(select(WebUser).where(WebUser.email == norm))
         ok = (
             user is not None
             and user.is_active
@@ -229,9 +225,7 @@ class WebUserService:
         return user
 
     async def _record_attempt(self, identifier: str, *, success: bool) -> None:
-        self._session.add(
-            LoginAttempt(identifier=identifier, success=success)
-        )
+        self._session.add(LoginAttempt(identifier=identifier, success=success))
         await self._session.flush()
 
     # ── Magic link ───────────────────────────────
@@ -270,9 +264,7 @@ class WebUserService:
         vez disso, fazemos a leitura+escrita na mesma transação que o
         chamador commitará).
         """
-        link = await self._session.scalar(
-            select(MagicLink).where(MagicLink.token == token)
-        )
+        link = await self._session.scalar(select(MagicLink).where(MagicLink.token == token))
         if link is None:
             raise NotFoundError("Link inválido ou expirado.", code="MAGIC_LINK_INVALID")
         if link.used_at is not None:
@@ -330,7 +322,5 @@ class WebUserService:
         Celery periódica futura ou para o script de seed.
         """
         cutoff = _now() - timedelta(hours=24)
-        result = await self._session.execute(
-            delete(MagicLink).where(MagicLink.expires_at < cutoff)
-        )
+        result = await self._session.execute(delete(MagicLink).where(MagicLink.expires_at < cutoff))
         return result.rowcount or 0

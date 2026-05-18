@@ -66,18 +66,18 @@ def humanize_when(when: datetime, *, now: datetime | None = None) -> str:
 # ──────────────────────────────────────────────
 
 _CATALOG_STATUS_LABELS = {
-    "pending":    ("Aguardando",   "processing"),
-    "processing": ("Processando",  "processing"),
-    "ready":      ("Pronto",       "ready"),
-    "error":      ("Erro",         "error"),
+    "pending": ("Aguardando", "processing"),
+    "processing": ("Processando", "processing"),
+    "ready": ("Pronto", "ready"),
+    "error": ("Erro", "error"),
 }
 
 _ORDER_STATUS_LABELS = {
-    "draft":     ("Aguardando",  "processing"),
-    "extracted": ("Pronto",      "ready"),
-    "confirmed": ("Confirmado",  "ready"),
-    "cancelled": ("Cancelado",   "error"),
-    "error":     ("Erro",        "error"),
+    "draft": ("Aguardando", "processing"),
+    "extracted": ("Pronto", "ready"),
+    "confirmed": ("Confirmado", "ready"),
+    "cancelled": ("Cancelado", "error"),
+    "error": ("Erro", "error"),
 }
 
 

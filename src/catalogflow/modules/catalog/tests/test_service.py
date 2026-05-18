@@ -328,7 +328,9 @@ class TestProcessCatalog:
 
         # Bytes do output PDF estão no storage e contêm widgets
         assert result["output_key"] in fake_storage.objects
-        assert fake_storage.objects[result["output_key"]] != fake_storage.objects[catalog.source_key]
+        assert (
+            fake_storage.objects[result["output_key"]] != fake_storage.objects[catalog.source_key]
+        )
 
     async def test_encrypted_pdf_marks_catalog_and_job_as_error(
         self,

@@ -91,9 +91,7 @@ async def sample_brand(db_session: AsyncSession) -> Brand:
 
 
 @pytest_asyncio.fixture
-async def sample_api_key(
-    db_session: AsyncSession, sample_brand: Brand
-) -> tuple[str, str]:
+async def sample_api_key(db_session: AsyncSession, sample_brand: Brand) -> tuple[str, str]:
     """Cria uma API key para `sample_brand`. Retorna `(raw_key, prefix)`."""
     api_key, raw = await auth_service.create_api_key(
         db_session,

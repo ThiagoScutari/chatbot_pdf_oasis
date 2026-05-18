@@ -276,7 +276,9 @@ class TestPurity:
 
 
 class TestInvalidInput:
-    def test_empty_bytes_raise_corrupt(self, analyzer: PDFAnalyzer, injector: FieldInjector) -> None:
+    def test_empty_bytes_raise_corrupt(
+        self, analyzer: PDFAnalyzer, injector: FieldInjector
+    ) -> None:
         # Para forçar metadata válido, simulamos um metadata vazio mas é o pdf que é o problema.
         meta = analyzer.analyze(_load("catalogo_1_produto_1_cor.pdf"))
         with pytest.raises(PDFCorruptError):

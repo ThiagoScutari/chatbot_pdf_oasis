@@ -110,8 +110,7 @@ class ErpSubmission(Base):
     __table_args__ = (
         UniqueConstraint("order_id", name="uq_erp_submissions_order_id"),
         CheckConstraint(
-            "status IN ('pending','submitting','accepted',"
-            "'partially_accepted','rejected','error')",
+            "status IN ('pending','submitting','accepted','partially_accepted','rejected','error')",
             name="ck_erp_submissions_status",
         ),
     )
