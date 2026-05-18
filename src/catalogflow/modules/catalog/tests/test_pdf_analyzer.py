@@ -7,11 +7,14 @@ commitadas. Se a estrutura visual mudar, regenere com:
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from pathlib import Path
 
+import pymupdf
 import pytest
 
+from catalogflow.modules.catalog.field_injector import FieldInjector
 from catalogflow.modules.catalog.pdf_analyzer import (
     CatalogMetadata,
     PDFAnalyzer,
@@ -243,6 +246,47 @@ class TestPriceExtraction:
         meta = analyzer.analyze(_load("catalogo_1_produto_1_cor.pdf"))
         (product,) = meta.product_pages
         assert product.price is None
+
+
+# ──────────────────────────────────────────────
+#  S05-01 — SKU com 9 dígitos
+# ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def pdf_sku_9_digits() -> bytes:
+    return _load("catalogo_sku_9_digitos.pdf")
+
+
+@pytest.fixture
+def pdf_1_produto_1_cor() -> bytes:
+    return _load("catalogo_1_produto_1_cor.pdf")
+
+
+def test_sku_9_digits_is_detected(pdf_sku_9_digits: bytes) -> None:
+    """SKU com 9 dígitos deve ser detectado como página de produto."""
+    result = PDFAnalyzer().analyze(pdf_bytes=pdf_sku_9_digits)
+    assert result.n_product_pages == 1
+    assert result.product_pages[0].sku == "442500908-0"
+
+
+def test_sku_9_digits_fields_are_injected(pdf_sku_9_digits: bytes) -> None:
+    """PDF com SKU de 9 dígitos deve receber campos AcroForm após injeção."""
+    metadata = PDFAnalyzer().analyze(pdf_bytes=pdf_sku_9_digits)
+    output = FieldInjector().inject(pdf_sku_9_digits, metadata)
+    doc = pymupdf.open(stream=output, filetype="pdf")
+    try:
+        widgets = [w for page in doc for w in (page.widgets() or [])]
+    finally:
+        doc.close()
+    assert len(widgets) > 0
+
+
+def test_sku_10_digits_unaffected(pdf_1_produto_1_cor: bytes) -> None:
+    """Regressão: SKU de 10 dígitos não deve ser afetado pela correção."""
+    result = PDFAnalyzer().analyze(pdf_bytes=pdf_1_produto_1_cor)
+    assert result.n_product_pages >= 1
+    assert re.match(r"^\d{10}-\d$", result.product_pages[0].sku)
 
 
 class TestSwatchDetectionThreshold:

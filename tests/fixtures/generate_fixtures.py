@@ -185,6 +185,26 @@ def build_sem_produtos() -> bytes:
     return data
 
 
+def build_sku_9_digits() -> bytes:
+    """Catálogo com SKU de 9 dígitos antes do hífen — regressão S05-01.
+
+    Reproduz o cenário VESTIDO SALOMÉ (catálogo Oasis MOTION páginas 30 e 36):
+    a agência gerou o catálogo sem o zero à esquerda do código (9 dígitos).
+    O analyzer deve detectá-lo como página de produto válida.
+    """
+    doc, page = _new_doc_with_page()
+    _add_decorative_top(page, "VESTIDO SALOMÉ — Coleção Demo")
+    # Legenda em linhas separadas para incluir o preço no formato R$ X.XXX,XX.
+    page.insert_text((50, 780), "442500908-0", fontname=FONT, fontsize=9)
+    page.insert_text((50, 790), "VESTIDO SALOMÉ", fontname=FONT, fontsize=9)
+    page.insert_text((50, 800), "R$ 1.288,00", fontname=FONT, fontsize=9)
+    page.insert_text((50, 810), "PP-M", fontname=FONT, fontsize=9)
+    _add_swatch(page, x=50, fill=(0.40, 0.10, 0.20))
+    data: bytes = doc.tobytes()
+    doc.close()
+    return data
+
+
 def build_criptografado() -> bytes:
     """PDF protegido por senha — exercita o branch `PDF_ENCRYPTED`."""
     doc, page = _new_doc_with_page()
@@ -215,6 +235,7 @@ FIXTURES: dict[str, callable] = {  # type: ignore[type-arg]
     "catalogo_1_produto_2_cores.pdf": build_1_produto_2_cores,
     "catalogo_2_produtos_pagina.pdf": build_2_produtos_pagina,
     "catalogo_pp_g.pdf": build_grade_pp_g,
+    "catalogo_sku_9_digitos.pdf": build_sku_9_digits,
     "pdf_sem_produtos.pdf": build_sem_produtos,
     "pdf_criptografado.pdf": build_criptografado,
 }

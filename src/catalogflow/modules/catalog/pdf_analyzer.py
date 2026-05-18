@@ -7,7 +7,7 @@ Contrato (ADR-001, CLAUDE.md):
 Lógica migrada de `oasis_form_v2.py`:
     - `detectar_swatches`: drawings vetoriais na zona inferior (y0 ≥ 92% da altura),
        largura < 45pt e altura < 45pt, com fill != branco.
-    - `extrair_blocos_legenda`: regex de SKU (`\\d{10,13}-\\d`) e grade (PP-M..PP-GG)
+    - `extrair_blocos_legenda`: regex de SKU (`\\d{9,13}-\\d`) e grade (PP-M..PP-GG)
        sobre o texto da página; classificação `single` / `left` / `right` por
        posição relativa ao meio horizontal.
     - `swatches_para`: filtra swatches pertencentes a cada bloco via x_mid.
@@ -100,7 +100,7 @@ class PDFAnalyzer:
     """Analisa o conteúdo bruto de um PDF de catálogo de moda."""
 
     # Regex idênticas ao POC oasis_form_v2.py
-    SKU_RE: ClassVar[re.Pattern[str]] = re.compile(r"\b(\d{10,13}-\d)\b")
+    SKU_RE: ClassVar[re.Pattern[str]] = re.compile(r"\b(\d{9,13}-\d)\b")
     GRADE_RE: ClassVar[re.Pattern[str]] = re.compile(r"\b(PP-GG|PP-G|PP-M|P-GG|P-G|P-M)\b")
     NAME_RE: ClassVar[re.Pattern[str]] = re.compile(
         r"\b(JAQUETA|CAL[ÇC]A|VESTIDO|CONJUNTO|BLUSA|BODY|SHORT|BLAZER|SAIA|TOP)\b",
