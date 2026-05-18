@@ -11,6 +11,7 @@ import re
 from decimal import Decimal
 from pathlib import Path
 
+import fitz
 import pymupdf
 import pytest
 
@@ -287,6 +288,129 @@ def test_sku_10_digits_unaffected(pdf_1_produto_1_cor: bytes) -> None:
     result = PDFAnalyzer().analyze(pdf_bytes=pdf_1_produto_1_cor)
     assert result.n_product_pages >= 1
     assert re.match(r"^\d{10}-\d$", result.product_pages[0].sku)
+
+
+# ──────────────────────────────────────────────
+#  S05-02 — Zonas de Voronoi horizontal (ADR-007)
+# ──────────────────────────────────────────────
+
+
+def test_assign_name_zones_single_sku() -> None:
+    zones = PDFAnalyzer()._assign_name_zones(
+        [("SKU-A", fitz.Rect(100, 200, 200, 220))],
+        page_width=720,
+        page_height=1080,
+    )
+    assert zones["SKU-A"].x0 == 0.0
+    assert zones["SKU-A"].x1 == 720.0
+
+
+def test_assign_name_zones_two_skus_midpoint() -> None:
+    zones = PDFAnalyzer()._assign_name_zones(
+        [
+            ("SKU-A", fitz.Rect(180, 900, 280, 920)),
+            ("SKU-B", fitz.Rect(540, 900, 640, 920)),
+        ],
+        page_width=720,
+        page_height=1080,
+    )
+    mid = (180 + 540) / 2
+    assert zones["SKU-A"].x0 == 0.0
+    assert zones["SKU-A"].x1 == pytest.approx(mid)
+    assert zones["SKU-B"].x0 == pytest.approx(mid)
+    assert zones["SKU-B"].x1 == 720.0
+
+
+def test_assign_name_zones_three_skus() -> None:
+    zones = PDFAnalyzer()._assign_name_zones(
+        [
+            ("SKU-A", fitz.Rect(120, 900, 200, 920)),
+            ("SKU-B", fitz.Rect(360, 900, 440, 920)),
+            ("SKU-C", fitz.Rect(600, 900, 680, 920)),
+        ],
+        page_width=720,
+        page_height=1080,
+    )
+    mid_ab = (120 + 360) / 2
+    mid_bc = (360 + 600) / 2
+    assert zones["SKU-A"].x1 == pytest.approx(mid_ab)
+    assert zones["SKU-B"].x0 == pytest.approx(mid_ab)
+    assert zones["SKU-B"].x1 == pytest.approx(mid_bc)
+    assert zones["SKU-C"].x0 == pytest.approx(mid_bc)
+    assert zones["SKU-C"].x1 == 720.0
+
+
+def test_assign_name_zones_asymmetric_layout() -> None:
+    """Fronteira segue os dados, não o centro fixo da página."""
+    zones = PDFAnalyzer()._assign_name_zones(
+        [
+            ("SKU-A", fitz.Rect(100, 900, 200, 920)),
+            ("SKU-B", fitz.Rect(480, 900, 580, 920)),
+        ],
+        page_width=720,
+        page_height=1080,
+    )
+    mid = (100 + 480) / 2  # 290.0, não 360.0 (page_width/2)
+    assert zones["SKU-A"].x1 == pytest.approx(mid)
+    assert zones["SKU-B"].x0 == pytest.approx(mid)
+
+
+def test_assign_name_zones_contiguous_and_non_overlapping() -> None:
+    zones = PDFAnalyzer()._assign_name_zones(
+        [
+            ("SKU-A", fitz.Rect(50, 900, 150, 920)),
+            ("SKU-B", fitz.Rect(300, 900, 400, 920)),
+            ("SKU-C", fitz.Rect(550, 900, 650, 920)),
+        ],
+        page_width=720,
+        page_height=1080,
+    )
+    sorted_z = sorted(zones.values(), key=lambda r: r.x0)
+    assert sorted_z[0].x0 == pytest.approx(0.0)
+    assert sorted_z[-1].x1 == pytest.approx(720.0)
+    for i in range(len(sorted_z) - 1):
+        assert sorted_z[i].x1 == pytest.approx(sorted_z[i + 1].x0)
+
+
+@pytest.fixture
+def pdf_dois_produtos_nomes_distintos() -> bytes:
+    return _load("catalogo_dois_produtos_nomes_distintos.pdf")
+
+
+def test_two_products_names_not_swapped(
+    pdf_dois_produtos_nomes_distintos: bytes,
+) -> None:
+    """Cada produto deve ter seu próprio nome — sem vazamento entre vizinhos."""
+    result = PDFAnalyzer().analyze(pdf_bytes=pdf_dois_produtos_nomes_distintos)
+    skus = {p.sku: p.name for p in result.product_pages}
+    assert skus.get("0322500004-0") == "JAQUETA BERENICE"
+    assert skus.get("0142500001-0") == "CALÇA CAPRI ESTHER"
+
+
+def test_single_product_name_unaffected(pdf_1_produto_1_cor: bytes) -> None:
+    """Regressão: página com 1 produto não deve ter seu nome alterado."""
+    result = PDFAnalyzer().analyze(pdf_bytes=pdf_1_produto_1_cor)
+    assert result.product_pages[0].name is not None
+    assert len(result.product_pages[0].name) > 0
+
+
+def test_two_products_each_receives_acroform_fields(
+    pdf_dois_produtos_nomes_distintos: bytes,
+) -> None:
+    """Ambos os produtos da página dupla devem receber campos AcroForm."""
+    metadata = PDFAnalyzer().analyze(pdf_bytes=pdf_dois_produtos_nomes_distintos)
+    output = FieldInjector().inject(pdf_dois_produtos_nomes_distintos, metadata)
+    doc = pymupdf.open(stream=output, filetype="pdf")
+    try:
+        field_names = [
+            w.field_name for page in doc for w in (page.widgets() or [])
+        ]
+    finally:
+        doc.close()
+    assert any("0322500004-0" in f for f in field_names), \
+        "Nenhum campo gerado para JAQUETA BERENICE"
+    assert any("0142500001-0" in f for f in field_names), \
+        "Nenhum campo gerado para CALÇA CAPRI ESTHER"
 
 
 class TestSwatchDetectionThreshold:

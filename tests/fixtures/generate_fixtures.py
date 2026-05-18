@@ -185,6 +185,58 @@ def build_sem_produtos() -> bytes:
     return data
 
 
+def build_dois_produtos_nomes_distintos() -> bytes:
+    """Página com 2 produtos lado a lado e nomes DISTINTOS — regressão S05-02.
+
+    Reproduz o cenário das páginas 5, 52, 61 e 69 do catálogo Oasis MOTION,
+    onde o nome de um produto vizinho era atribuído ao SKU errado por falta
+    de partição horizontal na busca de texto.
+
+    SKUs em posições X claramente distintas (160 e 500 em página de 720pt),
+    garantindo que o midpoint dinâmico calculado por `_assign_name_zones`
+    isole cada produto na sua coluna.
+    """
+    doc = pymupdf.open()
+    page_w = 720.0
+    page_h = 842.0
+    page = doc.new_page(width=page_w, height=page_h)
+
+    page.insert_text(
+        (50, 100),
+        "Dois produtos lado a lado — nomes não devem trocar",
+        fontname=FONT,
+        fontsize=14,
+    )
+
+    # Produto da esquerda — JAQUETA BERENICE (SKU em x≈160)
+    page.insert_text((160, 780), "0322500004-0", fontname=FONT, fontsize=9)
+    page.insert_text((160, 790), "JAQUETA BERENICE", fontname=FONT, fontsize=9)
+    page.insert_text((160, 800), "R$ 3.488,00", fontname=FONT, fontsize=9)
+    page.insert_text((160, 810), "PP-M", fontname=FONT, fontsize=9)
+    page.draw_rect(
+        pymupdf.Rect(160, SWATCH_Y, 160 + SWATCH_SIDE, SWATCH_Y + SWATCH_SIDE),
+        color=(0.0, 0.0, 0.0),
+        fill=(0.50, 0.20, 0.10),
+        width=0.5,
+    )
+
+    # Produto da direita — CALÇA CAPRI ESTHER (SKU em x≈500)
+    page.insert_text((500, 780), "0142500001-0", fontname=FONT, fontsize=9)
+    page.insert_text((500, 790), "CALÇA CAPRI ESTHER", fontname=FONT, fontsize=9)
+    page.insert_text((500, 800), "R$ 588,00", fontname=FONT, fontsize=9)
+    page.insert_text((500, 810), "PP-M", fontname=FONT, fontsize=9)
+    page.draw_rect(
+        pymupdf.Rect(500, SWATCH_Y, 500 + SWATCH_SIDE, SWATCH_Y + SWATCH_SIDE),
+        color=(0.0, 0.0, 0.0),
+        fill=(0.20, 0.40, 0.60),
+        width=0.5,
+    )
+
+    data: bytes = doc.tobytes()
+    doc.close()
+    return data
+
+
 def build_sku_9_digits() -> bytes:
     """Catálogo com SKU de 9 dígitos antes do hífen — regressão S05-01.
 
@@ -236,6 +288,7 @@ FIXTURES: dict[str, callable] = {  # type: ignore[type-arg]
     "catalogo_2_produtos_pagina.pdf": build_2_produtos_pagina,
     "catalogo_pp_g.pdf": build_grade_pp_g,
     "catalogo_sku_9_digitos.pdf": build_sku_9_digits,
+    "catalogo_dois_produtos_nomes_distintos.pdf": build_dois_produtos_nomes_distintos,
     "pdf_sem_produtos.pdf": build_sem_produtos,
     "pdf_criptografado.pdf": build_criptografado,
 }
