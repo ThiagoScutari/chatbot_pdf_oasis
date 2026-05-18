@@ -272,6 +272,8 @@ module = [
     "catalogflow.web.tests.test_web_pages",
     # resend.Emails.send — arg-type SendParams TypedDict
     "catalogflow.web.email_service",
+    # SQLAlchemy Result[Any].rowcount — stub version drift CI vs local
+    "catalogflow.web.user_service",
 ]
 ignore_errors = true
 
