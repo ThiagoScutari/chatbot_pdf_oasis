@@ -402,15 +402,15 @@ def test_two_products_each_receives_acroform_fields(
     output = FieldInjector().inject(pdf_dois_produtos_nomes_distintos, metadata)
     doc = pymupdf.open(stream=output, filetype="pdf")
     try:
-        field_names = [
-            w.field_name for page in doc for w in (page.widgets() or [])
-        ]
+        field_names = [w.field_name for page in doc for w in (page.widgets() or [])]
     finally:
         doc.close()
-    assert any("0322500004-0" in f for f in field_names), \
+    assert any("0322500004-0" in f for f in field_names), (
         "Nenhum campo gerado para JAQUETA BERENICE"
-    assert any("0142500001-0" in f for f in field_names), \
+    )
+    assert any("0142500001-0" in f for f in field_names), (
         "Nenhum campo gerado para CALÇA CAPRI ESTHER"
+    )
 
 
 class TestSwatchDetectionThreshold:

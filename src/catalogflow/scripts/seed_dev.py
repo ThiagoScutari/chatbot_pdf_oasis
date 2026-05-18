@@ -45,9 +45,7 @@ async def _seed() -> tuple[str, str, str, bool]:
                 plan="growth",
             )
 
-        admin = await session.scalar(
-            select(WebUser).where(WebUser.email == ADMIN_EMAIL)
-        )
+        admin = await session.scalar(select(WebUser).where(WebUser.email == ADMIN_EMAIL))
         admin_created = False
         if admin is None:
             admin = WebUser(
@@ -87,7 +85,7 @@ def main() -> None:
         print(f'export CATALOGFLOW_API_KEY="{raw}"')
         print()
         print(
-            "Use como: curl -H \"Authorization: Bearer $CATALOGFLOW_API_KEY\" "
+            'Use como: curl -H "Authorization: Bearer $CATALOGFLOW_API_KEY" '
             "http://localhost:8000/api/v1/health",
         )
         print("-" * 60)

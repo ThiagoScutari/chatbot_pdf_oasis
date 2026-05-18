@@ -274,11 +274,7 @@ class RomaneioService:
         self,
         order_id: UUID,
     ) -> tuple[Order, Brand]:
-        stmt = (
-            select(Order)
-            .where(Order.id == order_id)
-            .options(selectinload(Order.items))
-        )
+        stmt = select(Order).where(Order.id == order_id).options(selectinload(Order.items))
         result = await self.db.execute(stmt)
         order = result.scalar_one_or_none()
         if order is None:
@@ -411,7 +407,5 @@ class RomaneioService:
             # builder etc.) — diferente de orders onde flatten é permanente.
             job.status = "retry"
             error_code = getattr(error, "code", None)
-            job.error = (
-                f"{error_code}: {error}" if error_code else str(error)
-            )
+            job.error = f"{error_code}: {error}" if error_code else str(error)
         await self.db.flush()

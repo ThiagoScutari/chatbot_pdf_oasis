@@ -82,12 +82,8 @@ class TestCreateApiKey:
     ) -> None:
         brand = await auth_service.create_brand(db_session, slug="x2", name="X2")
         await db_session.commit()
-        _, raw_a = await auth_service.create_api_key(
-            db_session, brand_id=brand.id, name="A"
-        )
-        _, raw_b = await auth_service.create_api_key(
-            db_session, brand_id=brand.id, name="B"
-        )
+        _, raw_a = await auth_service.create_api_key(db_session, brand_id=brand.id, name="A")
+        _, raw_b = await auth_service.create_api_key(db_session, brand_id=brand.id, name="B")
         await db_session.commit()
         assert raw_a != raw_b
 
@@ -96,9 +92,7 @@ class TestVerifyApiKey:
     async def test_valid_key_returns_brand(self, db_session: AsyncSession) -> None:
         brand = await auth_service.create_brand(db_session, slug="vk", name="VK")
         await db_session.commit()
-        _, raw = await auth_service.create_api_key(
-            db_session, brand_id=brand.id, name="ok"
-        )
+        _, raw = await auth_service.create_api_key(db_session, brand_id=brand.id, name="ok")
         await db_session.commit()
 
         resolved = await auth_service.verify_api_key(db_session, raw)
@@ -147,9 +141,7 @@ class TestTouchLastUsed:
     async def test_updates_timestamp(self, db_session: AsyncSession) -> None:
         brand = await auth_service.create_brand(db_session, slug="tl", name="TL")
         await db_session.commit()
-        api_key, raw = await auth_service.create_api_key(
-            db_session, brand_id=brand.id, name="ok"
-        )
+        api_key, raw = await auth_service.create_api_key(db_session, brand_id=brand.id, name="ok")
         await db_session.commit()
         assert api_key.last_used is None
 
@@ -176,9 +168,7 @@ class TestRotateApiKey:
         await db_session.commit()
         old_hash = api_key.key_hash
 
-        rotated, raw_new = await auth_service.rotate_api_key(
-            db_session, api_key_id=api_key.id
-        )
+        rotated, raw_new = await auth_service.rotate_api_key(db_session, api_key_id=api_key.id)
         await db_session.commit()
         assert raw_new != raw_old
         assert rotated.key_hash != old_hash

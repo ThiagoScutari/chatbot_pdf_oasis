@@ -95,14 +95,17 @@ class TestCatalogProcessTransientErrors:
         async def boom(*args: Any, **kwargs: Any) -> dict[str, Any]:
             raise RuntimeError("transient blip")
 
-        with patch(
-            "catalogflow.modules.catalog.tasks._run_process_catalog",
-            new=boom,
-        ), patch.object(
-            process_catalog_task,
-            "retry",
-            side_effect=Retry("retry-scheduled"),
-        ) as mock_retry:
+        with (
+            patch(
+                "catalogflow.modules.catalog.tasks._run_process_catalog",
+                new=boom,
+            ),
+            patch.object(
+                process_catalog_task,
+                "retry",
+                side_effect=Retry("retry-scheduled"),
+            ) as mock_retry,
+        ):
             process_catalog_task.apply(args=[cid, jid])
         assert mock_retry.called, "self.retry() deveria ter sido invocado"
         # countdown segue 60 * 2^0 na primeira tentativa.

@@ -40,9 +40,7 @@ class Romaneio(Base):
     """
 
     __tablename__ = "romaneios"
-    __table_args__ = (
-        UniqueConstraint("order_id", name="uq_romaneios_order_id"),
-    )
+    __table_args__ = (UniqueConstraint("order_id", name="uq_romaneios_order_id"),)
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),

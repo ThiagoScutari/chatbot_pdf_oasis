@@ -320,9 +320,7 @@ class OrderService:
         order.status = "extracted"
         order.total_pecas = normalized.totals.total_pecas
         order.valor_total = (
-            normalized.totals.valor_total
-            if normalized.totals.valor_total != Decimal("0")
-            else None
+            normalized.totals.valor_total if normalized.totals.valor_total != Decimal("0") else None
         )
         order.extracted_at = datetime.now(UTC)
 

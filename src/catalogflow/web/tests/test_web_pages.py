@@ -32,9 +32,7 @@ async def _login(client: AsyncClient, _api_key: str | None = None) -> None:
 
 
 @pytest_asyncio.fixture
-async def sample_catalog(
-    db_session: AsyncSession, sample_brand: Brand
-) -> Catalog:
+async def sample_catalog(db_session: AsyncSession, sample_brand: Brand) -> Catalog:
     """Catálogo já 'pronto' para testar o detalhe."""
     catalog = Catalog(
         brand_id=sample_brand.id,
@@ -110,9 +108,7 @@ async def sample_order(
 
 
 class TestDashboard:
-    async def test_dashboard_without_session_redirects_to_login(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_dashboard_without_session_redirects_to_login(self, client: AsyncClient) -> None:
         resp = await client.get("/dashboard")
         assert resp.status_code == 302
         assert resp.headers["location"] == "/login"
@@ -132,9 +128,7 @@ class TestDashboard:
         assert "Pedidos" in body
         assert "Romaneios" in body
 
-    async def test_dashboard_with_invalid_session_redirects(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_dashboard_with_invalid_session_redirects(self, client: AsyncClient) -> None:
         client.cookies.set(SESSION_COOKIE, "not-a-valid-token")
         resp = await client.get("/dashboard")
         assert resp.status_code == 302
@@ -142,9 +136,7 @@ class TestDashboard:
 
 
 class TestCatalogsList:
-    async def test_catalogs_without_session_redirects_to_login(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_catalogs_without_session_redirects_to_login(self, client: AsyncClient) -> None:
         resp = await client.get("/catalogs")
         assert resp.status_code == 302
         assert resp.headers["location"] == "/login"
@@ -161,9 +153,7 @@ class TestCatalogsList:
         # CTA de envio.
         assert "+ Enviar primeiro catálogo" in body or "/catalogs/upload" in body
 
-    async def test_catalogs_with_invalid_session_redirects(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_catalogs_with_invalid_session_redirects(self, client: AsyncClient) -> None:
         client.cookies.set(SESSION_COOKIE, "not-a-valid-token")
         resp = await client.get("/catalogs")
         assert resp.status_code == 302
@@ -176,15 +166,11 @@ class TestCatalogBadgeFragment:
     ) -> None:
         await _login(client, sample_api_key)
         # UUID válido em forma mas inexistente.
-        resp = await client.get(
-            "/catalogs/00000000-0000-0000-0000-000000000000/_badge"
-        )
+        resp = await client.get("/catalogs/00000000-0000-0000-0000-000000000000/_badge")
         assert resp.status_code == 404
 
     async def test_badge_requires_session(self, client: AsyncClient) -> None:
-        resp = await client.get(
-            "/catalogs/00000000-0000-0000-0000-000000000000/_badge"
-        )
+        resp = await client.get("/catalogs/00000000-0000-0000-0000-000000000000/_badge")
         assert resp.status_code == 302
         assert resp.headers["location"] == "/login"
 
@@ -195,9 +181,7 @@ class TestCatalogUploadForm:
         assert resp.status_code == 302
         assert resp.headers["location"] == "/login"
 
-    async def test_upload_form_renders(
-        self, client: AsyncClient, sample_api_key: str
-    ) -> None:
+    async def test_upload_form_renders(self, client: AsyncClient, sample_api_key: str) -> None:
         await _login(client, sample_api_key)
         resp = await client.get("/catalogs/upload")
         assert resp.status_code == 200
@@ -252,9 +236,7 @@ class TestCatalogDetail:
         """Catálogo de outra brand → 404 elegante (sem vazar existência)."""
         from catalogflow.modules.auth import service as auth_service
 
-        other = await auth_service.create_brand(
-            db_session, slug="outra", name="Outra Marca"
-        )
+        other = await auth_service.create_brand(db_session, slug="outra", name="Outra Marca")
         await db_session.commit()
         other_catalog = Catalog(
             brand_id=other.id,
@@ -282,9 +264,7 @@ class TestOrdersList:
         assert resp.status_code == 302
         assert resp.headers["location"] == "/login"
 
-    async def test_empty_state(
-        self, client: AsyncClient, sample_api_key: str
-    ) -> None:
+    async def test_empty_state(self, client: AsyncClient, sample_api_key: str) -> None:
         await _login(client, sample_api_key)
         resp = await client.get("/orders")
         assert resp.status_code == 200
@@ -352,9 +332,7 @@ class TestOrderDetail:
     ) -> None:
         from catalogflow.modules.auth import service as auth_service
 
-        other = await auth_service.create_brand(
-            db_session, slug="outra2", name="Outra Marca 2"
-        )
+        other = await auth_service.create_brand(db_session, slug="outra2", name="Outra Marca 2")
         await db_session.commit()
         other_order = Order(
             brand_id=other.id,
@@ -453,9 +431,7 @@ class TestProductImage:
         monkeypatch.setattr(web_router, "fetch_product_image_url", fake_fetch)
 
         await _login(client, sample_api_key)
-        resp = await client.get(
-            "/product-image/sku-invalido?name=Vestido%20Joana"
-        )
+        resp = await client.get("/product-image/sku-invalido?name=Vestido%20Joana")
 
         assert resp.status_code == 200
         assert "image/svg+xml" in resp.headers["content-type"]
@@ -537,9 +513,7 @@ class TestSoftDeleteCatalog:
     ) -> None:
         from catalogflow.modules.auth import service as auth_service
 
-        other = await auth_service.create_brand(
-            db_session, slug="outra3", name="Outra Marca 3"
-        )
+        other = await auth_service.create_brand(db_session, slug="outra3", name="Outra Marca 3")
         await db_session.commit()
         foreign = Catalog(brand_id=other.id, name="Catálogo alheio", status="ready")
         db_session.add(foreign)
@@ -599,9 +573,7 @@ class TestSoftDeleteOrder:
         await client.post(f"/orders/{sample_order.id}/delete")
 
         # Reler o romaneio do banco pela chave primária.
-        rom = await db_session.scalar(
-            select(Romaneio).where(Romaneio.id == romaneio.id)
-        )
+        rom = await db_session.scalar(select(Romaneio).where(Romaneio.id == romaneio.id))
         assert rom is not None
         assert rom.deleted_at is not None
 
@@ -628,9 +600,7 @@ class TestSoftDeleteOrder:
     ) -> None:
         from catalogflow.modules.auth import service as auth_service
 
-        other = await auth_service.create_brand(
-            db_session, slug="outra4", name="Outra Marca 4"
-        )
+        other = await auth_service.create_brand(db_session, slug="outra4", name="Outra Marca 4")
         await db_session.commit()
         foreign = Order(
             brand_id=other.id,

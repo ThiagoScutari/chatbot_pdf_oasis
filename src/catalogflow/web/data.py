@@ -330,9 +330,7 @@ async def list_catalog_products(
     offset = (page - 1) * page_size
 
     total = await db.scalar(
-        select(func.count(CatalogProduct.id)).where(
-            CatalogProduct.catalog_id == catalog_id
-        )
+        select(func.count(CatalogProduct.id)).where(CatalogProduct.catalog_id == catalog_id)
     )
     stmt = (
         select(CatalogProduct)
@@ -634,9 +632,7 @@ def build_stock_map(stock_check: StockCheck | None) -> StockMap:
         except (KeyError, ValueError, TypeError):
             continue
         available = entry.get("available")
-        result[key] = (
-            int(available) if isinstance(available, (int, float)) else None
-        )
+        result[key] = int(available) if isinstance(available, (int, float)) else None
     return result
 
 
@@ -648,9 +644,7 @@ def count_pendency_items(stock_map: StockMap, items: list[OrderItem]) -> int:
     deixar claro o contrato; aqui usamos a coluna mais barata.
     """
     del stock_map  # contrato — não precisa nesta implementação
-    return sum(
-        1 for item in items if item.stock_status in ("partial", "out_of_stock")
-    )
+    return sum(1 for item in items if item.stock_status in ("partial", "out_of_stock"))
 
 
 def group_items_by_sku(
@@ -727,10 +721,13 @@ def group_items_by_sku(
         else:
             subtotal = None
 
-        product_name = next(
-            (it.product_name for it in sku_items if it.product_name),
-            sku,
-        ) or sku
+        product_name = (
+            next(
+                (it.product_name for it in sku_items if it.product_name),
+                sku,
+            )
+            or sku
+        )
 
         grouped.append(
             GroupedProduct(

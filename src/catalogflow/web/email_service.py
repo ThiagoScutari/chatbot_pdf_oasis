@@ -113,10 +113,10 @@ class EmailService:
 
 def _envelope(body_html: str) -> str:
     return (
-        "<div style=\"font-family:Inter,Arial,sans-serif;max-width:520px;"
-        "margin:0 auto;padding:24px;color:#2A241F;\">"
+        '<div style="font-family:Inter,Arial,sans-serif;max-width:520px;'
+        'margin:0 auto;padding:24px;color:#2A241F;">'
         f"{body_html}"
-        "<p style=\"color:#7A6E65;font-size:12px;margin-top:32px;\">"
+        '<p style="color:#7A6E65;font-size:12px;margin-top:32px;">'
         "CatalogFlow — Oasis Resortwear"
         "</p></div>"
     )
@@ -131,7 +131,7 @@ def _render_magic_link_html(*, name: str, link: str) -> str:
         'style="display:inline-block;background:#2A241F;color:#FAF8F5;'
         'padding:12px 24px;text-decoration:none;border-radius:4px;">'
         "Entrar na minha conta</a></p>"
-        "<p style=\"color:#7A6E65;font-size:13px;\">Se você não pediu este link, "
+        '<p style="color:#7A6E65;font-size:13px;">Se você não pediu este link, '
         "pode ignorar este email.</p>"
     )
     return _envelope(body)
@@ -161,9 +161,7 @@ def _render_denial_html(*, name: str) -> str:
     return _envelope(body)
 
 
-def _render_admin_notice_html(
-    *, requester_name: str, requester_email: str, review_url: str
-) -> str:
+def _render_admin_notice_html(*, requester_name: str, requester_email: str, review_url: str) -> str:
     body = (
         "<h2 style=\"font-family:'Cormorant Garamond',Georgia,serif;\">"
         "Novo pedido de acesso</h2>"

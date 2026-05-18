@@ -156,9 +156,7 @@ async def db_session(_async_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         # casos, o TRUNCATE abaixo limpa o estado para o próximo teste.
 
     truncate_sql = text(
-        "TRUNCATE TABLE "
-        + ", ".join(_TABLES_TO_TRUNCATE)
-        + " RESTART IDENTITY CASCADE",
+        "TRUNCATE TABLE " + ", ".join(_TABLES_TO_TRUNCATE) + " RESTART IDENTITY CASCADE",
     )
     async with _async_engine.begin() as conn:
         await conn.execute(truncate_sql)

@@ -787,8 +787,7 @@ async def catalog_download(
     return _render_not_found(
         request,
         title="Download indisponível",
-        message=err.get("message")
-        or "O catálogo ainda não está pronto para download.",
+        message=err.get("message") or "O catálogo ainda não está pronto para download.",
     )
 
 
@@ -1189,12 +1188,8 @@ async def order_detail(
             "auto_download": False,
             "stock_state": _classify_stock_state(detail),
             "stock_summary": _stock_summary_from(detail),
-            "stock_checked_at": (
-                detail.stock_check.checked_at if detail.stock_check else None
-            ),
-            "stock_error": (
-                detail.stock_check.error_message if detail.stock_check else None
-            ),
+            "stock_checked_at": (detail.stock_check.checked_at if detail.stock_check else None),
+            "stock_error": (detail.stock_check.error_message if detail.stock_check else None),
             "submission_state": _classify_submission_state(detail),
             "submission": detail.submission,
             "stock_map": stock_map,

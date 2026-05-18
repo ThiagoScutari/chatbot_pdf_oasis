@@ -150,9 +150,7 @@ async def auth_headers(db_session: AsyncSession, brand: Brand) -> dict[str, str]
 
 
 @pytest_asyncio.fixture
-async def other_brand_headers(
-    db_session: AsyncSession, other_brand: Brand
-) -> dict[str, str]:
+async def other_brand_headers(db_session: AsyncSession, other_brand: Brand) -> dict[str, str]:
     _, raw = await auth_service.create_api_key(
         db_session,
         brand_id=other_brand.id,
@@ -443,9 +441,7 @@ class TestJobsEndpoint:
         )
         job_id = post.json()["data"]["job_id"]
 
-        resp = await client.get(
-            f"/api/v1/jobs/{job_id}", headers=other_brand_headers
-        )
+        resp = await client.get(f"/api/v1/jobs/{job_id}", headers=other_brand_headers)
         assert resp.status_code == 404
         assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
 
@@ -454,7 +450,5 @@ class TestJobsEndpoint:
         client: AsyncClient,
         auth_headers: dict[str, str],
     ) -> None:
-        resp = await client.get(
-            f"/api/v1/jobs/{uuid4()}", headers=auth_headers
-        )
+        resp = await client.get(f"/api/v1/jobs/{uuid4()}", headers=auth_headers)
         assert resp.status_code == 404

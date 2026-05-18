@@ -78,9 +78,7 @@ async def sample_brand(db_session: AsyncSession) -> Brand:
 
 
 @pytest_asyncio.fixture
-async def sample_api_key(
-    db_session: AsyncSession, sample_brand: Brand
-) -> str:
+async def sample_api_key(db_session: AsyncSession, sample_brand: Brand) -> str:
     """Cria uma API key + um WebUser ativo para a brand.
 
     Sprint 03.5: o login passou a ser email+senha. Mantemos esta fixture
@@ -95,9 +93,7 @@ async def sample_api_key(
         name="web-login-test",
     )
     # Garante que existe operador ativo para o _login(email+senha) funcionar.
-    existing = await db_session.scalar(
-        select(WebUser).where(WebUser.email == SAMPLE_USER_EMAIL)
-    )
+    existing = await db_session.scalar(select(WebUser).where(WebUser.email == SAMPLE_USER_EMAIL))
     if existing is None:
         db_session.add(
             WebUser(
@@ -122,9 +118,7 @@ SAMPLE_ADMIN_PASSWORD = "admin-teste-123"
 @pytest_asyncio.fixture
 async def sample_user(db_session: AsyncSession, sample_brand: Brand) -> WebUser:
     """Operador ativo já aprovado — login pronto por email/senha."""
-    existing = await db_session.scalar(
-        select(WebUser).where(WebUser.email == SAMPLE_USER_EMAIL)
-    )
+    existing = await db_session.scalar(select(WebUser).where(WebUser.email == SAMPLE_USER_EMAIL))
     if existing is not None:
         return existing
     user = WebUser(

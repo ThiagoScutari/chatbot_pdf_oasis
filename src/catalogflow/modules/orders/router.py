@@ -114,11 +114,7 @@ async def get_order_endpoint(
             size=item.size,
             quantity=item.quantity,
             unit_price=item.unit_price,
-            subtotal=(
-                item.unit_price * item.quantity
-                if item.unit_price is not None
-                else None
-            ),
+            subtotal=(item.unit_price * item.quantity if item.unit_price is not None else None),
         )
         for item in order.items
     ]

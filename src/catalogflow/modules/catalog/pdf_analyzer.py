@@ -301,11 +301,7 @@ class PDFAnalyzer:
 
         zones: dict[str, pymupdf.Rect] = {}
         for i, (sku, rect) in enumerate(sorted_skus):
-            x_left = (
-                0.0
-                if i == 0
-                else (sorted_skus[i - 1][1].x0 + rect.x0) / 2.0
-            )
+            x_left = 0.0 if i == 0 else (sorted_skus[i - 1][1].x0 + rect.x0) / 2.0
             x_right = (
                 page_width
                 if i == len(sorted_skus) - 1
@@ -377,9 +373,7 @@ class PDFAnalyzer:
             # STEP C — filtra palavras para a zona deste SKU e roda regex
             # apenas no texto da zona (sem vazamento entre vizinhos).
             zone_words = [
-                w
-                for w in words
-                if float(w["x0"]) >= zone.x0 and float(w["x1"]) <= zone.x1
+                w for w in words if float(w["x0"]) >= zone.x0 and float(w["x1"]) <= zone.x1
             ]
             zone_text = " ".join(w["text"] for w in zone_words)
 
@@ -395,9 +389,7 @@ class PDFAnalyzer:
             # STEP D — bot_words restritos à zona (usados pelo bounding box
             # do painel de pedido em `field_injector`).
             subset = [
-                w
-                for w in bot_words
-                if float(w["x0"]) >= zone.x0 and float(w["x1"]) <= zone.x1
+                w for w in bot_words if float(w["x0"]) >= zone.x0 and float(w["x1"]) <= zone.x1
             ]
             if not subset:
                 continue

@@ -96,9 +96,7 @@ async def get_catalog_endpoint(
         error_message=catalog.error_message,
         created_at=catalog.created_at,
         updated_at=catalog.updated_at,
-        products=[
-            CatalogProductResponse.model_validate(p) for p in catalog.products
-        ],
+        products=[CatalogProductResponse.model_validate(p) for p in catalog.products],
     )
     return ok(payload, request_id=get_request_id(request))
 
