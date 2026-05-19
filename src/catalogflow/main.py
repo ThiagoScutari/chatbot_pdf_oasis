@@ -122,8 +122,12 @@ async def _validation_error_handler(
         details={"errors": _safe_validation_errors(exc)},
         request_id=request_id,
     )
+    # Starlette renomeou HTTP_422_UNPROCESSABLE_ENTITY → ..._CONTENT (deprecation
+    # warning na constante antiga). filterwarnings=error promoveria o warning
+    # a exception dentro do handler → 500 silencioso. Literal 422 funciona em
+    # qualquer versão.
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=422,
         content=envelope.model_dump(mode="json"),
     )
 
