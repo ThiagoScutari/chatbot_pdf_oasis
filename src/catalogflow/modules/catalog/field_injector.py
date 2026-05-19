@@ -1,3 +1,6 @@
+# mypy: disable-error-code="no-untyped-call,attr-defined,assignment"
+# ↑ pymupdf sem stubs; atributos de Widget (text_color, border_width) viram
+# `tuple[int,...]`/`int` na inferência do mypy e geram assignment falso-pos.
 """Engine puro que injeta campos AcroForm de pedido nas páginas de produto.
 
 Contrato (CLAUDE.md):
@@ -202,7 +205,6 @@ class FieldInjector:
         grade = product.grade
         sizes = product.sizes
         n_cores = max(1, product.n_colors)
-        n_tam = len(sizes)
         swatches = product.swatches
         x0, y0, x1, y1, campo_w = rect.x0, rect.y0, rect.x1, rect.y1, rect.campo_w
 
@@ -338,7 +340,7 @@ class FieldInjector:
         ti: int,
         campo_w: float,
     ) -> None:
-        """Cria e adiciona o widget AcroForm para uma célula (cor × tamanho)."""
+        """Cria e adiciona o widget AcroForm para uma célula (cor x tamanho)."""
         xc = x0 + COR_COL_W + ti * campo_w
         rect = pymupdf.Rect(
             xc + PAD_FIELD,

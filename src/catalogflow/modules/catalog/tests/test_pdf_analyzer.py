@@ -1,3 +1,5 @@
+# mypy: disable-error-code="no-untyped-call,attr-defined"
+# ↑ pymupdf/fitz sem stubs; testes inspecionam PDFs via Document/Rect/Point.
 """Testes do `PDFAnalyzer` contra as fixtures sintéticas.
 
 As fixtures são geradas por `tests/fixtures/generate_fixtures.py` e

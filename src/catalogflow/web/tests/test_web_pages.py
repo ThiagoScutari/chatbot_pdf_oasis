@@ -638,7 +638,7 @@ class TestWebErrorPages:
         from catalogflow.main import create_app
 
         app = create_app()
-        transport = ASGITransport(app=app)
+        transport = ASGITransport(app=app)  # type: ignore[arg-type]
         async with AsyncClient(
             transport=transport,
             base_url="http://testserver",
@@ -661,7 +661,7 @@ class TestWebErrorPages:
         from catalogflow.main import create_app
 
         app = create_app()
-        transport = ASGITransport(app=app)
+        transport = ASGITransport(app=app)  # type: ignore[arg-type]
         async with AsyncClient(
             transport=transport,
             base_url="http://testserver",

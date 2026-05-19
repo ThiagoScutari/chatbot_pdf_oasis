@@ -73,7 +73,7 @@ def app(db_session: AsyncSession) -> FastAPI:
 @pytest_asyncio.fixture
 async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     """Cliente HTTP async sobre o ASGI in-process."""
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
 

@@ -1,3 +1,5 @@
+# mypy: disable-error-code="no-untyped-call,attr-defined"
+# ↑ pymupdf sem stubs; testes inspecionam o PDF gerado.
 """Testes do `RomaneioService` — geração + download.
 
 Cenários cobertos:
@@ -21,6 +23,7 @@ import pymupdf
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
+from tests.fakes import FakeStorage
 
 from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.models import Job
@@ -30,7 +33,6 @@ from catalogflow.modules.romaneio.service import (
     RomaneioService,
     romaneio_output_key_for,
 )
-from catalogflow.modules.romaneio.tests.conftest import FakeStorage
 from catalogflow.shared.errors import (
     JobNotReadyError,
     NotFoundError,

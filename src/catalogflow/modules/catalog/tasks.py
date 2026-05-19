@@ -83,7 +83,7 @@ async def _run_process_catalog(catalog_id: UUID, job_id: UUID) -> dict[str, Any]
         await dispose_engine()
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True,
     name="catalog.process",
     max_retries=3,
@@ -95,7 +95,7 @@ def process_catalog_task(self: Task, catalog_id: str, job_id: str) -> dict[str, 
     """Entrada Celery: dispara o pipeline assíncrono.
 
     `bind=True` permite acessar `self.request` para implementar retry com
-    backoff exponencial: 60s, 120s, 240s (default_retry_delay × 2^retries).
+    backoff exponencial: 60s, 120s, 240s (default_retry_delay x 2^retries).
     """
     cid = UUID(catalog_id)
     jid = UUID(job_id)
@@ -122,7 +122,7 @@ def process_catalog_task(self: Task, catalog_id: str, job_id: str) -> dict[str, 
         raise self.retry(exc=exc, countdown=countdown) from exc
 
 
-@celery_app.task(name="catalog.shutdown", ignore_result=True)
+@celery_app.task(name="catalog.shutdown", ignore_result=True)  # type: ignore[misc]
 def _shutdown_engine() -> None:
     """Sinal manual para liberar engine — útil em SIGTERM custom no worker."""
     asyncio.run(dispose_engine())

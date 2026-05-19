@@ -187,7 +187,7 @@ class PDFAnalyzer:
                             ),
                         )
         finally:
-            doc.close()
+            doc.close()  # type: ignore[no-untyped-call]
 
         if not product_pages:
             raise PDFNoProductsError(
@@ -207,7 +207,7 @@ class PDFAnalyzer:
     def _open_pymupdf(self, pdf_bytes: bytes) -> pymupdf.Document:
         """Abre o PDF a partir de bytes. Levanta `PDFCorruptError` em falha."""
         try:
-            return pymupdf.open(stream=pdf_bytes, filetype="pdf")
+            return pymupdf.open(stream=pdf_bytes, filetype="pdf")  # type: ignore[no-untyped-call]
         except Exception as exc:
             raise PDFCorruptError(
                 "pdf corrompido ou em formato inválido",
@@ -262,11 +262,7 @@ class PDFAnalyzer:
 
     @staticmethod
     def _rgb_to_hex(rgb: tuple[float, float, float]) -> str:
-        return "#{:02x}{:02x}{:02x}".format(
-            int(round(rgb[0] * 255)),
-            int(round(rgb[1] * 255)),
-            int(round(rgb[2] * 255)),
-        )
+        return f"#{round(rgb[0] * 255):02x}{round(rgb[1] * 255):02x}{round(rgb[2] * 255):02x}"
 
     def _assign_name_zones(
         self,
@@ -296,7 +292,7 @@ class PDFAnalyzer:
                 "usando página inteira como zona para todos. SKUs: %s",
                 [sku for sku, _ in sorted_skus],
             )
-            full_page = pymupdf.Rect(0.0, 0.0, page_width, page_height)
+            full_page = pymupdf.Rect(0.0, 0.0, page_width, page_height)  # type: ignore[no-untyped-call]
             return {sku: full_page for sku, _ in sorted_skus}
 
         zones: dict[str, pymupdf.Rect] = {}
@@ -307,7 +303,7 @@ class PDFAnalyzer:
                 if i == len(sorted_skus) - 1
                 else (rect.x0 + sorted_skus[i + 1][1].x0) / 2.0
             )
-            zones[sku] = pymupdf.Rect(x_left, 0.0, x_right, page_height)
+            zones[sku] = pymupdf.Rect(x_left, 0.0, x_right, page_height)  # type: ignore[no-untyped-call]
         return zones
 
     def _extract_legend_blocks(
@@ -349,7 +345,7 @@ class PDFAnalyzer:
             sku_rects.append(
                 (
                     sku,
-                    pymupdf.Rect(
+                    pymupdf.Rect(  # type: ignore[no-untyped-call]
                         float(sku_word["x0"]),
                         float(sku_word["top"]),
                         float(sku_word["x1"]),

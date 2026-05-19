@@ -62,7 +62,7 @@ async def _run_process_romaneio(
         await dispose_engine()
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True,
     name="romaneio.generate",
     max_retries=3,

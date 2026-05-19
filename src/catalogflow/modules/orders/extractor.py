@@ -86,7 +86,7 @@ class OrderExtractor:
             raise PDFCorruptError("pdf vazio", code="PDF_CORRUPT")
 
         try:
-            doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+            doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")  # type: ignore[no-untyped-call]
         except Exception as exc:
             raise PDFCorruptError(
                 "pdf corrompido ou em formato inválido",
@@ -111,8 +111,8 @@ class OrderExtractor:
 
             for page_idx in range(n_pages):
                 page = doc[page_idx]
-                for widget in page.widgets() or []:
-                    if widget.field_type != pymupdf.PDF_WIDGET_TYPE_TEXT:
+                for widget in page.widgets() or []:  # type: ignore[no-untyped-call]
+                    if widget.field_type != pymupdf.PDF_WIDGET_TYPE_TEXT:  # type: ignore[attr-defined]
                         continue
 
                     n_fields_found += 1
@@ -159,7 +159,7 @@ class OrderExtractor:
                 source_format=_consolidate_source_format(formats_seen),
             )
         finally:
-            doc.close()
+            doc.close()  # type: ignore[no-untyped-call]
 
 
 # ──────────────────────────────────────────────

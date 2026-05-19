@@ -93,7 +93,9 @@ class EmailService:
             "html": html,
         }
         try:
-            resend.Emails.send(params)
+            # resend.Emails.send expects a SendParams TypedDict; nosso dict tem
+            # as mesmas chaves mas mypy não consegue inferir a equivalência.
+            resend.Emails.send(params)  # type: ignore[arg-type]
             logger.info("email sent to=%s subject=%r", to_email, subject)
             return True
         except Exception as exc:  # fail-soft: log e retorna False
