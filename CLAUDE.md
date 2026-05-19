@@ -208,6 +208,23 @@ Every API response follows this shape:
 
 7. **PDF flattening detection.** When a filled PDF arrives without `/AcroForm` in the catalog dictionary, it's been flattened (printed-to-PDF). Return `error.code = "PDF_FLATTENED"`, not a generic 500.
 
+8. **SKU regex deve aceitar 9–13 dígitos antes do hífen.**
+   O catálogo Oasis MOTION contém SKUs com 9 dígitos (ex: `442500908-0`).
+   O padrão correto é `r"\b(\d{9,13}-\d)\b"` — não `\d{10}` ou `\d{10,13}`.
+
+9. **Nunca hardcodar divisão de página para páginas multi-produto.**
+   Usar `_assign_name_zones()` (ADR-007) para calcular zonas dinamicamente.
+   `page_w / 2` é hardcode — quebra em layouts assimétricos e N > 2 produtos.
+
+10. **`pre-commit install` é obrigatório após clonar o repositório.**
+    Sem isso, ruff/mypy não rodam localmente e o CI falhará no primeiro push.
+    Nunca commitar sem rodar `pre-commit run --all-files` localmente.
+
+11. **Nunca usar `os.environ.setdefault()` em conftest.py para injetar secrets.**
+    `setdefault` não sobrescreve variáveis já definidas — o CI define
+    INTERNAL_SECRET com valor diferente do teste, causando 401 silencioso.
+    Usar `os.environ["INTERNAL_SECRET"] = "test-value"` (override forçado).
+
 ---
 
 ## Reference Documents

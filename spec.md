@@ -1,11 +1,11 @@
 # CatalogFlow — Especificação Técnica do Produto
 
-> **Versão:** 0.1.0-draft  
-> **Status:** Em revisão  
+> **Versão:** 0.2.0  
+> **Status:** Ativo  
 > **Autores:** Thiago Scutari (PMO), Claude Sonnet 4.6 (arquitetura)  
 > **Executor:** Claude Code  
 > **Criado em:** 2026-05-11  
-> **Última atualização:** 2026-05-11
+> **Última atualização:** 2026-05-18
 
 ---
 
@@ -156,6 +156,57 @@ Plataforma SaaS que transforma catálogos PDF visuais em instrumentos de captura
 
 **Decisão:** Todas as rotas públicas sob `/api/v1/`. Quando uma v2 for necessária, `/api/v2/` coexiste. Versão anterior deprecada com 6 meses de aviso.
 
+### ADR-007: Zonas de Voronoi horizontal para extração de metadados por SKU
+
+**Contexto:** Catálogos de moda podem ter N produtos por página com layouts
+assimétricos e variáveis entre coleções e marcas. Hardcoding de posições
+(como page_w / 2) quebra silenciosamente em layouts não previstos.
+
+**Decisão:** O PDFAnalyzer calcula zonas de busca de texto dinamicamente via
+_assign_name_zones(), usando os pontos médios entre as coordenadas X dos SKUs
+detectados na página como fronteiras. Nenhum valor de posição é hardcoded.
+Funciona para 1, 2, 3 ou N produtos por página. As extrações de name, price,
+grade e swatches são restritas à zona do respectivo SKU.
+
+**Consequências:**
+- Layouts assimétricos tratados corretamente — fronteira segue os dados
+- _assign_name_zones() é testável em isolamento, sem PDF real
+- Página com 1 produto: zona = página inteira (comportamento anterior preservado)
+
+**Alternativas descartadas:** page_w / 2 fixo (quebra em layouts assimétricos
+e páginas com 3+ produtos).
+
+### ADR-008: Mypy — ignore_missing_imports para libs externas, type: ignore nos call sites
+
+**Contexto:** PyMuPDF não tem stubs de tipo. A configuração inicial de mypy strict
+causou 164 erros de no-untyped-call — todos falsos positivos. A solução temporária
+(ignore_errors = true em 23 módulos) removeu toda a verificação de tipo do
+código core.
+
+**Decisão:** [[tool.mypy.overrides]] com ignore_missing_imports = true APENAS para
+libs externas (pymupdf, celery, redis, etc.). Para arquivos nossos com uso intensivo
+de pymupdf, usar diretiva de arquivo # mypy: disable-error-code="no-untyped-call"
+no topo. Para casos pontuais, # type: ignore[no-untyped-call] no call site.
+
+**Consequências:**
+- mypy verifica 100% do código nosso, exceto as linhas de chamada pymupdf
+- Supressão cirúrgica: o arquivo ou a linha, não o módulo inteiro no pyproject.toml
+- Quando pymupdf publicar stubs, warn_unused_ignores = true avisará automaticamente
+
+### ADR-009: pre-commit como portão local obrigatório
+
+**Contexto:** O CI falhava sistematicamente porque ruff/mypy não eram executados
+localmente antes de commitar. Cada PR exigia múltiplos commits de correção de CI.
+
+**Decisão:** pre-commit hooks obrigatórios com ruff check, ruff format e mypy.
+Versões das deps no hook pinadas para corresponder ao ambiente local e evitar
+drift de stubs. pre-commit install é parte do onboarding documentado em
+CLAUDE.md e README.md.
+
+**Consequências:**
+- Erros de lint/format/tipo detectados antes do push
+- CI passa na primeira tentativa
+
 ---
 
 ## 4. Stack Técnico
@@ -186,9 +237,13 @@ Plataforma SaaS que transforma catálogos PDF visuais em instrumentos de captura
 | Segurança | pip-audit + bandit | latest | Vulnerabilidades e SAST |
 | Containerização | Docker | 27+ | Multi-stage build, non-root user |
 | CI/CD | GitHub Actions | — | Pipeline completo |
-| Deploy | Fly.io ou Railway | — | Decisão antes do go-live |
-| Monitoring | Sentry | latest | Erros + performance |
-| APM | OpenTelemetry | latest | Traces de jobs Celery |
+| Deploy | VPS + Docker Compose + Traefik | — | Implantado em produção (VPS 162.240.102.45) |
+| Monitoring | Sentry | latest | Erros + performance (não implantado — Sprint futura) |
+| APM | OpenTelemetry | latest | Traces de jobs Celery (não implantado — Sprint futura) |
+| File Storage (local/prod) | MinIO | latest | S3-compatible; R2 planejado para escala |
+| Web UI | Jinja2 + HTMX + Alpine.js | latest | Sprint 03 |
+| Email | Resend | latest | Magic link + notificações (Sprint 03.5) |
+| Pre-commit | ruff + mypy hooks | latest | Sprint 06 — obrigatório no setup |
 
 ---
 
@@ -805,7 +860,7 @@ Retry: até 5 tentativas com backoff exponencial. Signature HMAC-SHA256 no heade
         │
         ├─ Atualizar Job (status=running)
         ├─ Download PDF do storage
-        ├─ CatalogAnalyzer.analyze(pdf)
+        ├─ PDFAnalyzer.analyze(pdf)
         │   ├─ Identificar páginas de produto (pdfplumber)
         │   ├─ Extrair SKUs, preços, grades
         │   ├─ Detectar swatches de cor (PyMuPDF drawings)
@@ -988,6 +1043,19 @@ Ao corrigir qualquer bug:
 3. Corrigir o bug
 4. Confirmar que o teste passa
 
+### Isolamento de testes — regras obrigatórias (Sprint 06)
+
+1. Testes que dependem de variáveis de ambiente (INTERNAL_SECRET, etc.) devem
+   injetá-las via monkeypatch.setenv ou override forçado no conftest.py.
+   Nunca usar os.environ.setdefault() — não sobrescreve valores do CI.
+
+2. Fixtures que criam registros com campos únicos (celery_id, etc.) devem usar
+   valores gerados (str(uuid4())) para evitar UniqueViolation em re-runs.
+
+3. O comando exato de cobertura do CI é:
+   pytest tests/ src/catalogflow --cov=src/catalogflow --cov-fail-under=80
+   Rodar este comando localmente antes de abrir qualquer PR.
+
 ---
 
 ## 11. Pipeline CI/CD
@@ -1022,7 +1090,7 @@ jobs:
       - checkout
       - setup Python 3.12
       - install dependencies
-      - pytest tests/ --cov=src --cov-fail-under=80 --cov-report=xml
+      - pytest tests/ src/catalogflow --cov=src/catalogflow --cov-fail-under=80 --cov-report=xml
       - upload coverage to Codecov
 
   build:
@@ -1033,20 +1101,10 @@ jobs:
       - docker run --rm image pytest tests/ -x -q  # smoke test na imagem
 ```
 
-### GitHub Actions — `deploy.yml`
+### Deploy
 
-Roda em: `push` para `main` (apenas após CI verde).
-
-```yaml
-jobs:
-  deploy:
-    needs: [quality, test, build]
-    environment: production
-    steps:
-      - flyctl deploy --remote-only
-      - health check: GET /api/v1/health → 200
-      - notify Sentry de novo deploy
-```
+Deploy atual: manual via VPS + Docker Compose. Procedimento no README.md.
+CI/CD automatizado planejado para Sprint futura.
 
 ### Branch strategy
 
@@ -1055,6 +1113,7 @@ jobs:
 - `feature/<nome>` — features individuais (branch curta, PR pequeno)
 - `fix/<nome>` — correções de bug
 - `chore/<nome>` — infra, deps, docs
+- Merge em main requer CI 100% verde (sem admin override a partir da Sprint 06).
 
 ### Commits: Conventional Commits
 
@@ -1122,7 +1181,7 @@ docs(adr): document PyMuPDF license decision
 
 ## 14. Roadmap de Fases
 
-### Fase 1 — MVP (8–10 semanas) ✅ Especificado aqui
+### Fase 1 — MVP (8–10 semanas) ✅ Especificado aqui ✅ Implantado — https://catalogo.thiagoscutari.com.br
 
 **Entregáveis:**
 - [ ] Módulos: `catalog`, `orders`, `romaneio`, `auth`
@@ -1135,6 +1194,23 @@ docs(adr): document PyMuPDF license decision
 
 **Critério de aceitação da Fase 1:**
 > Uma gerente comercial da Oasis Resortwear consegue fazer upload do catálogo MOTION via browser, receber o PDF editável em menos de 60 segundos, enviar para uma lojista de teste, receber de volta preenchido, fazer upload na plataforma e obter o romaneio PDF completo — sem intervenção técnica.
+
+**Sprints concluídas:**
+
+| Sprint | Entrega |
+|--------|---------|
+| 01 | Backend: catálogo PDF → AcroForm (PDFAnalyzer + FieldInjector) |
+| 02 | Backend: extração de pedido → romaneio PDF |
+| 03 | Interface web mobile-first + identidade Oasis |
+| 03.5 | Auth email/senha + magic link Resend + aprovação admin |
+| 04 | Integração ERP: MockAdapter + ConsistemAdapter (estoque) |
+| Deploy | Produção VPS + Traefik + MinIO + HTTPS |
+| 05 | Fix PDFAnalyzer: SKU 9 dígitos + Voronoi zones (ADR-007) |
+| 06 | CI verde + lint na fonte + pre-commit (ADR-008, ADR-009) |
+
+**Pendente Fase 1:**
+- ConsistemAdapter.submit_order — aguardando endpoint da Oasis
+- _build_cod_item — aguardando mapeamento real SKU → codItem
 
 ---
 

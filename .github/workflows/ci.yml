@@ -81,7 +81,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest tests/ src/catalogflow/modules \
+          pytest tests/ src/catalogflow \
             --cov=src/catalogflow \
             --cov-report=xml \
             --cov-report=term-missing \
