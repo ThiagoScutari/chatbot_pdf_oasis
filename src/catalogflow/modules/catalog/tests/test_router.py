@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
+from tests.fakes import FakeStorage
 
 from catalogflow.infra.database import get_db
 from catalogflow.infra.settings import get_settings
@@ -23,7 +24,6 @@ from catalogflow.modules.auth.router import router as auth_router
 from catalogflow.modules.catalog.dependencies import get_catalog_service
 from catalogflow.modules.catalog.router import router as catalog_router
 from catalogflow.modules.catalog.service import CatalogService
-from catalogflow.modules.catalog.tests.conftest import FakeStorage
 from catalogflow.shared.errors import DomainError
 from catalogflow.shared.jobs_router import router as jobs_router
 from catalogflow.shared.middleware import RequestIdMiddleware

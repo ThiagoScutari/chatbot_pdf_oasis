@@ -15,11 +15,11 @@ from redis.asyncio import Redis, from_url
 
 from catalogflow.infra.settings import get_settings
 
-_redis: Redis | None = None
-_redis_binary: Redis | None = None
+_redis: Redis[str] | None = None
+_redis_binary: Redis[bytes] | None = None
 
 
-def get_redis_client() -> Redis:
+def get_redis_client() -> Redis[str]:
     """Retorna o cliente Redis, criando-o na primeira chamada.
 
     Mantém um único `ConnectionPool` por processo. Os valores retornados
@@ -38,7 +38,7 @@ def get_redis_client() -> Redis:
     return _redis
 
 
-def get_redis_binary_client() -> Redis:
+def get_redis_binary_client() -> Redis[bytes]:
     """Cliente Redis binário (`decode_responses=False`).
 
     Usado pelo cache de fotos de produto — `redis-py` por padrão decodifica
@@ -56,7 +56,7 @@ def get_redis_binary_client() -> Redis:
     return _redis_binary
 
 
-async def get_redis() -> AsyncIterator[Redis]:
+async def get_redis() -> AsyncIterator[Redis[str]]:
     """Dependency FastAPI: injeta cliente Redis."""
     client = get_redis_client()
     try:
@@ -70,10 +70,12 @@ async def close_redis() -> None:
     """Fecha os pools globais. Chamado no shutdown da aplicação."""
     global _redis, _redis_binary
     if _redis is not None:
-        await _redis.aclose()
+        # redis-py 5.x adicionou aclose() (preferido em async); stubs antigos
+        # podem não expor o atributo. Fallback para close() seria síncrono.
+        await _redis.aclose()  # type: ignore[attr-defined]
         _redis = None
     if _redis_binary is not None:
-        await _redis_binary.aclose()
+        await _redis_binary.aclose()  # type: ignore[attr-defined]
         _redis_binary = None
 
 

@@ -1,3 +1,7 @@
+# mypy: disable-error-code="no-untyped-call,attr-defined,operator,union-attr,var-annotated,arg-type"
+# ↑ pymupdf sem stubs; widget.field_name/.rect retornam `Any | None` na visão
+# do mypy, que cascateia em operator/union-attr/arg-type/var-annotated nos
+# asserts dos testes — todos derivados da mesma causa-raiz.
 """Testes do `FieldInjector` — pipeline analyzer → injector com fixtures."""
 
 from __future__ import annotations
@@ -63,13 +67,13 @@ class TestFieldNameFor:
 
 class TestCountFields:
     def test_counts_per_product(self, analyzer: PDFAnalyzer) -> None:
-        # 1 produto/1 cor/PP-G → 1×4 = 4
+        # 1 produto/1 cor/PP-G -> 1x4 = 4
         meta = analyzer.analyze(_load("catalogo_1_produto_1_cor.pdf"))
         assert count_fields(meta) == 4
-        # 1 produto/2 cores/PP-G → 2×4 = 8
+        # 1 produto/2 cores/PP-G -> 2x4 = 8
         meta = analyzer.analyze(_load("catalogo_1_produto_2_cores.pdf"))
         assert count_fields(meta) == 8
-        # 2 produtos (PP-M + PP-G) → 1×3 + 1×4 = 7
+        # 2 produtos (PP-M + PP-G) -> 1x3 + 1x4 = 7
         meta = analyzer.analyze(_load("catalogo_2_produtos_pagina.pdf"))
         assert count_fields(meta) == 7
 

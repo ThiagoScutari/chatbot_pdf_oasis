@@ -26,7 +26,7 @@ from catalogflow.web.user_service import hash_password
 
 ADMIN_EMAIL: Final[str] = "admin@oasis.com.br"
 ADMIN_NAME: Final[str] = "Admin Oasis"
-ADMIN_PASSWORD: Final[str] = "oasis123"  # noqa: S105  # dev seed only
+ADMIN_PASSWORD: Final[str] = "oasis123"  # dev seed only
 
 
 async def _seed() -> tuple[str, str, str, bool]:

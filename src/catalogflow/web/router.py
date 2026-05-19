@@ -34,6 +34,10 @@ from catalogflow.shared.errors import (
     NotFoundError,
     ValidationError,
 )
+from catalogflow.shared.image_fetcher import (
+    cache_get_image_bytes,
+    cache_set_image_bytes,
+)
 from catalogflow.web import _helpers, data
 from catalogflow.web.auth import (
     SESSION_COOKIE,
@@ -47,10 +51,6 @@ from catalogflow.web.auth import (
     revoke_session_api_key,
     set_session_cookie,
     verify_session,
-)
-from catalogflow.shared.image_fetcher import (
-    cache_get_image_bytes,
-    cache_set_image_bytes,
 )
 from catalogflow.web.product_image import fetch_product_image_url
 from catalogflow.web.user_service import WebUserService

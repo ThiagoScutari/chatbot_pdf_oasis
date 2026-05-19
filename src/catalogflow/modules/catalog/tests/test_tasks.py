@@ -19,7 +19,6 @@ from celery.exceptions import Retry
 from catalogflow.modules.catalog.tasks import process_catalog_task
 from catalogflow.shared.errors import PDFCorruptError, PDFEncryptedError
 
-
 # ──────────────────────────────────────────────
 #  Sucesso — retorna dict do _run_process_catalog
 # ──────────────────────────────────────────────

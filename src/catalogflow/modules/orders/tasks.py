@@ -74,7 +74,7 @@ async def _run_process_order(order_id: UUID, job_id: UUID) -> dict[str, Any]:
         await dispose_engine()
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True,
     name="order.extract",
     max_retries=3,

@@ -77,13 +77,13 @@ class MockStockAdapter(StockAdapter):
         Bucket calculado por MD5 (não-criptográfico — usado apenas para
         distribuição uniforme estável entre execuções). Buckets:
 
-        - 0–69  → available  (70%)
-        - 70–89 → partial    (20%)
-        - 90–99 → out_of_stock (10%)
+        - 0-69  -> available  (70%)
+        - 70-89 -> partial    (20%)
+        - 90-99 -> out_of_stock (10%)
         """
         key = f"{item.sku}|{item.size}|{item.color_index}"
-        # nosec B324 — md5 usado para distribuição estável, não para segurança
-        bucket = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16) % 100
+        # md5 não-criptográfico: apenas para distribuir SKUs estavelmente em buckets.
+        bucket = int(hashlib.md5(key.encode("utf-8"), usedforsecurity=False).hexdigest(), 16) % 100
 
         status: StockStatus
         available_qty: int

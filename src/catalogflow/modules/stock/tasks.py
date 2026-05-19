@@ -88,7 +88,7 @@ async def _run_submit(
         await dispose_engine()
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True,
     name="stock.check",
     max_retries=3,
@@ -127,7 +127,7 @@ def check_stock_task(
         raise self.retry(exc=exc, countdown=countdown) from exc
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     bind=True,
     name="stock.submit",
     max_retries=3,

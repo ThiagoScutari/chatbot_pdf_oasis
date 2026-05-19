@@ -632,7 +632,7 @@ def build_stock_map(stock_check: StockCheck | None) -> StockMap:
         except (KeyError, ValueError, TypeError):
             continue
         available = entry.get("available")
-        result[key] = int(available) if isinstance(available, (int, float)) else None
+        result[key] = int(available) if isinstance(available, int | float) else None
     return result
 
 

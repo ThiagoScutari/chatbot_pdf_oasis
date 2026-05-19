@@ -290,6 +290,7 @@ python -m venv .venv
 .venv\Scripts\activate              # Windows
 # source .venv/bin/activate         # Linux/Mac
 pip install -e ".[dev]"
+pre-commit install  # obrigatório: roda ruff + mypy antes de cada commit
 
 # Lint + format
 ruff check .

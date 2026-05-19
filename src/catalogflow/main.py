@@ -104,7 +104,7 @@ def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]
     for err in exc.errors():
         item = {k: v for k, v in err.items() if k != "ctx"}
         # `input` pode conter UploadFile / bytes — coage para repr seguro.
-        if "input" in item and not isinstance(item["input"], (str, int, float, bool, type(None))):
+        if "input" in item and not isinstance(item["input"], str | int | float | bool | type(None)):
             item["input"] = repr(item["input"])[:200]
         safe.append(item)
     return safe
@@ -122,8 +122,12 @@ async def _validation_error_handler(
         details={"errors": _safe_validation_errors(exc)},
         request_id=request_id,
     )
+    # Starlette renomeou HTTP_422_UNPROCESSABLE_ENTITY → ..._CONTENT (deprecation
+    # warning na constante antiga). filterwarnings=error promoveria o warning
+    # a exception dentro do handler → 500 silencioso. Literal 422 funciona em
+    # qualquer versão.
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=422,
         content=envelope.model_dump(mode="json"),
     )
 

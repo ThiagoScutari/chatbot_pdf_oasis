@@ -1,3 +1,5 @@
+# mypy: disable-error-code="no-untyped-call,attr-defined"
+# ↑ pymupdf sem stubs; testes inspecionam o PDF gerado via pymupdf.Document.
 """Testes do `RomaneioBuilder` — função pura NormalizedOrderData → bytes PDF.
 
 Cenários cobertos:

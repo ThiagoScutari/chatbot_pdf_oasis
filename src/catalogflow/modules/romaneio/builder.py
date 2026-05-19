@@ -1,3 +1,10 @@
+# mypy: disable-error-code="no-untyped-call,attr-defined"
+# ↑ pymupdf não tem stubs de tipo; este módulo chama pymupdf extensivamente
+# (Document, Rect, Point, Widget, add_widget, draw_rect, insert_text, etc.).
+# As supressões por linha gerariam dezenas de comentários repetitivos — a
+# pragma de arquivo é o idioma do mypy para libs externas sem stubs. Quando
+# pymupdf publicar stubs (ou se migrarmos para PyPDFForm com stubs), basta
+# remover esta linha.
 """Engine puro de construção do PDF de romaneio.
 
 Contrato (CLAUDE.md):
@@ -24,13 +31,13 @@ from typing import Final
 
 import pymupdf
 
-logger = logging.getLogger(__name__)
-
 from catalogflow.modules.orders.normalizer import (
     NormalizedOrderData,
     NormalizedOrderItem,
     NormalizedTotals,
 )
+
+logger = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────
 #  Paleta (RGB 0-1) — adaptada de oasis_romaneio.py

@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from tests.fakes import FakeStorage
 
 from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
@@ -16,7 +17,6 @@ from catalogflow.modules.catalog.service import (
     output_key_for,
     source_key_for,
 )
-from catalogflow.modules.catalog.tests.conftest import FakeStorage
 from catalogflow.shared.errors import (
     JobNotReadyError,
     NotFoundError,
@@ -302,7 +302,7 @@ class TestProcessCatalog:
         # Resultado serializável
         assert isinstance(result, dict)
         assert result["n_skus"] == 1
-        assert result["n_fields"] == 8  # 2 cores × 4 tamanhos PP-G
+        assert result["n_fields"] == 8  # 2 cores x 4 tamanhos PP-G
         assert result["output_key"] == output_key_for(brand.id, catalog.id)
 
         # Catalog atualizado
@@ -328,6 +328,7 @@ class TestProcessCatalog:
 
         # Bytes do output PDF estão no storage e contêm widgets
         assert result["output_key"] in fake_storage.objects
+        assert catalog.source_key is not None
         assert (
             fake_storage.objects[result["output_key"]] != fake_storage.objects[catalog.source_key]
         )

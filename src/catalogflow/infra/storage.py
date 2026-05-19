@@ -9,15 +9,12 @@ multi-tenant passa pelo prefixo `{brand_id}/`. Ver CLAUDE.md.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import aioboto3
 from botocore.config import Config
 
 from catalogflow.infra.settings import Settings, get_settings
-
-if TYPE_CHECKING:
-    from types_aiobotocore_s3.client import S3Client  # type: ignore[import-not-found]
 
 
 class StorageError(RuntimeError):
@@ -97,7 +94,7 @@ class StorageClient:
     ) -> str:
         """Faz upload de `data` na chave `key`. Retorna a chave gravada."""
         try:
-            async with self._client() as s3:  # type: ignore[union-attr]
+            async with self._client() as s3:
                 await s3.put_object(
                     Bucket=self._bucket,
                     Key=key,
@@ -112,7 +109,7 @@ class StorageClient:
     async def download(self, key: str) -> bytes:
         """Baixa o objeto e retorna seu corpo em bytes."""
         try:
-            async with self._client() as s3:  # type: ignore[union-attr]
+            async with self._client() as s3:
                 obj = await s3.get_object(Bucket=self._bucket, Key=key)
                 body = await obj["Body"].read()
                 if not isinstance(body, bytes):
@@ -127,7 +124,7 @@ class StorageClient:
         """Gera URL assinada para download via HTTP direto."""
         ttl = expires_in if expires_in is not None else self._presigned_ttl
         try:
-            async with self._client() as s3:  # type: ignore[union-attr]
+            async with self._client() as s3:
                 url = await s3.generate_presigned_url(
                     "get_object",
                     Params={"Bucket": self._bucket, "Key": key},
@@ -146,7 +143,7 @@ class StorageClient:
     async def delete(self, key: str) -> None:
         """Remove o objeto. Idempotente — não falha se o objeto não existe."""
         try:
-            async with self._client() as s3:  # type: ignore[union-attr]
+            async with self._client() as s3:
                 await s3.delete_object(Bucket=self._bucket, Key=key)
         except Exception as exc:  # pragma: no cover - rede
             raise StorageError(f"delete failed for {key}: {exc}") from exc
@@ -154,7 +151,7 @@ class StorageClient:
     async def exists(self, key: str) -> bool:
         """Retorna True se o objeto existe."""
         try:
-            async with self._client() as s3:  # type: ignore[union-attr]
+            async with self._client() as s3:
                 await s3.head_object(Bucket=self._bucket, Key=key)
                 return True
         except Exception:

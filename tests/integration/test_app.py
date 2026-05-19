@@ -106,13 +106,13 @@ class TestDomainErrorHandler:
         app: FastAPI,
         client: AsyncClient,
     ) -> None:
-        class _Custom(DomainError):
+        class _CustomError(DomainError):
             code = "CUSTOM"
             http_status = 418
 
         @app.get("/boom/custom")
         async def _boom() -> None:
-            raise _Custom("teapot")
+            raise _CustomError("teapot")
 
         resp = await client.get("/boom/custom")
         assert resp.status_code == 418

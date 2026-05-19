@@ -54,7 +54,7 @@ dependencies = [
     "bcrypt>=4.0",
 
     # HTTP client
-    "httpx>=0.27.0",
+    "httpx>=0.28",
 
     # Web UI (Sprint 03) — Jinja2 templates + signed session cookies
     "jinja2>=3.1",
@@ -88,7 +88,7 @@ dev = [
 
     # Lint / format / type
     "ruff>=0.7.0",
-    "mypy>=1.13.0",
+    "mypy==1.15.0",
     "types-redis>=4.6.0",
     "boto3-stubs[s3]>=1.35.0",
     "types-python-jose>=3.3.0",
@@ -148,29 +148,13 @@ ignore = [
     "E501",  # line length (formatter handles)
     "S101",  # assert (pytest depende)
     "B008",  # function call in argument defaults — padrão de FastAPI Depends()
-    # ── Pre-existing warnings silenced to unblock CI; lint cleanup sprint TBD ──
-    "F401",     # unused-import
-    "F841",     # unused-variable
-    "E402",     # module-import-not-at-top-of-file
-    "I001",     # unsorted-imports
-    "N818",     # error-suffix-on-exception-name
-    "S110",     # try-except-pass
-    "S324",     # hashlib-insecure-hash-function (md5 usado para hashing não-criptográfico)
-    "ASYNC109", # async-function-with-timeout
-    "UP032",    # f-string
-    "UP046",    # non-pep695-generic-class
-    "UP047",    # non-pep695-generic-function
-    "RUF002",   # ambiguous-unicode-character-docstring
-    "RUF003",   # ambiguous-unicode-character-comment
-    "RUF046",   # unnecessary-cast-to-int
-    "RUF059",   # unused-unpacked-variable
-    "RUF100",   # unused-noqa
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S105", "S106", "S311"]  # senhas/tokens de teste, random
 "**/tests/**/*.py" = ["S105", "S106", "S311"]  # idem para tests sob src/
-"src/catalogflow/scripts/*.py" = ["S104"]    # bind 0.0.0.0 em dev
+"conftest.py" = ["S105", "S106"]             # fixtures globais usam tokens de teste
+"src/catalogflow/scripts/*.py" = ["S104", "S105"]  # bind 0.0.0.0 + senha seed em dev
 
 [tool.ruff.format]
 quote-style = "double"
@@ -204,6 +188,9 @@ exclude = [
 [[tool.mypy.overrides]]
 module = [
     "pymupdf",
+    "pymupdf.*",
+    "fitz",
+    "fitz.*",
     "pdfplumber",
     "pdfplumber.*",
     "pypdfform",
@@ -224,58 +211,10 @@ module = [
 ]
 ignore_missing_imports = true
 
-# pymupdf/fitz não têm stubs — todas as chamadas viram no-untyped-call.
-# `ignore_errors = true` suprime erros emitidos ao analisar esses módulos.
-[[tool.mypy.overrides]]
-module = ["pymupdf", "pymupdf.*", "fitz", "fitz.*"]
-ignore_missing_imports = true
-ignore_errors = true
-
 # celery/redis sem stubs no ambiente atual — apenas import-untyped/missing.
 [[tool.mypy.overrides]]
 module = ["celery", "celery.*", "redis", "redis.*"]
 ignore_missing_imports = true
-
-# Módulos da codebase que chamam libs sem stubs adequados (pymupdf, celery
-# task decorators, redis, aioboto3 via storage) ou usam padrões FastAPI que
-# o stub do httpx ASGITransport não suporta corretamente. Todas as 164 falhas
-# de mypy se enquadram nessa raiz comum. `ignore_errors` é o expediente para
-# destravar CI; a sprint de lint vai remover este bloco arquivo por arquivo
-# corrigindo na fonte (anotações de tipo, etc.).
-[[tool.mypy.overrides]]
-module = [
-    # pymupdf-heavy (sem stubs)
-    "catalogflow.modules.catalog.pdf_analyzer",
-    "catalogflow.modules.catalog.field_injector",
-    "catalogflow.modules.catalog.tests.test_pdf_analyzer",
-    "catalogflow.modules.catalog.tests.test_field_injector",
-    "catalogflow.modules.orders.extractor",
-    "catalogflow.modules.romaneio.builder",
-    "catalogflow.modules.romaneio.tests.test_builder",
-    "catalogflow.modules.romaneio.tests.test_service",
-    # celery task decorators (untyped-decorator)
-    "catalogflow.modules.catalog.tasks",
-    "catalogflow.modules.orders.tasks",
-    "catalogflow.modules.romaneio.tasks",
-    "catalogflow.modules.stock.tasks",
-    # redis e aioboto3 — type-arg, attr-defined em libs typed-but-incomplete
-    "catalogflow.infra.cache",
-    "catalogflow.infra.storage",
-    # FastAPI ASGITransport mismatch + outros em test files
-    "catalogflow.modules.catalog.tests.test_router",
-    "catalogflow.modules.catalog.tests.test_service",
-    "catalogflow.modules.orders.tests.test_router",
-    "catalogflow.modules.orders.tests.test_service",
-    "catalogflow.modules.stock.tests.test_router",
-    "catalogflow.modules.auth.tests.conftest",
-    "catalogflow.web.tests.conftest",
-    "catalogflow.web.tests.test_web_pages",
-    # resend.Emails.send — arg-type SendParams TypedDict
-    "catalogflow.web.email_service",
-    # SQLAlchemy Result[Any].rowcount — stub version drift CI vs local
-    "catalogflow.web.user_service",
-]
-ignore_errors = true
 
 # ──────────────────────────────────────────────
 #  pytest

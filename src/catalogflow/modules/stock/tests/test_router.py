@@ -27,12 +27,10 @@ from catalogflow.modules.auth.router import router as auth_router
 from catalogflow.modules.orders.models import Order, OrderItem
 from catalogflow.modules.stock.adapter import StockAdapter, StockQuery, StockResult
 from catalogflow.modules.stock.dependencies import get_stock_service
-from catalogflow.modules.stock.mock_adapter import MockStockAdapter
 from catalogflow.modules.stock.router import router as stock_router
 from catalogflow.modules.stock.service import StockService
 from catalogflow.shared.errors import DomainError
 from catalogflow.shared.middleware import RequestIdMiddleware
-
 
 # ──────────────────────────────────────────────
 #  Helpers
@@ -492,7 +490,7 @@ class TestGetSubmission:
             dispatch_check=check_dispatch,
             dispatch_submit=submit_dispatch,
         )
-        submission, job = await service.enqueue_submission(
+        _submission, job = await service.enqueue_submission(
             order.id,
             brand.id,
             "LOJA-42",
