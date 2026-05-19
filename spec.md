@@ -1,11 +1,11 @@
 # CatalogFlow — Especificação Técnica do Produto
 
-> **Versão:** 0.2.0  
-> **Status:** Ativo  
+> **Versão:** 0.6.0  
+> **Status:** Ativo — Fase 1 (MVP) em produção  
 > **Autores:** Thiago Scutari (PMO), Claude Sonnet 4.6 (arquitetura)  
 > **Executor:** Claude Code  
 > **Criado em:** 2026-05-11  
-> **Última atualização:** 2026-05-18
+> **Última atualização:** 2026-05-19
 
 ---
 
@@ -90,122 +90,22 @@ Plataforma SaaS que transforma catálogos PDF visuais em instrumentos de captura
 
 ## 3. Decisões Arquiteturais (ADRs)
 
-### ADR-001: Monolito Modular (não microserviços)
+> **Fonte única:** cada ADR vive em `docs/adr/ADR-NNN-slug.md`. Esta seção
+> é apenas o índice. Mudanças de decisão devem editar o arquivo dedicado e
+> manter esta tabela em sincronia. Ver [`docs/adr/README.md`](./docs/adr/README.md)
+> para o formato.
 
-**Contexto:** Todo processamento de PDF é CPU-bound. A equipe é pequena (vibe coding + AI executor). O domínio ainda está sendo descoberto.
-
-**Decisão:** Monolito modular com separação clara de responsabilidades por domínio. Cada módulo tem sua pasta, seus testes, seus modelos. Módulos se comunicam via imports diretos — não via HTTP ou mensagem.
-
-**Consequências:**
-- Deploy simples (um único container)
-- Refatoração segura (type hints + testes como rede de segurança)
-- Quando um módulo justificar extração (ex: `stock` com contrato de ERP estável), pode virar microserviço sem reescrever
-
-**Alternativas descartadas:** Microserviços (complexidade operacional sem benefício), Serverless (cold start inaceitável para PDF processing, limites de tamanho de payload).
-
----
-
-### ADR-002: FastAPI + Celery (não Django, não Flask)
-
-**Contexto:** Processamento de PDF é lento (2–15s por catálogo de 70 páginas). Clientes não podem esperar numa request HTTP síncrona.
-
-**Decisão:** FastAPI para a camada HTTP (async nativo, Pydantic v2, OpenAPI automático). Celery + Redis para jobs assíncronos. Workers separados do servidor web.
-
-**Consequências:**
-- Endpoints de processamento retornam `job_id` imediatamente
-- Cliente faz polling em `GET /api/v1/jobs/{job_id}` ou recebe webhook
-- Workers escalam horizontalmente sem modificar a API
-
----
-
-### ADR-003: PostgreSQL + Redis (não SQLite)
-
-**Contexto:** Multi-tenant desde o dia 1. Múltiplos workers precisam de coordenação. Redis já necessário para Celery.
-
-**Decisão:** PostgreSQL para dados relacionais (brands, catalogs, orders, jobs). Redis para fila Celery + cache de resultados. Sem SQLite mesmo em desenvolvimento (parity com produção).
-
-**Motivo de rejeitar SQLite:** Múltiplos workers escrevendo concorrentemente causariam locks. Migrar de SQLite para Postgres mid-flight é custoso.
-
----
-
-### ADR-004: PyMuPDF (AGPL) — repositório público como conformidade
-
-**Contexto:** PyMuPDF é tecnicamente superior para manipulação de AcroForm. Licença AGPL exige divulgação do código-fonte quando o software é distribuído como serviço web.
-
-**Decisão:** Usar PyMuPDF sem restrições. O repositório do CatalogFlow é e permanecerá público no GitHub (github.com/ThiagoScutari/chatbot_pdf_oasis), o que cumpre integralmente a exigência de divulgação da AGPL. Nenhuma licença comercial Artifex é necessária enquanto o repositório permanecer público.
-
-**Consequência:** PyPDFForm deixa de ser fallback necessário por questão de licença. Pode ser avaliado futuramente apenas por razões técnicas, não legais.
-
-**Alerta para o futuro:** Se o repositório for tornado privado (ex: versão white-label para cliente enterprise), a questão de licença volta à tona. Nesse cenário, avaliar licença comercial Artifex ou migração para PyPDFForm antes de fechar o repositório. A migração seria cirúrgica — apenas `pdf_analyzer.py` e `field_injector.py`, cujas interfaces são estáveis (bytes in → bytes/dataclass out).
-
-**Última atualização:** 2026-05-11 — decisão fechada.
-
----
-
-### ADR-005: S3-compatible storage para arquivos PDF
-
-**Contexto:** PDFs de catálogo chegam a 30–50MB. Armazenar em banco é antipadrão.
-
-**Decisão:** Cloudflare R2 (compatível com S3 API, sem egress fees) para todos os uploads e outputs. Banco armazena apenas metadados e referência ao objeto (chave S3).
-
----
-
-### ADR-006: Versionamento de API com prefixo `/api/v1/`
-
-**Contexto:** API pública que clientes vão integrar. Precisamos evoluir sem quebrar contratos.
-
-**Decisão:** Todas as rotas públicas sob `/api/v1/`. Quando uma v2 for necessária, `/api/v2/` coexiste. Versão anterior deprecada com 6 meses de aviso.
-
-### ADR-007: Zonas de Voronoi horizontal para extração de metadados por SKU
-
-**Contexto:** Catálogos de moda podem ter N produtos por página com layouts
-assimétricos e variáveis entre coleções e marcas. Hardcoding de posições
-(como page_w / 2) quebra silenciosamente em layouts não previstos.
-
-**Decisão:** O PDFAnalyzer calcula zonas de busca de texto dinamicamente via
-_assign_name_zones(), usando os pontos médios entre as coordenadas X dos SKUs
-detectados na página como fronteiras. Nenhum valor de posição é hardcoded.
-Funciona para 1, 2, 3 ou N produtos por página. As extrações de name, price,
-grade e swatches são restritas à zona do respectivo SKU.
-
-**Consequências:**
-- Layouts assimétricos tratados corretamente — fronteira segue os dados
-- _assign_name_zones() é testável em isolamento, sem PDF real
-- Página com 1 produto: zona = página inteira (comportamento anterior preservado)
-
-**Alternativas descartadas:** page_w / 2 fixo (quebra em layouts assimétricos
-e páginas com 3+ produtos).
-
-### ADR-008: Mypy — ignore_missing_imports para libs externas, type: ignore nos call sites
-
-**Contexto:** PyMuPDF não tem stubs de tipo. A configuração inicial de mypy strict
-causou 164 erros de no-untyped-call — todos falsos positivos. A solução temporária
-(ignore_errors = true em 23 módulos) removeu toda a verificação de tipo do
-código core.
-
-**Decisão:** [[tool.mypy.overrides]] com ignore_missing_imports = true APENAS para
-libs externas (pymupdf, celery, redis, etc.). Para arquivos nossos com uso intensivo
-de pymupdf, usar diretiva de arquivo # mypy: disable-error-code="no-untyped-call"
-no topo. Para casos pontuais, # type: ignore[no-untyped-call] no call site.
-
-**Consequências:**
-- mypy verifica 100% do código nosso, exceto as linhas de chamada pymupdf
-- Supressão cirúrgica: o arquivo ou a linha, não o módulo inteiro no pyproject.toml
-- Quando pymupdf publicar stubs, warn_unused_ignores = true avisará automaticamente
-
-### ADR-009: pre-commit como portão local obrigatório
-
-**Contexto:** O CI falhava sistematicamente porque ruff/mypy não eram executados
-localmente antes de commitar. Cada PR exigia múltiplos commits de correção de CI.
-
-**Decisão:** pre-commit hooks obrigatórios com ruff check, ruff format e mypy.
-Versões das deps no hook pinadas para corresponder ao ambiente local e evitar
-drift de stubs. pre-commit install é parte do onboarding documentado em
-CLAUDE.md e README.md.
-
-**Consequências:**
-- Erros de lint/format/tipo detectados antes do push
-- CI passa na primeira tentativa
+| # | Título | Arquivo |
+|---:|---|---|
+| ADR-001 | Monolito Modular (não microserviços) | [`docs/adr/ADR-001-monolito-modular.md`](./docs/adr/ADR-001-monolito-modular.md) |
+| ADR-002 | FastAPI + Celery (não Django, não Flask) | [`docs/adr/ADR-002-fastapi-celery.md`](./docs/adr/ADR-002-fastapi-celery.md) |
+| ADR-003 | PostgreSQL + Redis (não SQLite) | [`docs/adr/ADR-003-postgres-redis.md`](./docs/adr/ADR-003-postgres-redis.md) |
+| ADR-004 | PyMuPDF (AGPL) — repositório público como conformidade | [`docs/adr/ADR-004-pymupdf-license.md`](./docs/adr/ADR-004-pymupdf-license.md) |
+| ADR-005 | S3-compatible storage para arquivos PDF | [`docs/adr/ADR-005-s3-storage.md`](./docs/adr/ADR-005-s3-storage.md) |
+| ADR-006 | Versionamento de API com prefixo `/api/v1/` | [`docs/adr/ADR-006-api-versioning.md`](./docs/adr/ADR-006-api-versioning.md) |
+| ADR-007 | Zonas de Voronoi horizontal para extração de metadados por SKU | [`docs/adr/ADR-007-voronoi-zones.md`](./docs/adr/ADR-007-voronoi-zones.md) |
+| ADR-008 | Mypy — `ignore_missing_imports` para libs externas, `type: ignore` nos call sites | [`docs/adr/ADR-008-mypy-config.md`](./docs/adr/ADR-008-mypy-config.md) |
+| ADR-009 | `pre-commit` como portão local obrigatório | [`docs/adr/ADR-009-pre-commit.md`](./docs/adr/ADR-009-pre-commit.md) |
 
 ---
 
@@ -297,15 +197,17 @@ catalogflow/
 │   │   │   │       ├── test_service.py
 │   │   │   │       └── test_builder.py
 │   │   │   │
-│   │   │   ├── stock/                  # [Fase 2] Integração de estoque
+│   │   │   ├── stock/                  # Integração de estoque (Sprint 04)
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── models.py
 │   │   │   │   ├── schemas.py
 │   │   │   │   ├── service.py
 │   │   │   │   ├── router.py
-│   │   │   │   ├── adapters/           # Adaptadores por ERP
-│   │   │   │   │   ├── base.py         # ABC interface
-│   │   │   │   │   └── generic_http.py # Adapter genérico HTTP
+│   │   │   │   ├── tasks.py
+│   │   │   │   ├── dependencies.py
+│   │   │   │   ├── adapter.py          # ABC StockAdapter + dataclasses
+│   │   │   │   ├── mock_adapter.py     # MockStockAdapter (demo/CI)
+│   │   │   │   ├── consistem_adapter.py# ConsistemAdapter (HTTP real)
 │   │   │   │   └── tests/
 │   │   │   │
 │   │   │   ├── reservation/            # [Fase 3] Reserva de estoque
@@ -328,12 +230,17 @@ catalogflow/
 │   │   ├── shared/                     # Código transversal
 │   │   │   ├── __init__.py
 │   │   │   ├── errors.py               # Exceções de domínio
-│   │   │   ├── pagination.py           # Page, PageParams
 │   │   │   ├── responses.py            # Envelopes de resposta padrão
-│   │   │   └── utils/
-│   │   │       ├── file.py             # Sanitização de nomes
-│   │   │       └── mime.py             # Detecção server-side de MIME
+│   │   │   ├── middleware.py           # RequestIdMiddleware
+│   │   │   ├── jobs_router.py          # GET /api/v1/jobs/{id}
+│   │   │   ├── image_fetcher.py        # Scraping AMC QRCode (UI + PDFs)
+│   │   │   └── utils/                  # placeholder (vazio)
 │   │   │
+│   │   # Notas:
+│   │   # - Validação de MIME (`%PDF` + python-magic) está embutida em
+│   │   #   catalog/service.py e orders/service.py — não há shared/utils/{file,mime}.py.
+│   │   # - Paginação web vive em web/data.py — não há shared/pagination.py.
+│   │   #
 │   │   └── infra/                      # Dependências externas
 │   │       ├── __init__.py
 │   │       ├── database.py             # Engine, Session, Base
@@ -355,20 +262,24 @@ catalogflow/
 │   └── versions/
 │
 ├── docs/
-│   ├── adr/
+│   ├── adr/                            # Fonte única dos ADRs (ver §3)
+│   │   ├── README.md
 │   │   ├── ADR-001-monolito-modular.md
 │   │   ├── ADR-002-fastapi-celery.md
 │   │   ├── ADR-003-postgres-redis.md
 │   │   ├── ADR-004-pymupdf-license.md
 │   │   ├── ADR-005-s3-storage.md
-│   │   └── ADR-006-api-versioning.md
-│   └── api/
-│       └── openapi.yaml                # Auto-gerado pelo FastAPI
+│   │   ├── ADR-006-api-versioning.md
+│   │   ├── ADR-007-voronoi-zones.md
+│   │   ├── ADR-008-mypy-config.md
+│   │   └── ADR-009-pre-commit.md
+│   ├── sprint_XX/                      # PRD + prompts por sprint
+│   └── analise_estado_atual.md         # snapshot técnico
 │
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                      # Lint + Type + Tests + Build
-│       └── deploy.yml                  # Deploy em produção (main branch)
+│       └── ci.yml                      # Lint + Type + Tests + Build
+│                                       # (deploy é manual; CD planejado)
 │
 ├── docker/
 │   ├── Dockerfile                      # Multi-stage, non-root
@@ -439,22 +350,97 @@ catalogflow/
 
 ### `auth` — Autenticação e autorização
 
-**Responsabilidade:** Multi-tenant. Cada `Brand` (marca de moda) tem seus catálogos, pedidos e lojistas isolados.
+**Responsabilidade:** Multi-tenant. Cada `Brand` (marca de moda) tem seus
+catálogos, pedidos e lojistas isolados.
 
-**Entidades:**
-- `Brand` — a empresa de moda (Oasis Resortwear, etc.)
-- `ApiKey` — chave SHA-256, prefixo `cf_`, para acesso programático
-- `User` — operador humano (gerente comercial) com login+senha
+**Entidades (em SQLAlchemy 2.0, persistidas via migrations 0001 e 0004):**
 
-**Estratégia:** API Key para integrações + JWT para web UI. Nunca expor a key crua após geração.
+- `Brand` — a empresa de moda (Oasis Resortwear, etc.).
+- `ApiKey` — chave SHA-256, prefixo `cf_`, para acesso programático à API
+  REST (`Authorization: Bearer cf_...`). Plaintext exposto uma única vez.
+- `WebUser` — operador humano (gerente comercial) com e-mail/senha;
+  `role` (`operator` | `admin`) + `is_active` (aprovação manual pelo admin).
+- `MagicLink` — token URL-safe de uso único (TTL 15 min) gerado por
+  `secrets.token_urlsafe()`, usado para login passwordless via Resend.
+- `LoginAttempt` — registro de tentativa de login (`identifier` + `success`
+  + `attempted_at`) para a janela móvel de rate-limit (5 falhas em 5 min).
+
+**Estratégia:**
+
+- **API REST** — `Authorization: Bearer cf_<key>`. Nunca expor a key crua
+  após geração; armazenamos apenas o hash SHA-256 + os primeiros 8 chars
+  para identificação visual.
+- **UI web** — sessão por cookie HMAC assinado (`itsdangerous`, TTL 8 h)
+  amarrada a um `WebUser`. Fluxos de e-mail/senha + magic link via Resend
+  (Sprint 03.5).
 
 ---
 
-### `stock` — Integração de estoque *(Fase 2)*
+### `stock` — Integração de estoque *(Sprint 04 — entregue)*
 
-**Responsabilidade:** Dado um `OrderData`, consultar disponibilidade de cada SKU no ERP da marca e retornar um `StockCheckResult`.
+**Responsabilidade:** Dado um `Order`, (a) consultar a disponibilidade real
+por `(sku, size, color_index)` no ERP da marca e persistir o resultado em
+`stock_checks` + `order_items.stock_status`/`available_qty`; (b) enviar o
+pedido ao ERP por `customer_code`, persistindo em `erp_submissions` com
+idempotência por `order_id` (UNIQUE).
 
-**Adapter pattern:** interface `StockAdapter` com método `check_availability(skus: list[str]) -> dict[str, StockInfo]`. Cada ERP tem seu adapter concreto.
+**Adapter Pattern.** Interface única `StockAdapter` (ABC) consumida pelo
+`StockService`. A implementação concreta é escolhida em **runtime** pelo
+valor de `ERP_ADAPTER` (`mock` | `consistem`) — trocar entre adapters não
+requer rebuild da imagem.
+
+Assinatura real (`modules/stock/adapter.py`):
+
+```python
+class StockAdapter(ABC):
+    @abstractmethod
+    async def check_availability(
+        self, queries: list[StockQuery]
+    ) -> list[StockResult]: ...
+
+    @abstractmethod
+    async def submit_order(
+        self,
+        order_reference: str,
+        customer_code: str,
+        items: list[StockQuery],
+    ) -> dict[str, Any]: ...
+
+@dataclass(frozen=True)
+class StockQuery:
+    sku: str
+    size: str
+    color_index: int
+    requested_qty: int
+
+@dataclass(frozen=True)
+class StockResult:
+    sku: str
+    size: str
+    color_index: int
+    requested_qty: int
+    available_qty: int | None      # None apenas quando status == "unknown"
+    status: Literal["available", "partial", "out_of_stock", "unknown"]
+```
+
+**Contrato:**
+
+- `check_availability` é idempotente; falhas por item viram
+  `status="unknown"` (nunca derrubam o batch).
+- `submit_order` não é idempotente por natureza — o `erp_reference`
+  devolvido é o que permite deduplicar no lado CatalogFlow.
+
+**Adapters concretos hoje:**
+
+- `MockStockAdapter` — distribuição determinística 70/20/10 via hash MD5;
+  `submit_order` devolve `MOCK-<8 hex>`. Cobre demo, dev e CI sem rede.
+- `ConsistemAdapter` — HTTP real contra Consistem da AMC Têxtil:
+  `GET /saldoEstoqueAtual/{codItem}/{codNatureza}` com header `empresa`,
+  fórmula contábil `estoqueAtual − estReservPedido − estReservProducao −
+  estReservLotes`, paralelismo com `Semaphore(5)`. `submit_order` ainda
+  é `NotImplementedError` (endpoint de criação de pedido aguarda definição
+  da Oasis); `_build_cod_item` está em formato provisório `"{sku}.{size}.{color_index}"`
+  e é a **única** função a alterar quando o mapeamento real chegar.
 
 ---
 
@@ -472,14 +458,28 @@ catalogflow/
 
 ```
 Brand (1) ──── (N) ApiKey
-Brand (1) ──── (N) User
+Brand (1) ──── (N) WebUser
+WebUser (1) ── (N) MagicLink
+LoginAttempt  (sem FK; janela móvel para rate-limit)
+
 Brand (1) ──── (N) Catalog
 Catalog (1) ── (N) CatalogProduct
 Catalog (1) ── (N) Order
 Order (1) ──── (N) OrderItem
 Order (1) ──── (1) Romaneio
-Job (N) ──────────── (linked to: Catalog | Order | Romaneio)
+Order (1) ──── (N) StockCheck         # Sprint 04
+Order (1) ──── (1) ErpSubmission      # Sprint 04 — UNIQUE(order_id)
+
+Job (N) ──────────── (linked to: Catalog | Order | Romaneio | StockCheck | ErpSubmission)
 ```
+
+**Soft-delete (migration 0006):** `catalogs`, `orders` e `romaneios`
+carregam `deleted_at` + `deleted_by` (FK → `web_users`). A UI esconde
+linhas com `deleted_at IS NOT NULL`; auditoria preserva o histórico.
+`catalog_products`, `order_items`, `stock_checks` e `erp_submissions`
+herdam a exclusão lógica pelo pai (cascade lógico via filtro). Índices
+parciais `WHERE deleted_at IS NULL` mantêm o custo das listagens
+constante mesmo com volume acumulado.
 
 ### Schemas SQL (referência — Alembic gera as migrations)
 
@@ -590,7 +590,7 @@ CREATE TABLE jobs (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     brand_id    UUID NOT NULL REFERENCES brands(id),
     celery_id   VARCHAR(255) UNIQUE,                -- task ID do Celery
-    job_type    VARCHAR(64) NOT NULL,               -- catalog.process | order.extract | romaneio.generate
+    job_type    VARCHAR(64) NOT NULL,               -- catalog.process | order.extract | romaneio.generate | stock.check | stock.submit
     entity_id   UUID,                               -- ID do catalog, order, etc.
     status      VARCHAR(32) NOT NULL DEFAULT 'pending',
     -- pending | running | success | error | retry
@@ -601,6 +601,80 @@ CREATE TABLE jobs (
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- web_users (Sprint 03.5 — auth web com email+senha + magic link)
+CREATE TABLE web_users (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    brand_id      UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    name          VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),                    -- nullable: pode logar via magic-link
+    role          VARCHAR(32) NOT NULL DEFAULT 'operator',  -- operator | admin
+    is_active     BOOLEAN NOT NULL DEFAULT false,  -- exige aprovação do admin
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- magic_links (token URL-safe de uso único, TTL 15 min)
+CREATE TABLE magic_links (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL REFERENCES web_users(id) ON DELETE CASCADE,
+    token      VARCHAR(128) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- login_attempts (rate-limit: 5 falhas em 5 min por identifier)
+CREATE TABLE login_attempts (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identifier   VARCHAR(255) NOT NULL,            -- e-mail tentado (lowercase)
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    success      BOOLEAN NOT NULL DEFAULT false
+);
+CREATE INDEX ix_login_attempts_identifier_attempted_at
+    ON login_attempts (identifier, attempted_at);
+
+-- stock_checks (Sprint 04 — uma linha por consulta de disponibilidade)
+CREATE TABLE stock_checks (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id       UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    brand_id       UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    status         VARCHAR(32) NOT NULL DEFAULT 'pending',
+    -- pending | running | completed | error
+    result         JSONB,                          -- snapshot completo do que o adapter devolveu
+    checked_at     TIMESTAMPTZ,
+    error_message  TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_stock_checks_order ON stock_checks (order_id);
+
+-- erp_submissions (Sprint 04 — UNIQUE order_id: um envio ativo por pedido)
+CREATE TABLE erp_submissions (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id       UUID NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+    brand_id       UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    customer_code  VARCHAR(64) NOT NULL,
+    status         VARCHAR(32) NOT NULL DEFAULT 'pending',
+    -- pending | running | accepted | partially_accepted | rejected | error
+    erp_reference  VARCHAR(128),                   -- ex.: "MOCK-a7f3e91b" ou número do Consistem
+    submitted_at   TIMESTAMPTZ,
+    error_message  TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_erp_submissions_order ON erp_submissions (order_id);
+
+-- Soft-delete (migration 0006) — aplicado a catalogs / orders / romaneios:
+ALTER TABLE catalogs  ADD COLUMN deleted_at TIMESTAMPTZ,
+                      ADD COLUMN deleted_by UUID REFERENCES web_users(id) ON DELETE SET NULL;
+ALTER TABLE orders    ADD COLUMN deleted_at TIMESTAMPTZ,
+                      ADD COLUMN deleted_by UUID REFERENCES web_users(id) ON DELETE SET NULL;
+ALTER TABLE romaneios ADD COLUMN deleted_at TIMESTAMPTZ,
+                      ADD COLUMN deleted_by UUID REFERENCES web_users(id) ON DELETE SET NULL;
+-- Índices parciais para manter as listagens rápidas:
+CREATE INDEX ix_catalogs_alive  ON catalogs  (brand_id, created_at) WHERE deleted_at IS NULL;
+CREATE INDEX ix_orders_alive    ON orders    (brand_id, created_at) WHERE deleted_at IS NULL;
+CREATE INDEX ix_romaneios_alive ON romaneios (brand_id, generated_at) WHERE deleted_at IS NULL;
 ```
 
 ### Schema canônico do pedido (JSON interno)

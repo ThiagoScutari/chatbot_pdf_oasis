@@ -5,6 +5,79 @@ versionamento [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.6.0] — 2026-05-18 — Sprint 06: CI verde + lint na fonte + pre-commit
+
+Encerra a dívida técnica de qualidade acumulada nas sprints anteriores: o CI
+passa a exigir verde de primeira (sem `|| true`, sem overrides amplos de
+`ruff`/`mypy`) e o `pre-commit` se torna portão obrigatório no setup local.
+
+### Added
+
+- `.pre-commit-config.yaml` com hooks de `ruff check`, `ruff format` e
+  `mypy` — versões pinadas para corresponder ao ambiente local e evitar
+  drift de stubs.
+- `pre-commit install` documentado como passo obrigatório de onboarding em
+  `CLAUDE.md` e `README.md`.
+- 132 testes novos elevando a cobertura agregada de 65 % para 89 %
+  (`web/` + `shared/` + caminhos de erro pouco cobertos).
+
+### Fixed
+
+- Resolução de **todos** os 42 erros pendentes de `ruff` na fonte (sem
+  supressão `# noqa`).
+- Resolução de **todos** os erros de `mypy --strict`; `ignore_errors = true`
+  removido dos 23 módulos onde estava ativo.
+- 4 testes que estavam falhando há sprints (incluindo o uso de `hashlib.md5`
+  sem `usedforsecurity=False` apontado pelo Bandit B324).
+- `chore(ci): extend mypy override for SQLAlchemy Result.rowcount drift` —
+  drift de stubs sob SQLAlchemy 2.0.36.
+- `fix(main): validation handler 500 in CI` — `starlette.status.HTTP_422_UNPROCESSABLE_ENTITY` foi deprecada e o `filterwarnings = ["error", …]` promovia a deprecation a exceção dentro do handler, gerando 500 silencioso. Trocado pelo literal `422`.
+- `fix(ci): upgrade httpx to 0.28+` — `ASGITransport` mudou de assinatura
+  entre 0.27 e 0.28; testes E2E quebravam ao instanciar `AsyncClient` com
+  `transport=ASGITransport(app)`.
+
+### Decisões registradas
+
+- ADR-008: política definitiva de `mypy` — `ignore_missing_imports` apenas
+  para libs externas; supressão cirúrgica por arquivo ou linha, nunca por
+  módulo no `pyproject.toml`.
+- ADR-009: `pre-commit` como portão local obrigatório. Sem ele, o CI falha
+  no primeiro push — perda garantida de minutos de Actions e poluição do
+  histórico com commits "fix CI".
+- CI a partir desta sprint **não aceita admin override** para mergear em
+  `main` com check vermelho.
+
+---
+
+## [0.5.0] — 2026-05-15 — Sprint 05: PDFAnalyzer robusto (Voronoi + SKU 9 dígitos)
+
+Corrige dois bugs do `PDFAnalyzer` descobertos em catálogos reais da Oasis
+após o piloto em produção. Sprint cirúrgica — não toca em outras partes do
+sistema.
+
+### Fixed
+
+- **SKU de 9 dígitos** — o catálogo MOTION contém SKUs como `442500908-0`
+  (9 dígitos antes do hífen) que o regex original `\b(\d{10,13}-\d)\b`
+  rejeitava silenciosamente, deixando produtos fora do processamento. Novo
+  padrão `\b(\d{9,13}-\d)\b` aceita 9–13 dígitos. Fixture
+  `catalogo_sku_9_digitos.pdf` adicionada para regressão.
+- **Vazamento de nome entre produtos em página multi-produto** — quando
+  uma página tinha 2+ produtos em layout assimétrico, o nome de um produto
+  era atribuído ao SKU vizinho porque o código usava `page_w / 2` como
+  fronteira hardcoded. Substituído por zonas de Voronoi horizontal calculadas
+  dinamicamente a partir das coordenadas X dos SKUs detectados. Fixture
+  `catalogo_dois_produtos_nomes_distintos.pdf` adicionada.
+
+### Decisões registradas
+
+- ADR-007: zonas de Voronoi horizontal como mecanismo padrão de delimitação
+  de "zona de busca por SKU". Nenhuma posição é hardcoded; o algoritmo
+  funciona para 1, 2, 3 ou N produtos por página. `_assign_name_zones()`
+  é testável em isolamento, sem PDF real.
+
+---
+
 ## [0.4.0] — 2026-05-14 — Sprint 04: Integração ERP (estoque + envio)
 
 Adiciona dois fluxos de integração com ERP ao CatalogFlow:

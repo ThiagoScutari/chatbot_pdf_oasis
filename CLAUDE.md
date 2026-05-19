@@ -8,15 +8,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CatalogFlow** (codename: PDF Oasis) — B2B SaaS platform that transforms visual fashion catalog PDFs (AcroForm-free) into interactive order-capture instruments, then extracts filled orders into structured romaneio (invoice) PDFs.
 
-**Current status:** Specification + POC phase. The `spec.md` at the root is the authoritative technical contract. No FastAPI app, database, or test suite exists yet — implementation begins from scratch following the spec.
+**Current status:** **Fase 1 (MVP) completa e em produção** em <https://catalogo.thiagoscutari.com.br> (VPS + Docker Compose + Traefik/HTTPS, cliente piloto Oasis Resortwear). Sprints 01–06 entregues:
+
+- **01** — pipeline `catálogo PDF → AcroForm` (`PDFAnalyzer` + `FieldInjector`).
+- **02** — extração de pedido + geração de romaneio.
+- **03** — UI web (Jinja2 + HTMX + Alpine.js).
+- **03.5** — auth e-mail/senha + magic link (Resend).
+- **04** — integração ERP (MockStockAdapter + ConsistemAdapter — consulta de estoque entregue; `submit_order` pendente do endpoint Consistem).
+- **05** — fix do `PDFAnalyzer` (SKU 9 dígitos + zonas de Voronoi, ADR-007).
+- **06** — CI 100 % verde + lint na fonte + `pre-commit` obrigatório (ADR-008, ADR-009).
+
+O `spec.md` continua sendo o contrato técnico autoritativo; quando código e spec divergirem, **o código vence** — abra um PR para realinhar o spec.
 
 **Active sprint:** Check `docs/sprint_XX/PRD_sprint_XX.md` for the current sprint scope and acceptance criteria. Never implement beyond the active sprint's scope.
 
 ---
 
 ## Development Commands
-
-Once implementation starts (none of these files exist yet — create them per `spec.md §5`):
 
 ```bash
 # Quality
@@ -65,14 +73,17 @@ pre-commit run --all-files    # verificação manual de todos os arquivos
 
 ## Architecture
 
-### Core Design (ADR-001 to ADR-006)
+### Core Design (ADR-001 to ADR-009 — ver `docs/adr/`)
 
-- **Monolito modular** — no microservices. Modules communicate via direct Python imports, not HTTP. Extract to microservice only when a module's contract is stable and team is larger.
-- **FastAPI + Celery** — PDF processing is CPU-bound (2–15s). API endpoints return `job_id` immediately; clients poll `GET /api/v1/jobs/{job_id}` or receive webhooks. Never run PDF processing synchronously in an HTTP handler.
-- **PostgreSQL + Redis always** — no SQLite even in dev/tests. Multiple Celery workers require concurrent writes. Redis doubles as Celery broker and result cache.
-- **PyMuPDF (fitz)** is the primary PDF engine (AcroForm manipulation). AGPL license — requires commercial license (~US$500/yr Artifex) **before production go-live**. Fallback: PyPDFForm (MIT).
-- **S3-compatible storage (Cloudflare R2)** for all PDFs. Database stores only metadata + S3 object key. Never store PDF bytes in the database.
-- **All routes under `/api/v1/`**. Multi-tenant from day 1: every query filters by `brand_id`.
+- **Monolito modular** (ADR-001) — no microservices. Modules communicate via direct Python imports, not HTTP. Extract to microservice only when a module's contract is stable and team is larger.
+- **FastAPI + Celery** (ADR-002) — PDF processing is CPU-bound (2–15s). API endpoints return `job_id` immediately; clients poll `GET /api/v1/jobs/{job_id}` or receive webhooks. Never run PDF processing synchronously in an HTTP handler.
+- **PostgreSQL + Redis always** (ADR-003) — no SQLite even in dev/tests. Multiple Celery workers require concurrent writes. Redis doubles as Celery broker and result cache.
+- **PyMuPDF (fitz)** (ADR-004) is the primary PDF engine (AcroForm manipulation). AGPL license — satisfeita pelo repositório público no GitHub (<https://github.com/ThiagoScutari/chatbot_pdf_oasis>). **Nenhuma licença comercial Artifex é necessária** enquanto o repo permanecer público. Se um dia o repo for fechado, ver ADR-004 para a migração para PyPDFForm.
+- **S3-compatible storage** (ADR-005) for all PDFs (MinIO em dev e em produção; Cloudflare R2 planejado para escala). Database stores only metadata + S3 object key. Never store PDF bytes in the database.
+- **All routes under `/api/v1/`** (ADR-006). Multi-tenant from day 1: every query filters by `brand_id`.
+- **Zonas de Voronoi** (ADR-007) — `PDFAnalyzer` calcula zonas de busca por SKU dinamicamente via `_assign_name_zones()`. Nunca hardcodar `page_w / 2`.
+- **Mypy cirúrgico** (ADR-008) — `ignore_missing_imports` só para libs externas; supressão `# type: ignore` no call site, nunca no módulo inteiro do `pyproject.toml`.
+- **`pre-commit` obrigatório** (ADR-009) — `pre-commit install` após clonar, sem exceção. CI exige verde de primeira.
 
 ### Module Structure (`src/catalogflow/`)
 
@@ -182,7 +193,7 @@ Every API response follows this shape:
 
 ## Critical Constraints
 
-- **PyMuPDF license**: Do not deploy to production without commercial license or switching to PyPDFForm fallback.
+- **PyMuPDF license (ADR-004)**: AGPL é satisfeita pelo repositório público no GitHub — nenhuma licença Artifex necessária. Se algum dia o repositório for tornado privado (ex.: white-label), reabrir ADR-004 antes de fechar.
 - **Multi-tenancy**: Every database query must include `brand_id` in WHERE clause. S3 keys must be prefixed with `brand_id/`. A request authenticated as Brand A must never access Brand B's resources — test this explicitly.
 - **File validation**: Server-side MIME detection required (`python-magic`), don't trust `Content-Type`. Max upload: 50MB. Validate PDF is not encrypted before processing.
 - **No synchronous PDF processing in HTTP request handlers** — always dispatch to Celery. The endpoint returns 202 with a `job_id`.
