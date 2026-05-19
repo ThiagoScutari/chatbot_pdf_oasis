@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Final
+from typing import Any, Final, cast
 from uuid import UUID
 
 import bcrypt
@@ -323,4 +323,5 @@ class WebUserService:
         """
         cutoff = _now() - timedelta(hours=24)
         result = await self._session.execute(delete(MagicLink).where(MagicLink.expires_at < cutoff))
-        return result.rowcount or 0
+        rowcount: int = cast(Any, result).rowcount
+        return rowcount or 0

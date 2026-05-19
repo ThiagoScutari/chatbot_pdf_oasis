@@ -57,7 +57,7 @@ def app(db_session: AsyncSession) -> FastAPI:
 async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     """Cliente HTTP async sobre o ASGI in-process. follow_redirects=False
     para deixar o teste asserts em códigos 302 explícitos."""
-    transport = ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = ASGITransport(app=app)
     async with AsyncClient(
         transport=transport,
         base_url="http://testserver",

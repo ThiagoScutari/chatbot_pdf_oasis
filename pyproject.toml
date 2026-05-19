@@ -54,7 +54,7 @@ dependencies = [
     "bcrypt>=4.0",
 
     # HTTP client
-    "httpx>=0.27.0",
+    "httpx>=0.28",
 
     # Web UI (Sprint 03) — Jinja2 templates + signed session cookies
     "jinja2>=3.1",
