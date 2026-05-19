@@ -74,6 +74,8 @@ romaneio_*.pdf
 
 # ── Claude Code workspace ──────────────────────
 .claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
 
 docs/*.png
 docs/*.html

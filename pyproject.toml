@@ -148,29 +148,13 @@ ignore = [
     "E501",  # line length (formatter handles)
     "S101",  # assert (pytest depende)
     "B008",  # function call in argument defaults — padrão de FastAPI Depends()
-    # ── Pre-existing warnings silenced to unblock CI; lint cleanup sprint TBD ──
-    "F401",     # unused-import
-    "F841",     # unused-variable
-    "E402",     # module-import-not-at-top-of-file
-    "I001",     # unsorted-imports
-    "N818",     # error-suffix-on-exception-name
-    "S110",     # try-except-pass
-    "S324",     # hashlib-insecure-hash-function (md5 usado para hashing não-criptográfico)
-    "ASYNC109", # async-function-with-timeout
-    "UP032",    # f-string
-    "UP046",    # non-pep695-generic-class
-    "UP047",    # non-pep695-generic-function
-    "RUF002",   # ambiguous-unicode-character-docstring
-    "RUF003",   # ambiguous-unicode-character-comment
-    "RUF046",   # unnecessary-cast-to-int
-    "RUF059",   # unused-unpacked-variable
-    "RUF100",   # unused-noqa
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S105", "S106", "S311"]  # senhas/tokens de teste, random
 "**/tests/**/*.py" = ["S105", "S106", "S311"]  # idem para tests sob src/
-"src/catalogflow/scripts/*.py" = ["S104"]    # bind 0.0.0.0 em dev
+"conftest.py" = ["S105", "S106"]             # fixtures globais usam tokens de teste
+"src/catalogflow/scripts/*.py" = ["S104", "S105"]  # bind 0.0.0.0 + senha seed em dev
 
 [tool.ruff.format]
 quote-style = "double"

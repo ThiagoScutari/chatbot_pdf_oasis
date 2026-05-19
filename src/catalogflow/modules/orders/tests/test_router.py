@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
+from tests.fakes import FakeStorage
 
 from catalogflow.infra.database import get_db
 from catalogflow.infra.storage import get_storage
@@ -33,7 +34,6 @@ from catalogflow.modules.orders.dependencies import (
 from catalogflow.modules.orders.models import Order, OrderItem
 from catalogflow.modules.orders.router import router as orders_router
 from catalogflow.modules.orders.service import OrderService
-from catalogflow.modules.orders.tests.conftest import FakeStorage
 from catalogflow.modules.romaneio.models import Romaneio
 from catalogflow.modules.romaneio.service import (
     RomaneioService,
@@ -159,7 +159,7 @@ def app(
 
 @pytest_asyncio.fixture
 async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(
         transport=transport,
         base_url="http://testserver",

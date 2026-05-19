@@ -19,6 +19,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from tests.fakes import FakeStorage
 
 from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
@@ -28,7 +29,6 @@ from catalogflow.modules.orders.service import (
     OrderService,
     source_pdf_key_for,
 )
-from catalogflow.modules.orders.tests.conftest import FakeStorage
 from catalogflow.shared.errors import (
     NotFoundError,
     PDFCorruptError,
@@ -146,7 +146,7 @@ class TestCreateOrder:
             pdf_bytes=pdf,
             catalog_id=None,
             lojista_name="Loja Demo",
-            lojista_token="abc-123",  # noqa: S106  — token de identificação da lojista, não credencial
+            lojista_token="abc-123",
         )
         await db_session.commit()
 

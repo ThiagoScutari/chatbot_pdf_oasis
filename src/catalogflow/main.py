@@ -104,7 +104,7 @@ def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]
     for err in exc.errors():
         item = {k: v for k, v in err.items() if k != "ctx"}
         # `input` pode conter UploadFile / bytes — coage para repr seguro.
-        if "input" in item and not isinstance(item["input"], (str, int, float, bool, type(None))):
+        if "input" in item and not isinstance(item["input"], str | int | float | bool | type(None)):
             item["input"] = repr(item["input"])[:200]
         safe.append(item)
     return safe

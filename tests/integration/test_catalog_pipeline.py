@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalogflow.modules.auth import service as auth_service
 from catalogflow.modules.auth.models import Brand
-from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
+from catalogflow.modules.catalog.models import CatalogProduct, Job
 from catalogflow.modules.catalog.service import CatalogService
 from tests.fakes import FakeStorage
 
@@ -96,7 +96,7 @@ class TestCatalogPipelineEndToEnd:
         )
         await db_session.commit()
         assert result["n_skus"] == 1
-        assert result["n_fields"] == 8  # 2 cores × 4 tamanhos PP-G
+        assert result["n_fields"] == 8  # 2 cores x 4 tamanhos PP-G
 
         # 3) Estado final do Catalog
         await db_session.refresh(catalog)

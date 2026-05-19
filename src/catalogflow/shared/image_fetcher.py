@@ -119,7 +119,7 @@ def _normalize_sku(sku: str) -> str | None:
 async def fetch_product_image_url(
     sku: str,
     *,
-    timeout: float = _DEFAULT_TIMEOUT_SECONDS,
+    timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
 ) -> str | None:
     """Retorna a URL da foto de catálogo do produto, ou `None`.
 
@@ -137,7 +137,7 @@ async def fetch_product_image_url(
     page_url = f"{_BASE_URL}/{codigo}"
 
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             resp = await client.get(page_url)
     except httpx.HTTPError as exc:
         logger.debug("product-image: HTTPError em %s — %s", page_url, exc)
@@ -170,7 +170,7 @@ async def fetch_product_image_url(
 async def fetch_product_image_bytes(
     sku: str,
     *,
-    timeout: float = _DEFAULT_TIMEOUT_SECONDS,
+    timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
 ) -> bytes | None:
     """Resolve a URL via `fetch_product_image_url` e baixa os bytes.
 
@@ -182,11 +182,11 @@ async def fetch_product_image_bytes(
     if cached_bytes is not None:
         return cached_bytes
 
-    url = await fetch_product_image_url(sku, timeout=timeout)
+    url = await fetch_product_image_url(sku, timeout_seconds=timeout_seconds)
     if url is None:
         return None
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             resp = await client.get(url)
     except httpx.HTTPError as exc:
         logger.debug("product-image-bytes: HTTPError em %s — %s", url, exc)
@@ -205,7 +205,7 @@ async def fetch_product_images(
     skus: list[str],
     *,
     max_concurrent: int = 5,
-    timeout: float = _DEFAULT_TIMEOUT_SECONDS,
+    timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
 ) -> dict[str, bytes]:
     """Busca fotos de múltiplos produtos em paralelo.
 
@@ -228,7 +228,7 @@ async def fetch_product_images(
 
     async def bounded(sku: str) -> tuple[str, bytes | None]:
         async with semaphore:
-            return sku, await fetch_product_image_bytes(sku, timeout=timeout)
+            return sku, await fetch_product_image_bytes(sku, timeout_seconds=timeout_seconds)
 
     results = await asyncio.gather(*(bounded(s) for s in unique_skus))
     return {sku: img for sku, img in results if img is not None}

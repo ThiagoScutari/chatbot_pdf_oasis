@@ -24,7 +24,7 @@ from sqlalchemy.orm import selectinload
 
 from catalogflow.infra.settings import Settings, get_settings
 from catalogflow.modules.catalog.models import Job
-from catalogflow.modules.orders.models import Order, OrderItem
+from catalogflow.modules.orders.models import Order
 from catalogflow.modules.stock.adapter import (
     StockAdapter,
     StockQuery,

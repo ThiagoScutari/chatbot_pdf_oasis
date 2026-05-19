@@ -12,7 +12,7 @@ Decisão (ADR-003): nunca SQLite, mesmo em testes. CLAUDE.md proíbe explicitame
 
 from __future__ import annotations
 
-import asyncio
+import logging
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -28,10 +28,11 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool  # noqa: F401  (reservado p/ futuras configs)
+from sqlalchemy.pool import NullPool
 from testcontainers.postgres import PostgresContainer
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+logger = logging.getLogger(__name__)
 
 # Tabelas alvo do TRUNCATE entre testes. Mantenha sincronizada com modelos
 # conforme novos módulos forem adicionados. Ordem: filhos antes dos pais
@@ -86,7 +87,7 @@ def _apply_migrations(database_url: str) -> Iterator[None]:
     # com valor diferente do que os testes esperam, gerando 401 em vez de 422/201.
     # A fixture precisa garantir que o valor de teste sempre prevaleça sobre
     # qualquer .env do dev ou env var do runner.
-    os.environ["INTERNAL_SECRET"] = "test-internal-secret"  # noqa: S105
+    os.environ["INTERNAL_SECRET"] = "test-internal-secret"
     os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-use")
     # Suprime S3_PUBLIC_URL vindo do .env do dev — testes exercitam o
     # caminho de produção (presigned URL), não o atalho de download direto.
@@ -130,8 +131,10 @@ async def _async_engine(database_url: str) -> AsyncIterator[AsyncEngine]:
     if _db._engine is not None:
         try:
             await _db._engine.dispose()
-        except Exception:
-            pass
+        except Exception as exc:
+            # Dispose pode falhar se o engine pertence a um loop fechado;
+            # nesse caso descartamos o ref e seguimos. Log em debug para diagnóstico.
+            logger.debug("descarte de engine pré-existente falhou: %s", exc)
         _db._engine = None
         _db._session_factory = None
 
@@ -144,8 +147,8 @@ async def _async_engine(database_url: str) -> AsyncIterator[AsyncEngine]:
         if _db._engine is not None:
             try:
                 await _db._engine.dispose()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("descarte pós-teste do engine global falhou: %s", exc)
             _db._engine = None
             _db._session_factory = None
 

@@ -14,12 +14,10 @@ Formato (spec.md §8):
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, Generic, TypeVar
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
-
-T = TypeVar("T")
 
 
 class ErrorPayload(BaseModel):
@@ -37,7 +35,7 @@ class ResponseMeta(BaseModel):
     timestamp: datetime
 
 
-class StandardResponse(BaseModel, Generic[T]):
+class StandardResponse[T](BaseModel):
     """Envelope canônico. `T` é o tipo do payload em `data`."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -62,7 +60,7 @@ def _ensure_request_id(request_id: str | None) -> str:
     return request_id or str(uuid4())
 
 
-def ok(
+def ok[T](
     data: T,
     *,
     request_id: str | None = None,

@@ -9,10 +9,10 @@ from __future__ import annotations
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
+from tests.fakes import FakeStorage
 
 from catalogflow.modules.auth import service as auth_service
 from catalogflow.modules.auth.models import Brand
-from tests.fakes import FakeStorage
 
 
 @pytest.fixture

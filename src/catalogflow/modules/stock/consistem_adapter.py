@@ -180,7 +180,7 @@ class ConsistemAdapter(StockAdapter):
 
     @staticmethod
     def _classify(disponivel: int, requested: int) -> tuple[StockStatus, int]:
-        """Mapeia disponível × requested para (status, available_qty)."""
+        """Mapeia disponivel x requested para (status, available_qty)."""
         if disponivel <= 0:
             return "out_of_stock", 0
         if disponivel >= requested:
