@@ -55,6 +55,12 @@ python oasis_form_v2.py                    # Transform catalog PDF → editable 
 python oasis_romaneio.py <filled.pdf> [retailer_name]  # Extract order → generate romaneio
 ```
 
+```bash
+# Pre-commit (obrigatório no setup — executar UMA VEZ após clonar)
+pre-commit install            # instala hooks locais
+pre-commit run --all-files    # verificação manual de todos os arquivos
+```
+
 ---
 
 ## Architecture
