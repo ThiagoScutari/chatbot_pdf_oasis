@@ -82,7 +82,11 @@ def database_url(_pg_container: PostgresContainer) -> str:
 def _apply_migrations(database_url: str) -> Iterator[None]:
     """Patcha settings e aplica `alembic upgrade head` no container."""
     os.environ["DATABASE_URL"] = database_url
-    os.environ.setdefault("INTERNAL_SECRET", "test-internal-secret")
+    # Override (não setdefault) — em CI o INTERNAL_SECRET vem do workflow yml
+    # com valor diferente do que os testes esperam, gerando 401 em vez de 422/201.
+    # A fixture precisa garantir que o valor de teste sempre prevaleça sobre
+    # qualquer .env do dev ou env var do runner.
+    os.environ["INTERNAL_SECRET"] = "test-internal-secret"  # noqa: S105
     os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-use")
     # Suprime S3_PUBLIC_URL vindo do .env do dev — testes exercitam o
     # caminho de produção (presigned URL), não o atalho de download direto.

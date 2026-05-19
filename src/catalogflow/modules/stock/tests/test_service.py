@@ -23,12 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalogflow.infra.settings import Settings
 from catalogflow.modules.auth.models import Brand
-from catalogflow.modules.catalog.models import Job
 from catalogflow.modules.orders.models import Order, OrderItem
 from catalogflow.modules.stock.adapter import StockAdapter, StockQuery, StockResult
 from catalogflow.modules.stock.consistem_adapter import ConsistemAdapter
 from catalogflow.modules.stock.mock_adapter import MockStockAdapter
-from catalogflow.modules.stock.models import ErpSubmission, StockCheck
+from catalogflow.modules.stock.models import StockCheck
 from catalogflow.modules.stock.service import StockService, summarize_stock_check
 from catalogflow.shared.errors import ConflictError, NotFoundError
 
@@ -48,7 +47,10 @@ class _SpyDispatchCheck:
 
     def __call__(self, order_id: str, sc_id: str, job_id: str) -> _FakeDispatchResult:
         self.calls.append((order_id, sc_id, job_id))
-        return _FakeDispatchResult(task_id=f"celery-{order_id[:8]}")
+        # uuid4 garante celery_id único entre chamadas no mesmo order_id —
+        # evita UniqueViolation no `uq_jobs_celery_id` em testes que enfileiram
+        # múltiplos jobs sequencialmente para o mesmo pedido.
+        return _FakeDispatchResult(task_id=f"celery-{uuid4().hex[:12]}")
 
 
 class _SpyDispatchSubmit:
@@ -57,7 +59,7 @@ class _SpyDispatchSubmit:
 
     def __call__(self, order_id: str, customer_code: str, job_id: str) -> _FakeDispatchResult:
         self.calls.append((order_id, customer_code, job_id))
-        return _FakeDispatchResult(task_id=f"celery-{order_id[:8]}")
+        return _FakeDispatchResult(task_id=f"celery-{uuid4().hex[:12]}")
 
 
 class _ScriptedAdapter(StockAdapter):
