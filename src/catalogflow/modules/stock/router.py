@@ -17,9 +17,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 
 from catalogflow.modules.auth.dependencies import get_current_brand
 from catalogflow.modules.auth.models import Brand
+from catalogflow.modules.catalog.models import Job
 from catalogflow.modules.stock.dependencies import get_stock_service
 from catalogflow.modules.stock.schemas import (
     ErpSubmissionEnqueueResponse,
@@ -61,6 +63,17 @@ async def enqueue_stock_check(
     Cross-tenant: pedido de outra brand → 404 `ORDER_NOT_FOUND`.
     """
     stock_check, job = await service.enqueue_stock_check(order_id, brand.id)
+    # Idempotência (S07-01B): quando o service devolve `job=None`, já
+    # havia um check ativo — recuperamos o Job correspondente para manter
+    # o contrato da resposta (job_id é obrigatório no schema).
+    if job is None:
+        latest_job_stmt = (
+            select(Job)
+            .where(Job.entity_id == stock_check.order_id, Job.job_type == "stock.check")
+            .order_by(Job.created_at.desc())
+            .limit(1)
+        )
+        job = (await service.db.execute(latest_job_stmt)).scalar_one()
     payload = StockCheckEnqueueResponse(
         stock_check_id=stock_check.id,
         job_id=job.id,

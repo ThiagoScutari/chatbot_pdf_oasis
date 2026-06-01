@@ -2,7 +2,7 @@
 
    Quatro estados:
    - "absent"     → botão "Consultar estoque" (dispara o flow)
-   - "checking"   → spinner + polling HTMX a cada 2s
+   - "checking"   → spinner + polling HTMX a cada 2s (limite 90 tentativas)
    - "completed"  → summary "N disponíveis · N parciais · N zerados · N ?"
    - "error"      → mensagem amigável + botão "Tentar de novo"
 
@@ -12,7 +12,10 @@
      stock_summary    (dict | None) — populado quando completed
      stock_checked_at (datetime | None) — opcional, para legenda
      stock_error      (str | None)
+     poll_count       (int) — contador de polls do HTMX; default 0
+                              quando o fragmento é embutido em detail.html
 #}
+{% set poll_count = poll_count|default(0) %}
 
 {% if stock_state == "completed" %}
 <div class="stock-action stock-action--done" id="stock-action">
@@ -55,11 +58,12 @@
 </div>
 
 {% elif stock_state == "checking" %}
+{% if poll_count < 90 %}
 <div
   class="stock-action stock-action--checking"
   id="stock-action"
-  hx-get="/orders/{{ order.id }}/stock-check-poll"
-  hx-trigger="every 2s"
+  hx-get="/orders/{{ order.id }}/stock-check-poll?poll_count={{ poll_count + 1 }}"
+  hx-trigger="load delay:2s"
   hx-swap="outerHTML"
 >
   <p class="processing-meta">
@@ -67,6 +71,18 @@
     Consultando estoque no ERP…
   </p>
 </div>
+{% else %}
+<div class="stock-action stock-action--error" id="stock-action">
+  <p class="stock-error">A consulta de estoque demorou mais que o esperado.</p>
+  <button
+    type="button"
+    class="btn-primary"
+    hx-post="/orders/{{ order.id }}/stock-check-web"
+    hx-target="#stock-action"
+    hx-swap="outerHTML"
+  >Tentar novamente</button>
+</div>
+{% endif %}
 
 {% elif stock_state == "error" %}
 <div class="stock-action stock-action--error" id="stock-action">

@@ -14,7 +14,7 @@ uma única variável de ambiente.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -36,6 +36,11 @@ from catalogflow.modules.stock.models import ErpSubmission, StockCheck
 from catalogflow.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger(__name__)
+
+#: Janela durante a qual um StockCheck `pending`/`checking` é considerado
+#: "ativo" — bloqueia novo dispatch (S07-01B). Casa com o timeout usado
+#: por `web.router._classify_stock_state` para classificar stuck.
+_ACTIVE_STOCK_CHECK_WINDOW = timedelta(minutes=5)
 
 
 class StockService:
@@ -94,18 +99,52 @@ class StockService:
     #  check_order_stock — enfileira (router) + executa (task)
     # ─────────────────────────────────────────
 
+    async def _get_active_stock_check(self, order_id: UUID) -> StockCheck | None:
+        """Retorna um StockCheck `pending`/`checking` criado há < 5 min.
+
+        Usado por `enqueue_stock_check` para impedir double-dispatch quando
+        o usuário clica "Consultar estoque" duas vezes (ou quando dois
+        cliques chegam concorrentemente). Restringe pela mesma janela do
+        timeout no classifier — checks "velhos" são tratados como stuck e
+        liberam um novo dispatch.
+        """
+        cutoff = datetime.now(UTC) - _ACTIVE_STOCK_CHECK_WINDOW
+        stmt = (
+            select(StockCheck)
+            .where(
+                StockCheck.order_id == order_id,
+                StockCheck.status.in_(["pending", "checking"]),
+                StockCheck.created_at > cutoff,
+            )
+            .order_by(StockCheck.created_at.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def enqueue_stock_check(
         self,
         order_id: UUID,
         brand_id: UUID,
-    ) -> tuple[StockCheck, Job]:
+    ) -> tuple[StockCheck, Job | None]:
         """Cria StockCheck(pending) + Job + enfileira a Celery task.
 
-        Idempotência: re-disparar enquanto há um check `pending`/`checking`
-        cria um novo registro — auditoria preserva histórico. A consulta
-        anterior fica intacta com o `checked_at` original.
+        Idempotência (S07-01B): se já existe um check `pending`/`checking`
+        criado nos últimos 5 minutos, devolve esse check e `Job=None` —
+        sinalizando ao caller que NADA foi enfileirado nesta chamada.
+        Evita o double-dispatch que produziu o job stuck em produção
+        (PRD sprint_07).
         """
         order = await self._load_order_owned(order_id, brand_id)
+
+        existing = await self._get_active_stock_check(order.id)
+        if existing is not None:
+            logger.info(
+                "stock.enqueue: returning existing active check %s for order %s",
+                existing.id,
+                order.id,
+            )
+            return existing, None
 
         stock_check = StockCheck(
             order_id=order.id,
@@ -454,7 +493,11 @@ class StockService:
         stmt = (
             update(Job)
             .where(Job.id == job_id, Job.status == "pending")
-            .values(status="running", progress=10)
+            .values(
+                status="running",
+                progress=10,
+                started_at=datetime.now(UTC),
+            )
             .returning(Job.id)
         )
         result = await self.db.execute(stmt)
