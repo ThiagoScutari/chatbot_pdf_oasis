@@ -5,7 +5,7 @@
 > **Autores:** Thiago Scutari (PMO), Claude Sonnet 4.6 (arquitetura)  
 > **Executor:** Claude Code  
 > **Criado em:** 2026-05-11  
-> **Última atualização:** 2026-05-19
+> **Última atualização:** 2026-06-01
 
 ---
 
@@ -1263,7 +1263,7 @@ docs(adr): document PyMuPDF license decision
 - [ ] Web UI básica (upload + download + status)
 - [ ] Pipeline CI/CD completo
 - [ ] Suite de testes ≥ 80% cobertura
-- [ ] Deploy em Fly.io com domínio customizado
+- [ ] Deploy em VPS + Docker Compose + Traefik com domínio customizado
 - [ ] Documentação: README + ADRs + OpenAPI
 
 **Critério de aceitação da Fase 1:**
@@ -1281,6 +1281,7 @@ docs(adr): document PyMuPDF license decision
 | Deploy | Produção VPS + Traefik + MinIO + HTTPS |
 | 05 | Fix PDFAnalyzer: SKU 9 dígitos + Voronoi zones (ADR-007) |
 | 06 | CI verde + lint na fonte + pre-commit (ADR-008, ADR-009) |
+| 07 | Robustez: stock-check stuck + image placeholder (ADR-010 pendente) |
 
 **Pendente Fase 1:**
 - ConsistemAdapter.submit_order — aguardando endpoint da Oasis
@@ -1323,7 +1324,7 @@ Os itens abaixo não fazem parte de nenhuma fase atual e **não devem ser implem
 - ❌ Geração de catálogo do zero (apenas processar existente) — Fase 1
 - ❌ Assinatura digital de romaneios — complexidade jurídica fora do escopo
 - ❌ Integração com Shopify/VTEX/Tiny — ERP genérico cobre isso na Fase 2
-- ❌ Kubernetes — Fly.io machines é suficiente até 100k req/dia
+- ❌ Kubernetes — VPS + Docker Compose é suficiente para o volume atual
 - ❌ GraphQL — REST com OpenAPI serve o caso de uso
 
 ---

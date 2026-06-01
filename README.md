@@ -685,6 +685,25 @@ automatizado está planejado para uma sprint futura.
 **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) —
 `feat(catalog):`, `fix(orders):`, `test(auth):`, `chore(ci):`, `docs(adr):`.
 
+### Deploy em produção
+
+```bash
+# Na VPS (162.240.102.45):
+cd /workspace/catalogsync
+git pull origin main
+docker compose -f docker-compose.prod.yml build --no-cache api worker
+docker compose -f docker-compose.prod.yml up -d api worker
+sleep 15
+docker logs catalogflow-worker --tail=5
+# Esperado: "Connected to redis://..."
+
+# Se a sprint incluir nova migration:
+docker exec catalogflow-api sh -c "cd /app && alembic upgrade head"
+```
+
+Verificar se a sprint inclui nova migration consultando
+`migrations/versions/` — arquivo com número maior que a versão anterior.
+
 ---
 
 ## Roadmap e sprints
@@ -702,6 +721,7 @@ A **Fase 1 (MVP)** está completa e **em produção** em
 | Deploy | Produção: VPS + Traefik + MinIO + HTTPS |
 | 05 | Fix do `PDFAnalyzer`: SKU de 9 dígitos + zonas de Voronoi (ADR-007) |
 | 06 | CI verde + lint na fonte + `pre-commit` (ADR-008, ADR-009) |
+| 07 | Robustez: stock-check stuck + image placeholder — timeout de 5 min, enqueue idempotente, poll limit, image proxy sempre 200 | ✅ |
 
 **Pendências da Fase 1** (aguardando a Oasis): `ConsistemAdapter.submit_order`
 (endpoint de criação de pedido) e `_build_cod_item` (mapeamento real SKU → codItem).
