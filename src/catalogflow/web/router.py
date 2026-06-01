@@ -1762,36 +1762,48 @@ async def product_image(
     - `img_url:{sku}` no Redis (TTL 7d): aplicado dentro de
       `fetch_product_image_url`, pula o scraping HTML.
 
-    Falha de Redis é silenciosa (fail-soft) — o handler volta ao caminho
-    completo scraping+download. Endpoint protegido por sessão para não
-    virar proxy genérico de scraping.
+    Contrato (S07-02): este endpoint **sempre devolve 200**. Qualquer
+    erro (Redis, scraping AMC, download upstream, exceção inesperada)
+    cai no placeholder SVG — nunca propaga 4xx/5xx ao browser, que
+    renderizaria o ícone de imagem quebrada. O wrapper externo
+    `try/except Exception` é a rede de segurança final: os helpers
+    internos (`cache_*`, `fetch_*`) já são fail-soft, mas o defensive
+    catch protege contra surprises futuras (ex.: bug em
+    `_placeholder_svg_response` chamado abaixo).
+    Endpoint protegido por sessão para não virar proxy genérico de scraping.
     """
     del api_key  # gate de sessão; não usado pelo handler
 
-    # Atalho de cache: se já temos os bytes, devolvemos no ato.
-    cached = await cache_get_image_bytes(sku)
-    if cached is not None:
-        return Response(
-            content=cached,
-            media_type="image/jpeg",
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
-    image_url = await fetch_product_image_url(sku)
-    if image_url:
-        upstream: httpx.Response | None
-        try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                upstream = await client.get(image_url)
-        except httpx.HTTPError:
-            upstream = None
-
-        if upstream is not None and upstream.status_code == 200:
-            await cache_set_image_bytes(sku, upstream.content)
+    try:
+        cached = await cache_get_image_bytes(sku)
+        if cached is not None:
             return Response(
-                content=upstream.content,
-                media_type=upstream.headers.get("content-type", "image/jpeg"),
+                content=cached,
+                media_type="image/jpeg",
                 headers={"Cache-Control": "public, max-age=86400"},
             )
+
+        image_url = await fetch_product_image_url(sku)
+        if image_url:
+            upstream: httpx.Response | None
+            try:
+                async with httpx.AsyncClient(timeout=3.0) as client:
+                    upstream = await client.get(image_url)
+            except httpx.HTTPError:
+                upstream = None
+
+            if upstream is not None and upstream.status_code == 200:
+                await cache_set_image_bytes(sku, upstream.content)
+                return Response(
+                    content=upstream.content,
+                    media_type=upstream.headers.get("content-type", "image/jpeg"),
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
+    except Exception:
+        logger.warning(
+            "product_image: fetch failed for sku=%s — falling back to placeholder",
+            sku,
+            exc_info=True,
+        )
 
     return _placeholder_svg_response(sku, name)

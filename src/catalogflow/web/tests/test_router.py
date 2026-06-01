@@ -1830,6 +1830,58 @@ class TestProductImageBranches:
         assert resp.status_code == 200
         assert "image/svg+xml" in resp.headers["content-type"]
 
+    async def test_returns_placeholder_when_fetch_returns_none(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """S07-02: `fetch_product_image_url` retornando None → 200 + SVG."""
+        del sample_api_key
+
+        async def no_cache(sku: str) -> None:
+            del sku
+            return None
+
+        async def fake_fetch_none(_sku: str) -> None:
+            return None
+
+        monkeypatch.setattr("catalogflow.web.router.cache_get_image_bytes", no_cache)
+        monkeypatch.setattr("catalogflow.web.router.fetch_product_image_url", fake_fetch_none)
+        await _login_as_user(client)
+        resp = await client.get("/product-image/SKU-NONE")
+        assert resp.status_code == 200
+        assert "image/svg+xml" in resp.headers["content-type"]
+
+    async def test_returns_placeholder_when_helper_raises(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """S07-02: helper levantando Exception genérica → 200 + SVG (não 500)."""
+        del sample_api_key
+
+        async def boom(_sku: str) -> bytes:
+            raise RuntimeError("redis exploded")
+
+        monkeypatch.setattr("catalogflow.web.router.cache_get_image_bytes", boom)
+        await _login_as_user(client)
+        resp = await client.get("/product-image/SKU-BOOM?name=Vestido%20Joana")
+        assert resp.status_code == 200
+        assert "image/svg+xml" in resp.headers["content-type"]
+        assert ">VJ<" in resp.text
+
+    def test_placeholder_svg_is_valid(self) -> None:
+        """`_placeholder_svg_response` retorna 200 + SVG bem-formado."""
+        resp = web_router._placeholder_svg_response("SKU-X", "Vestido Joana")
+        assert resp.status_code == 200
+        assert resp.media_type == "image/svg+xml"
+        body = bytes(resp.body).decode()
+        assert body.startswith("<svg")
+        assert body.endswith("</svg>")
+        assert ">VJ<" in body
+
 
 # ──────────────────────────────────────────────
 #  render_web_500
