@@ -329,6 +329,7 @@ class TestGetStockCheck:
         )
         sc, job = await service.enqueue_stock_check(order.id, brand.id)
         await db_session.commit()
+        assert job is not None
         await service.check_order_stock(
             order_id=order.id,
             stock_check_id=sc.id,

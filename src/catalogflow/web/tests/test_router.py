@@ -12,7 +12,7 @@ Complementa `test_web_pages.py` e `test_web_auth.py` cobrindo:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -314,11 +314,15 @@ class TestClassifyStockState:
             ("checking", "checking"),
             ("completed", "completed"),
             ("error", "error"),
-            ("anything-else", "error"),
         ],
     )
     def test_status_mapping(self, status: str, expected: str) -> None:
-        """Mapeamento de StockCheck.status para o estado da UI."""
+        """Mapeamento de StockCheck.status para o estado da UI.
+
+        Sem `created_at` (objeto in-memory, não flushed), o gate de
+        stuck detection é pulado — `pending`/`checking` permanecem
+        como `"checking"`.
+        """
         from catalogflow.web.data import OrderDetail
 
         sc = StockCheck(order_id=uuid4(), brand_id=uuid4(), status=status, result={})
@@ -326,6 +330,30 @@ class TestClassifyStockState:
             order=Order(), catalog_name=None, romaneio=None, stock_check=sc, submission=None
         )
         assert web_router._classify_stock_state(detail) == expected
+
+    def test_returns_error_for_stuck_job(self) -> None:
+        """StockCheck > 5 min em pending → 'error' (S07-01)."""
+        from catalogflow.web.data import OrderDetail
+
+        sc = StockCheck(order_id=uuid4(), brand_id=uuid4(), status="pending", result={})
+        sc.created_at = datetime.now(UTC) - timedelta(
+            minutes=web_router.STOCK_CHECK_TIMEOUT_MINUTES + 1
+        )
+        detail = OrderDetail(
+            order=Order(), catalog_name=None, romaneio=None, stock_check=sc, submission=None
+        )
+        assert web_router._classify_stock_state(detail) == "error"
+
+    def test_returns_checking_when_recent(self) -> None:
+        """StockCheck < 5 min em pending → 'checking' (S07-01)."""
+        from catalogflow.web.data import OrderDetail
+
+        sc = StockCheck(order_id=uuid4(), brand_id=uuid4(), status="pending", result={})
+        sc.created_at = datetime.now(UTC) - timedelta(seconds=30)
+        detail = OrderDetail(
+            order=Order(), catalog_name=None, romaneio=None, stock_check=sc, submission=None
+        )
+        assert web_router._classify_stock_state(detail) == "checking"
 
 
 class TestClassifySubmissionState:
@@ -1448,6 +1476,59 @@ class TestStockAndSubmit:
         await _login_as_user(client)
         resp = await client.get(f"/orders/{uuid4()}/stock-check-poll")
         assert resp.status_code == 404
+
+    async def test_stock_check_poll_continues_below_90(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_order: Order,
+        db_session: AsyncSession,
+    ) -> None:
+        """poll_count baixo + checking → fragmento contém hx-trigger de polling."""
+        del sample_api_key
+        sc = StockCheck(
+            order_id=sample_order.id,
+            brand_id=sample_order.brand_id,
+            status="pending",
+            result={},
+        )
+        db_session.add(sc)
+        await db_session.commit()
+        await _login_as_user(client)
+        resp = await client.get(
+            f"/orders/{sample_order.id}/stock-check-poll?poll_count=0",
+        )
+        assert resp.status_code == 200
+        body = resp.text
+        assert "hx-trigger" in body
+        # Incrementa para o próximo poll.
+        assert "poll_count=1" in body
+
+    async def test_stock_check_poll_stops_at_90(
+        self,
+        client: AsyncClient,
+        sample_api_key: str,
+        sample_order: Order,
+        db_session: AsyncSession,
+    ) -> None:
+        """poll_count=90 + checking → sem hx-trigger; mostra botão de retry."""
+        del sample_api_key
+        sc = StockCheck(
+            order_id=sample_order.id,
+            brand_id=sample_order.brand_id,
+            status="pending",
+            result={},
+        )
+        db_session.add(sc)
+        await db_session.commit()
+        await _login_as_user(client)
+        resp = await client.get(
+            f"/orders/{sample_order.id}/stock-check-poll?poll_count=90",
+        )
+        assert resp.status_code == 200
+        body = resp.text
+        assert "hx-trigger" not in body
+        assert "Tentar novamente" in body
 
     async def test_submit_kick(
         self,

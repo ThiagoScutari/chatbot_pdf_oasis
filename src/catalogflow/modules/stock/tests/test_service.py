@@ -13,6 +13,7 @@ Cenários cobertos:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -184,6 +185,7 @@ class TestEnqueueStockCheck:
         assert stock_check.status == "pending"
         assert stock_check.order_id == order.id
         assert stock_check.brand_id == brand.id
+        assert job is not None
         assert job.job_type == "stock.check"
         assert job.entity_id == order.id
         assert job.celery_id is not None
@@ -211,6 +213,62 @@ class TestEnqueueStockCheck:
             await service.enqueue_stock_check(order.id, brand.id)
         assert exc_info.value.code == "ORDER_NOT_FOUND"
 
+    async def test_returns_existing_when_pending_recent(
+        self,
+        db_session: AsyncSession,
+        brand: Brand,
+    ) -> None:
+        """S07-01B: re-enqueue retorna check ativo + Job=None, sem novo dispatch."""
+        order = await _seed_order(db_session, brand)
+        dispatch = _SpyDispatchCheck()
+        service = StockService(
+            db_session,
+            adapter=MockStockAdapter(),
+            dispatch_check=dispatch,
+        )
+        first_check, first_job = await service.enqueue_stock_check(order.id, brand.id)
+        await db_session.commit()
+        assert first_job is not None
+        assert len(dispatch.calls) == 1
+
+        second_check, second_job = await service.enqueue_stock_check(order.id, brand.id)
+        await db_session.commit()
+
+        assert second_check.id == first_check.id
+        assert second_job is None
+        # Não houve novo dispatch.
+        assert len(dispatch.calls) == 1
+
+    async def test_creates_new_when_no_active(
+        self,
+        db_session: AsyncSession,
+        brand: Brand,
+    ) -> None:
+        """S07-01B: sem pending recente → cria novo + dispatcha task."""
+        order = await _seed_order(db_session, brand)
+        dispatch = _SpyDispatchCheck()
+        service = StockService(
+            db_session,
+            adapter=MockStockAdapter(),
+            dispatch_check=dispatch,
+        )
+        # Sem check prévio — deve criar e dispatchar.
+        first_check, first_job = await service.enqueue_stock_check(order.id, brand.id)
+        await db_session.commit()
+        assert first_job is not None
+        assert len(dispatch.calls) == 1
+
+        # Marca o primeiro como completed para liberar novo dispatch.
+        first_check.status = "completed"
+        await db_session.commit()
+
+        second_check, second_job = await service.enqueue_stock_check(order.id, brand.id)
+        await db_session.commit()
+
+        assert second_check.id != first_check.id
+        assert second_job is not None
+        assert len(dispatch.calls) == 2
+
 
 # ──────────────────────────────────────────────
 #  check_order_stock (pipeline executado pela task)
@@ -231,6 +289,7 @@ class TestCheckOrderStock:
         )
         stock_check, job = await service.enqueue_stock_check(order.id, brand.id)
         await db_session.commit()
+        assert job is not None
 
         result = await service.check_order_stock(
             order_id=order.id,
@@ -272,6 +331,7 @@ class TestCheckOrderStock:
         )
         stock_check, job = await service.enqueue_stock_check(order.id, brand.id)
         await db_session.commit()
+        assert job is not None
 
         first = await service.check_order_stock(
             order_id=order.id,
@@ -286,6 +346,67 @@ class TestCheckOrderStock:
             job_id=job.id,
         )
         assert second == {"skipped": True, "job_id": str(job.id)}
+
+
+# ──────────────────────────────────────────────
+#  _claim_job — stamping de started_at (S07-01)
+# ──────────────────────────────────────────────
+
+
+class TestClaimJobStartedAt:
+    async def test_claim_job_sets_started_at(
+        self,
+        db_session: AsyncSession,
+        brand: Brand,
+    ) -> None:
+        """`_claim_job` grava `started_at` ao transitar para `running`."""
+        order = await _seed_order(db_session, brand, n_items=1)
+        service = StockService(
+            db_session,
+            adapter=MockStockAdapter(),
+            dispatch_check=_SpyDispatchCheck(),
+        )
+        _, job = await service.enqueue_stock_check(order.id, brand.id)
+        await db_session.commit()
+        assert job is not None
+
+        assert job.status == "pending"
+        assert job.started_at is None
+
+        claimed = await service._claim_job(job.id)
+        assert claimed is True
+
+        await db_session.refresh(job)
+        assert job.status == "running"
+        assert job.started_at is not None
+        # Sanidade: started_at recém-gravado (< 5s atrás).
+        delta = datetime.now(UTC) - job.started_at
+        assert delta.total_seconds() < 5
+
+    async def test_claim_job_idempotent_when_already_running(
+        self,
+        db_session: AsyncSession,
+        brand: Brand,
+    ) -> None:
+        """Segunda claim no mesmo job retorna False e não sobrescreve started_at."""
+        order = await _seed_order(db_session, brand, n_items=1)
+        service = StockService(
+            db_session,
+            adapter=MockStockAdapter(),
+            dispatch_check=_SpyDispatchCheck(),
+        )
+        _, job = await service.enqueue_stock_check(order.id, brand.id)
+        await db_session.commit()
+        assert job is not None
+
+        assert await service._claim_job(job.id) is True
+        await db_session.refresh(job)
+        first_started_at = job.started_at
+        assert first_started_at is not None
+
+        assert await service._claim_job(job.id) is False
+        await db_session.refresh(job)
+        assert job.started_at == first_started_at
 
 
 # ──────────────────────────────────────────────
@@ -316,6 +437,10 @@ class TestGetStockCheck:
         )
 
         first, _ = await service.enqueue_stock_check(order.id, brand.id)
+        await db_session.commit()
+        # S07-01B: enqueue é idempotente enquanto o primeiro está pending.
+        # Para forçar uma segunda linha precisamos finalizar a primeira.
+        first.status = "completed"
         await db_session.commit()
         second, _ = await service.enqueue_stock_check(order.id, brand.id)
         await db_session.commit()

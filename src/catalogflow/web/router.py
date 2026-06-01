@@ -10,13 +10,13 @@ o `WebUser`; a `api_key` é usada nas chamadas internas à API REST
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -1108,16 +1108,33 @@ def _classify_romaneio_state(detail: data.OrderDetail) -> str:
     return "processing"
 
 
+#: Tempo máximo que um StockCheck pode permanecer `pending`/`checking`
+#: antes de ser tratado como stuck (S07-01). Conservador — a consulta
+#: real ao MockAdapter resolve em ms; ao Consistem, alguns segundos.
+STOCK_CHECK_TIMEOUT_MINUTES = 5
+
+
 def _classify_stock_state(detail: data.OrderDetail) -> str:
-    """`absent | checking | completed | error` para o fragmento _stock_action."""
+    """`absent | checking | completed | error` para o fragmento _stock_action.
+
+    Stuck detection (S07-01): StockCheck em `pending`/`checking` há mais de
+    `STOCK_CHECK_TIMEOUT_MINUTES` é classificado como `error` — surface
+    desbloqueia a UI sem precisar transitar o status no banco (evita
+    write no hot path de polling). `created_at` pode ser `None` em testes
+    in-memory (sem flush); nesse caso pula o gate e mantém `checking`.
+    """
     sc = detail.stock_check
     if sc is None:
         return "absent"
-    if sc.status in ("pending", "checking"):
-        return "checking"
     if sc.status == "completed":
         return "completed"
-    return "error"
+    if sc.status == "error":
+        return "error"
+    if sc.created_at is not None:
+        age = datetime.now(UTC) - sc.created_at
+        if age > timedelta(minutes=STOCK_CHECK_TIMEOUT_MINUTES):
+            return "error"
+    return "checking"
 
 
 def _classify_submission_state(detail: data.OrderDetail) -> str:
@@ -1416,8 +1433,15 @@ async def _render_stock_fragment(
     order_id: UUID,
     brand: Brand,
     db: AsyncSession,
+    *,
+    poll_count: int = 0,
 ) -> HTMLResponse:
-    """Renderiza `_stock_action.html` com o estado atual do StockCheck."""
+    """Renderiza `_stock_action.html` com o estado atual do StockCheck.
+
+    `poll_count` é repassado ao template para que o fragmento HTMX possa
+    incrementar o contador na próxima request e parar após o limite
+    (S07-01B — proteção frontend contra polling infinito).
+    """
     detail = await data.get_order_detail(db, order_id, brand.id)
     if detail is None:
         return HTMLResponse(content="", status_code=status.HTTP_404_NOT_FOUND)
@@ -1432,6 +1456,7 @@ async def _render_stock_fragment(
             "stock_summary": _stock_summary_from(detail),
             "stock_checked_at": detail.stock_check.checked_at if detail.stock_check else None,
             "stock_error": detail.stock_check.error_message if detail.stock_check else None,
+            "poll_count": poll_count,
         },
     )
     # Quando a consulta terminou, sinaliza o HTMX para recarregar a página
@@ -1486,11 +1511,17 @@ async def order_stock_check_kick(
 async def order_stock_check_poll(
     request: Request,
     order_id: UUID,
+    poll_count: int = Query(default=0, ge=0),
     brand: Brand = Depends(require_session_brand),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    """Fragmento de polling — HTMX chama a cada 2s enquanto `checking`."""
-    return await _render_stock_fragment(request, order_id, brand, db)
+    """Fragmento de polling — HTMX chama a cada 2s enquanto `checking`.
+
+    `poll_count` é a contagem corrente. O template emite o próximo poll
+    com `poll_count+1` na URL, e para de fazer auto-poll quando o limite
+    é atingido (S07-01B).
+    """
+    return await _render_stock_fragment(request, order_id, brand, db, poll_count=poll_count)
 
 
 @router.post("/orders/{order_id}/submit-web", response_class=HTMLResponse)
