@@ -72,6 +72,9 @@ dependencies = [
     # Observabilidade
     "structlog>=24.4.0",
     "sentry-sdk[fastapi,celery]>=2.18.0",
+
+    # Validação de profiles de formato (Sprint 08 / ADR-010)
+    "jsonschema>=4.21,<5",
 ]
 
 [project.optional-dependencies]
@@ -208,6 +211,9 @@ module = [
     "bs4.*",
     "resend",
     "resend.*",
+    # jsonschema sem stubs no ambiente atual — ADR-008 (override de módulo, não call site)
+    "jsonschema",
+    "jsonschema.*",
 ]
 ignore_missing_imports = true
 

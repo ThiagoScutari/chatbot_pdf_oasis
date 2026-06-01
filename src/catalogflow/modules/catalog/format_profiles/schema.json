@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BrandFormatProfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "strategies"],
+  "properties": {
+    "id":      { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 64 },
+    "name":    { "type": "string", "minLength": 1, "maxLength": 200 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "strategies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sku", "grade", "price", "swatches", "name"],
+      "properties": {
+        "sku":      { "$ref": "#/$defs/strategy_ref" },
+        "grade":    { "$ref": "#/$defs/strategy_ref" },
+        "price":    { "$ref": "#/$defs/strategy_ref" },
+        "swatches": { "$ref": "#/$defs/strategy_ref" },
+        "name":     { "$ref": "#/$defs/strategy_ref" }
+      }
+    }
+  },
+  "$defs": {
+    "strategy_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id":     { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 64 },
+        "params": { "type": "object" }
+      }
+    }
+  }
+}
