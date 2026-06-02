@@ -68,8 +68,14 @@ REGISTRIES = [
 
 
 @pytest.fixture(autouse=True)
-def _clear_all_registries() -> Iterator[None]:
-    """Esvazia todos os registries antes e depois de cada teste."""
+def _isolate_all_registries() -> Iterator[None]:
+    """Isola cada teste do estado real dos registries.
+
+    Salva snapshot do estado pré-teste (que pode estar populado pelas
+    estratégias auto-registradas na Fase B), esvazia, executa o teste e
+    restaura. Sem isso, um teste de registry deixaria as estratégias
+    reais desregistradas e quebraria a regressão no resto da suite.
+    """
     from catalogflow.modules.catalog.strategies.grade import GRADE_STRATEGIES
     from catalogflow.modules.catalog.strategies.name import NAME_STRATEGIES
     from catalogflow.modules.catalog.strategies.price import PRICE_STRATEGIES
@@ -83,11 +89,15 @@ def _clear_all_registries() -> Iterator[None]:
         SWATCHES_STRATEGIES,
         NAME_STRATEGIES,
     )
+    snapshots = [dict(reg) for reg in all_regs]
     for reg in all_regs:
         reg.clear()
-    yield
-    for reg in all_regs:
-        reg.clear()
+    try:
+        yield
+    finally:
+        for reg, snap in zip(all_regs, snapshots, strict=True):
+            reg.clear()
+            reg.update(snap)
 
 
 def _make_fake_strategy(abc_module: Any, abc_name: str) -> type:

@@ -30,3 +30,7 @@ def get_swatches_strategy(name: str) -> type[SwatchesStrategy]:
             f"Swatches strategy not found: {name!r}. Available: {sorted(SWATCHES_STRATEGIES)}",
         )
     return cls
+
+
+# Auto-discovery das estratégias concretas (ver nota em sku/__init__.py).
+from catalogflow.modules.catalog.strategies.swatches import geometric_bottom  # noqa: E402, F401

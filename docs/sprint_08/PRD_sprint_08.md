@@ -4,7 +4,7 @@
 **Data:** 2026-06-01
 **Sprint:** 08
 **Branch alvo:** `feature/sprint-08-multi-format-analyzer`
-**Base:** `develop`
+**Base:** `main`
 **Duração estimada:** 7–10 dias úteis (5 fases sequenciais)
 **ADR de referência:** [ADR-010](../adr/ADR-010-multi-format-catalog-support.md)
 **Aprovado por:** Thiago Scutari (PMO) — _pendente_
@@ -304,15 +304,21 @@ testes cobrem cenários com fallback.
 **DoD da fase:** `pytest catalogflow/modules/catalog/` verde, cobertura ≥ 80%,
 golden Oasis continua intacto.
 
-### Fase E — Documentação + integração CI · 1 dia
+### Fase E — Documentação + integração CI + hardening · 1 dia
 
 **Entregáveis:**
 - `CLAUDE.md` atualizado: novo ponto sobre profiles + como adicionar profile
-  novo + invariantes (`Brand.format_profile_id` nunca null)
+  novo + invariantes (`Brand.format_profile_id` nunca null) + correção da
+  convenção de branch (`main` em vez de `develop` — trunk-based)
 - `README.md`: parágrafo sobre multi-format na seção de arquitetura
 - `spec.md`: inclusão da ADR-010 inline
 - `CHANGELOG.md`: entrada `feat(catalog): multi-format support via strategy profiles`
 - CI: garantir job dedicado de regressão golden file
+- **Hardening do `load_profile`:** validar `profile_id` contra `^[a-z][a-z0-9_]*$`
+  antes de construir o path do arquivo, prevenindo path traversal acidental.
+  Levanta `BrandFormatProfileNotFoundError` em formato inválido. Cobre com
+  teste dedicado (`test_load_profile_with_path_traversal_attempt_is_rejected`).
+  Achado durante spot-check da Fase A.
 - Status da ADR-010: `Proposed` → `Accepted`
 
 **DoD da fase:** PR pronto para review do PMO. Todos os critérios da seção 6
@@ -322,7 +328,7 @@ checados.
 
 ## 6. Definition of Done (DoD da sprint)
 
-A sprint está pronta para merge em `develop` quando **todos** os itens abaixo
+A sprint está pronta para merge em `main` quando **todos** os itens abaixo
 estiverem verdes:
 
 - [ ] Todos os critérios de aceitação arquiteturais da ADR-010 atendidos
@@ -332,6 +338,8 @@ estiverem verdes:
       `catalogo_real_oasis.pdf`
 - [ ] Profile `ferla_like` detecta ≥ 5/7 produtos do catálogo FERLA com SKU e
       grade corretos
+- [ ] `load_profile` rejeita `profile_id` fora do pattern `^[a-z][a-z0-9_]*$`
+      com `BrandFormatProfileNotFoundError` (hardening da Fase E)
 - [ ] `ruff check` e `ruff format --check` sem warnings
 - [ ] `mypy --strict` verde
 - [ ] `pip-audit` sem vulnerabilidades novas
@@ -394,7 +402,7 @@ As três pendências da versão Draft foram aprovadas pelo PMO em 2026-06-01:
 ```bash
 alembic downgrade -1   # reverte migration 08-02
 alembic downgrade -1   # reverte migration 08-01
-git checkout develop
+git checkout main
 ```
 
 **Em produção (improvável — o merge só sai após PMO + CI):**
@@ -426,15 +434,18 @@ O job marca como `failed` com código claro. Operador é notificado.
 | Fixture FERLA sintética não reflete catálogo real | Média | Médio | Validação manual com PDF original durante Fase D |
 | `field_injector.py` quebra com `grade=None` | Alta | Alto | Cobertura específica na Fase C com produto sem grade |
 | ReportLab gera PDF não-determinístico entre execuções | Média | Médio | Definir seed/timestamp fixo no `_ferla_fixture_builder.py`; commit do PDF gerado |
+| Path traversal acidental via `profile_id` controlado por admin | Baixa | Médio | Hardening na Fase E: validar `profile_id` contra `^[a-z][a-z0-9_]*$` antes de construir path |
 
 ---
 
 ## 11. Branch strategy e política de commits
 
-- **Branch:** `feature/sprint-08-multi-format-analyzer`, sai de `develop`
+- **Branch:** `feature/sprint-08-multi-format-analyzer`, sai de `main`
+  (repo é trunk-based — `develop` não existe; o CLAUDE.md desatualizado
+  será corrigido na Fase E)
 - **Nunca:** rebase em `main` durante a sprint
 - **Commits:** Conventional Commits, atômicos por fase
-- **PR:** review obrigatório do PMO antes de merge em `develop`
+- **PR:** review obrigatório do PMO antes de merge em `main`
 - **CI:** verde + suite de regressão verde como portão
 
 **Commits esperados (uma referência por fase):**

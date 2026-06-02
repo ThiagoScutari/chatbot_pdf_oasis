@@ -29,3 +29,7 @@ def get_price_strategy(name: str) -> type[PriceStrategy]:
             f"Price strategy not found: {name!r}. Available: {sorted(PRICE_STRATEGIES)}",
         )
     return cls
+
+
+# Auto-discovery das estratégias concretas (ver nota em sku/__init__.py).
+from catalogflow.modules.catalog.strategies.price import br_currency  # noqa: E402, F401

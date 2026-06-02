@@ -29,3 +29,7 @@ def get_name_strategy(name: str) -> type[NameStrategy]:
             f"Name strategy not found: {name!r}. Available: {sorted(NAME_STRATEGIES)}",
         )
     return cls
+
+
+# Auto-discovery das estratégias concretas (ver nota em sku/__init__.py).
+from catalogflow.modules.catalog.strategies.name import category_vocabulary  # noqa: E402, F401

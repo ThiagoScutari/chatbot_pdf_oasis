@@ -66,6 +66,12 @@ redis_data/
 # CLAUDE.md: nunca commitar PDFs reais da Oasis ao repo.
 # Pasta example/ permanece local para smoke test manual.
 example/*.pdf
+# Catálogos reais de clientes usados como baseline de regressão
+# (Sprint 08 ADR-010); ficam em docs/ apenas para uso local — nunca
+# entram no repo. `docs/PDF exemplos.pdf` é meta-documentação, não
+# catálogo, e segue versionado.
+docs/catalogo_oasis.pdf
+docs/catalogo_ferla.pdf
 
 # ── Output local de POC ────────────────────────
 *_output.pdf

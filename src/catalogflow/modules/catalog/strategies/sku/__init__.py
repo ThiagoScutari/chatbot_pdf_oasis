@@ -40,3 +40,10 @@ def get_sku_strategy(name: str) -> type[SkuStrategy]:
             f"SKU strategy not found: {name!r}. Available: {sorted(SKU_STRATEGIES)}",
         )
     return cls
+
+
+# Auto-discovery das estratégias concretas — import com efeito colateral.
+# Posicionado no fim do módulo para evitar ImportError circular: cada
+# estratégia importa `register_sku_strategy` deste módulo, que já está
+# definido neste ponto.
+from catalogflow.modules.catalog.strategies.sku import regex_hyphenated  # noqa: E402, F401

@@ -29,3 +29,7 @@ def get_grade_strategy(name: str) -> type[GradeStrategy]:
             f"Grade strategy not found: {name!r}. Available: {sorted(GRADE_STRATEGIES)}",
         )
     return cls
+
+
+# Auto-discovery das estratégias concretas (ver nota em sku/__init__.py).
+from catalogflow.modules.catalog.strategies.grade import alpha_range  # noqa: E402, F401

@@ -182,11 +182,16 @@ class TestPurity:
 
 class TestSwatchHexConversion:
     def test_hex_matches_rgb(self) -> None:
-        an = PDFAnalyzer()
-        assert an._rgb_to_hex((0.0, 0.0, 0.0)) == "#000000"
-        assert an._rgb_to_hex((1.0, 1.0, 1.0)) == "#ffffff"
+        # Sprint 08 (ADR-010): _rgb_to_hex migrou para a estratégia
+        # `GeometricBottomSwatches`. O contrato bit-a-bit é preservado.
+        from catalogflow.modules.catalog.strategies.swatches.geometric_bottom import (
+            GeometricBottomSwatches,
+        )
+
+        assert GeometricBottomSwatches._rgb_to_hex((0.0, 0.0, 0.0)) == "#000000"
+        assert GeometricBottomSwatches._rgb_to_hex((1.0, 1.0, 1.0)) == "#ffffff"
         # 0.5 → 128 (int(round(0.5 * 255)))
-        hx = an._rgb_to_hex((0.5, 0.5, 0.5))
+        hx = GeometricBottomSwatches._rgb_to_hex((0.5, 0.5, 0.5))
         assert hx in {"#7f7f7f", "#808080"}
 
 
