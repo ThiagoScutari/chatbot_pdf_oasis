@@ -50,7 +50,7 @@ def _serialize_product(p: ProductPageMeta) -> dict[str, Any]:
         "name": p.name,
         "price": str(p.price) if isinstance(p.price, Decimal) else None,
         "grade": p.grade,
-        "sizes": list(p.sizes),
+        "sizes": list(p.sizes) if p.sizes is not None else None,
         "n_colors": p.n_colors,
         "swatches": [_serialize_swatch(s) for s in p.swatches],
         "page_index": p.page_index,

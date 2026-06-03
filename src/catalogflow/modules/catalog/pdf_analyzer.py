@@ -16,9 +16,12 @@ Helpers ainda no analyzer:
     - `_open_pymupdf`: instancia `pymupdf.Document` a partir de bytes.
     - `_assign_name_zones`: zonas Voronoi horizontais (ADR-007).
 
-Defaults `DEFAULT_GRADE` / `DEFAULT_SIZES` continuam aplicados de forma
-silenciosa nesta fase. Eles viram warnings explícitos na Fase C
-(ADR-011).
+Observabilidade não-bloqueante (ADR-011 D2): degradações locais (grade,
+nome, preço ou swatches não detectados) não levantam exceção. Em vez de
+aplicar defaults silenciosos, o orquestrador registra um
+`AnalyzerWarning` estruturado em `CatalogMetadata.warnings` e persiste o
+campo correspondente como `None`. `PDFNoProductsError` permanece
+bloqueante (falha global, não degradação local).
 """
 
 from __future__ import annotations
@@ -27,11 +30,20 @@ import io
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import ClassVar
 
 import pdfplumber
 import pymupdf
 
+from catalogflow.modules.catalog.domain import (
+    GRADE_NOT_DETECTED,
+    NAME_NOT_DETECTED,
+    PRICE_NOT_DETECTED,
+    SEVERITY_ERROR,
+    SEVERITY_INFO,
+    SEVERITY_WARNING,
+    SWATCHES_NOT_DETECTED,
+    AnalyzerWarning,
+)
 from catalogflow.modules.catalog.format_profiles import load_profile
 from catalogflow.modules.catalog.strategies.base import (
     StrategyContext,
@@ -97,8 +109,8 @@ class ProductPageMeta:
     sku: str
     name: str | None
     price: Decimal | None
-    grade: str
-    sizes: list[str]
+    grade: str | None
+    sizes: list[str] | None
     n_colors: int
     swatches: list[SwatchInfo]
     page_index: int
@@ -117,6 +129,7 @@ class CatalogMetadata:
     n_pages: int
     n_product_pages: int
     product_pages: list[ProductPageMeta] = field(default_factory=list)
+    warnings: list[AnalyzerWarning] = field(default_factory=list)
 
     @property
     def n_skus(self) -> int:
@@ -131,10 +144,6 @@ class CatalogMetadata:
 
 class PDFAnalyzer:
     """Orquestra estratégias plugáveis (ADR-010) sobre o PDF de catálogo."""
-
-    # Defaults silenciosos. Migrados para warnings explícitos na Fase C.
-    DEFAULT_GRADE: ClassVar[str] = "PP-M"
-    DEFAULT_SIZES: ClassVar[list[str]] = ["PP", "P", "M"]
 
     # ── API pública ───────────────────────────
 
@@ -192,6 +201,7 @@ class PDFAnalyzer:
 
             n_pages = doc.page_count
             product_pages: list[ProductPageMeta] = []
+            warnings_buffer: list[AnalyzerWarning] = []
 
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as plumb:
                 for idx in range(n_pages):
@@ -242,13 +252,70 @@ class PDFAnalyzer:
                         name_m = name_strat.extract(zctx, name_params)
                         block_swatches = swatches_strat.extract(ctx, sku, zone, swatches_params)
 
-                        # Fallbacks silenciosos preservados (viram warnings na Fase C).
+                        # Observabilidade não-bloqueante (ADR-011 D2): nada de
+                        # defaults silenciosos. Cada degradação local vira um
+                        # AnalyzerWarning estruturado e o campo fica `None`.
                         if grade_m is None:
-                            grade = self.DEFAULT_GRADE
-                            sizes = list(self.DEFAULT_SIZES)
+                            warnings_buffer.append(
+                                AnalyzerWarning(
+                                    code=GRADE_NOT_DETECTED,
+                                    severity=SEVERITY_ERROR,
+                                    page_index=idx,
+                                    sku=sku,
+                                    message=(
+                                        f"Grade não detectada para o SKU {sku} na página {idx + 1}"
+                                    ),
+                                    detected_value=None,
+                                ),
+                            )
+                            grade = None
+                            sizes = None
                         else:
                             grade = grade_m.grade
                             sizes = list(grade_m.sizes)
+
+                        if name_m is None:
+                            warnings_buffer.append(
+                                AnalyzerWarning(
+                                    code=NAME_NOT_DETECTED,
+                                    severity=SEVERITY_WARNING,
+                                    page_index=idx,
+                                    sku=sku,
+                                    message=(
+                                        f"Nome do produto não pôde ser extraído da página {idx + 1}"
+                                    ),
+                                    detected_value=None,
+                                ),
+                            )
+
+                        if price_m is None:
+                            warnings_buffer.append(
+                                AnalyzerWarning(
+                                    code=PRICE_NOT_DETECTED,
+                                    severity=SEVERITY_WARNING,
+                                    page_index=idx,
+                                    sku=sku,
+                                    message=(
+                                        f"Preço não detectado para o SKU {sku} na página {idx + 1}"
+                                    ),
+                                    detected_value=None,
+                                ),
+                            )
+
+                        if not block_swatches:
+                            warnings_buffer.append(
+                                AnalyzerWarning(
+                                    code=SWATCHES_NOT_DETECTED,
+                                    severity=SEVERITY_INFO,
+                                    page_index=idx,
+                                    sku=sku,
+                                    message=(
+                                        f"Nenhum swatch detectado para o SKU {sku} "
+                                        f"na página {idx + 1}"
+                                    ),
+                                    detected_value=None,
+                                ),
+                            )
 
                         subset = [
                             w
@@ -315,6 +382,7 @@ class PDFAnalyzer:
             n_pages=n_pages,
             n_product_pages=n_product_pages,
             product_pages=product_pages,
+            warnings=warnings_buffer,
         )
 
     # ── Helpers internos ──────────────────────

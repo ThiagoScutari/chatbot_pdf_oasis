@@ -132,6 +132,21 @@ class TestGradePPG:
 # ──────────────────────────────────────────────
 
 
+class TestWarningsBaseline:
+    """ADR-011: catálogo bem-formado não gera warnings."""
+
+    def test_catalog_metadata_includes_empty_warnings_list_by_default(self) -> None:
+        # `warnings` tem default_factory=list — ausente => lista vazia.
+        meta = CatalogMetadata(n_pages=1, n_product_pages=1)
+        assert meta.warnings == []
+
+    def test_analyze_default_profile_id_is_oasis_default(self) -> None:
+        import inspect
+
+        sig = inspect.signature(PDFAnalyzer.analyze)
+        assert sig.parameters["profile_id"].default == "oasis_default"
+
+
 class TestNoProducts:
     def test_raises_pdf_no_products(self, analyzer: PDFAnalyzer) -> None:
         with pytest.raises(PDFNoProductsError) as exc_info:
@@ -281,7 +296,7 @@ def test_sku_9_digits_is_detected(pdf_sku_9_digits: bytes) -> None:
 def test_sku_9_digits_fields_are_injected(pdf_sku_9_digits: bytes) -> None:
     """PDF com SKU de 9 dígitos deve receber campos AcroForm após injeção."""
     metadata = PDFAnalyzer().analyze(pdf_bytes=pdf_sku_9_digits)
-    output = FieldInjector().inject(pdf_sku_9_digits, metadata)
+    output, _ = FieldInjector().inject(pdf_sku_9_digits, metadata)
     doc = pymupdf.open(stream=output, filetype="pdf")
     try:
         widgets = [w for page in doc for w in (page.widgets() or [])]
@@ -406,7 +421,7 @@ def test_two_products_each_receives_acroform_fields(
 ) -> None:
     """Ambos os produtos da página dupla devem receber campos AcroForm."""
     metadata = PDFAnalyzer().analyze(pdf_bytes=pdf_dois_produtos_nomes_distintos)
-    output = FieldInjector().inject(pdf_dois_produtos_nomes_distintos, metadata)
+    output, _ = FieldInjector().inject(pdf_dois_produtos_nomes_distintos, metadata)
     doc = pymupdf.open(stream=output, filetype="pdf")
     try:
         field_names = [w.field_name for page in doc for w in (page.widgets() or [])]

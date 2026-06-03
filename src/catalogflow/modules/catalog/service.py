@@ -234,7 +234,7 @@ class CatalogService:
             await self._update_progress(job_id, 60)
 
             # ── Injeção dos campos AcroForm no PDF.
-            output_bytes = self.injector.inject(pdf_bytes, metadata)
+            output_bytes, _injector_warnings = self.injector.inject(pdf_bytes, metadata)
             await self._update_progress(job_id, 80)
 
             # ── Upload do PDF resultante.
@@ -336,6 +336,11 @@ class CatalogService:
         metadata: CatalogMetadata,
     ) -> None:
         for product in metadata.product_pages:
+            # Coerção ADR-011 (§7.4): `sizes=None` na dataclass significa
+            # "não detectado, warning emitido"; no banco a coluna
+            # `catalog_products.sizes` é NOT NULL → persiste `[]`. Sem
+            # migration extra para relaxar a coluna.
+            sizes_payload = list(product.sizes) if product.sizes is not None else []
             self.db.add(
                 CatalogProduct(
                     catalog_id=catalog_id,
@@ -343,7 +348,7 @@ class CatalogService:
                     name=product.name,
                     price=product.price,
                     grade=product.grade,
-                    sizes=list(product.sizes),
+                    sizes=sizes_payload,
                     n_colors=product.n_colors,
                     swatches=[self._swatch_to_dict(s) for s in product.swatches],
                     page_index=product.page_index,
