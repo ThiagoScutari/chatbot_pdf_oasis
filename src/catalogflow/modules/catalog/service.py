@@ -23,6 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from catalogflow.infra.settings import Settings, get_settings
 from catalogflow.infra.storage import StorageClient, get_storage_client
+from catalogflow.modules.catalog.domain import AnalyzerWarning
 from catalogflow.modules.catalog.field_injector import FieldInjector, count_fields
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
 from catalogflow.modules.catalog.pdf_analyzer import (
@@ -234,8 +235,12 @@ class CatalogService:
             await self._update_progress(job_id, 60)
 
             # ── Injeção dos campos AcroForm no PDF.
-            output_bytes, _injector_warnings = self.injector.inject(pdf_bytes, metadata)
+            output_bytes, injector_warnings = self.injector.inject(pdf_bytes, metadata)
             await self._update_progress(job_id, 80)
+
+            # ── Agrega warnings do analyzer + injector e persiste (ADR-011 D5).
+            all_warnings = [*metadata.warnings, *injector_warnings]
+            catalog.warnings = [self._warning_to_dict(w) for w in all_warnings]
 
             # ── Upload do PDF resultante.
             output_key = output_key_for(catalog.brand_id, catalog.id)
@@ -359,6 +364,18 @@ class CatalogService:
     @staticmethod
     def _swatch_to_dict(swatch: SwatchInfo) -> dict[str, Any]:
         return swatch.to_dict()
+
+    @staticmethod
+    def _warning_to_dict(warning: AnalyzerWarning) -> dict[str, Any]:
+        """Serializa um `AnalyzerWarning` para a coluna JSONB (ADR-011 D5)."""
+        return {
+            "code": warning.code,
+            "severity": warning.severity,
+            "page_index": warning.page_index,
+            "sku": warning.sku,
+            "message": warning.message,
+            "detected_value": warning.detected_value,
+        }
 
     async def _mark_success(
         self,

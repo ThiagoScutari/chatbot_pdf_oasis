@@ -85,6 +85,13 @@ class Catalog(Base):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
+    # Lista serializada de `AnalyzerWarning` produzidos no processamento
+    # (ADR-011 D5). Catálogos sem degradação herdam `[]`.
+    warnings: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

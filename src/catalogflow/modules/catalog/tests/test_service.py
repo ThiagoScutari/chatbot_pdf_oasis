@@ -1,3 +1,6 @@
+# mypy: disable-error-code="no-untyped-call"
+# ↑ pymupdf/fitz sem stubs; o helper que monta PDFs sintéticos usa
+# Document/Rect/tobytes, todos vistos como untyped pelo mypy.
 """Testes do `CatalogService` — com FakeStorage e dispatch_task mockado."""
 
 from __future__ import annotations
@@ -403,6 +406,126 @@ class TestProcessCatalog:
 # ──────────────────────────────────────────────
 #  Helpers de chave
 # ──────────────────────────────────────────────
+
+
+# ──────────────────────────────────────────────
+#  ADR-011 — persistência de warnings + coerção de sizes
+# ──────────────────────────────────────────────
+
+
+def _make_product_pdf(*, include_grade: bool = True) -> bytes:
+    """Produto único sintético; grade ligável para forçar degradação."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((50, 800), "0442500941-0", fontsize=9)
+    page.insert_text((50, 810), "JAQUETA BERENICE", fontsize=9)
+    page.insert_text((50, 820), "R$ 100,00", fontsize=9)
+    if include_grade:
+        page.insert_text((50, 830), "PP-G", fontsize=9)
+    page.draw_rect(
+        pymupdf.Rect(300, 815, 320, 835),
+        color=(0.0, 0.0, 0.0),
+        fill=(0.3, 0.4, 0.5),
+    )
+    data: bytes = doc.tobytes()
+    doc.close()
+    return data
+
+
+async def _process_inline_pdf(
+    service: CatalogService,
+    db_session: AsyncSession,
+    brand: Brand,
+    pdf_bytes: bytes,
+) -> Catalog:
+    catalog, job = await service.create_catalog(
+        brand_id=brand.id,
+        name="x",
+        collection=None,
+        pdf_bytes=pdf_bytes,
+    )
+    await db_session.commit()
+    await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
+    await db_session.commit()
+    await db_session.refresh(catalog)
+    return catalog
+
+
+class TestProcessCatalogWarnings:
+    async def test_service_persists_empty_list_when_no_warnings(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _make_product_pdf(include_grade=True)
+        )
+        assert catalog.status == "ready"
+        assert catalog.warnings == []
+
+    async def test_service_persists_warnings_in_catalog_row(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        # Fixture sem preço → PRICE_NOT_DETECTED (warning do analyzer).
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _load("catalogo_1_produto_1_cor.pdf")
+        )
+        codes = {w["code"] for w in catalog.warnings}
+        assert "PRICE_NOT_DETECTED" in codes
+        # Shape serializado completo (6 chaves do AnalyzerWarning).
+        price_w = next(w for w in catalog.warnings if w["code"] == "PRICE_NOT_DETECTED")
+        assert set(price_w) == {
+            "code",
+            "severity",
+            "page_index",
+            "sku",
+            "message",
+            "detected_value",
+        }
+        assert price_w["severity"] == "warning"
+
+    async def test_service_combines_analyzer_and_injector_warnings(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        # Sem grade → GRADE_NOT_DETECTED (analyzer) + FIELDS_NOT_INJECTED_NO_GRADE (injector).
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _make_product_pdf(include_grade=False)
+        )
+        codes = {w["code"] for w in catalog.warnings}
+        assert "GRADE_NOT_DETECTED" in codes
+        assert "FIELDS_NOT_INJECTED_NO_GRADE" in codes
+
+    async def test_persist_products_coerces_none_sizes_to_empty_list(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _make_product_pdf(include_grade=False)
+        )
+        stmt = select(CatalogProduct).where(CatalogProduct.catalog_id == catalog.id)
+        product = (await db_session.execute(stmt)).scalar_one()
+        # grade ausente persiste como NULL; sizes coage None -> [] (coluna NOT NULL).
+        assert product.grade is None
+        assert product.sizes == []
 
 
 class TestKeyHelpers:

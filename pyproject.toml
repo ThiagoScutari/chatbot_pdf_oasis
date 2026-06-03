@@ -214,6 +214,10 @@ module = [
     # jsonschema sem stubs no ambiente atual — ADR-008 (override de módulo, não call site)
     "jsonschema",
     "jsonschema.*",
+    # alembic sem stubs — usado pelo teste de reversibilidade da migration
+    # 0008 (único import de alembic dentro de src/; conftest/env.py ficam fora).
+    "alembic",
+    "alembic.*",
 ]
 ignore_missing_imports = true
 
