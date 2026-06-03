@@ -23,6 +23,7 @@ from typing import Any
 
 import pytest
 
+from catalogflow.modules.catalog.domain import AnalyzerWarning
 from catalogflow.modules.catalog.pdf_analyzer import (
     CatalogMetadata,
     PDFAnalyzer,
@@ -63,11 +64,23 @@ def _serialize_product(p: ProductPageMeta) -> dict[str, Any]:
     }
 
 
+def _serialize_warning(w: AnalyzerWarning) -> dict[str, Any]:
+    return {
+        "code": w.code,
+        "severity": w.severity,
+        "page_index": w.page_index,
+        "sku": w.sku,
+        "message": w.message,
+        "detected_value": w.detected_value,
+    }
+
+
 def _serialize_metadata(m: CatalogMetadata) -> dict[str, Any]:
     return {
         "n_pages": m.n_pages,
         "n_product_pages": m.n_product_pages,
         "product_pages": [_serialize_product(p) for p in m.product_pages],
+        "warnings": [_serialize_warning(w) for w in m.warnings],
     }
 
 
