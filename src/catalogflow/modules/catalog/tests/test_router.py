@@ -279,6 +279,7 @@ class TestGetCatalog:
         assert body["data"]["id"] == catalog_id
         assert body["data"]["status"] == "pending"
         assert body["data"]["products"] == []  # ainda não processado
+        assert body["data"]["warnings"] == []  # campo exposto (ADR-011 D5)
 
     async def test_other_brand_returns_404(
         self,

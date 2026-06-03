@@ -42,6 +42,19 @@ class SwatchPayload(BaseModel):
     fill_rgb: tuple[float, float, float]
 
 
+class AnalyzerWarningSchema(BaseModel):
+    """Serialização de um `AnalyzerWarning` na API (ADR-011 D5)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    severity: str
+    page_index: int
+    sku: str | None
+    message: str
+    detected_value: str | None
+
+
 class CatalogProductResponse(BaseModel):
     """Produto detectado durante a análise do PDF."""
 
@@ -52,7 +65,7 @@ class CatalogProductResponse(BaseModel):
     name: str | None
     price: Decimal | None
     grade: str | None
-    sizes: list[str]
+    sizes: list[str] | None
     n_colors: int
     swatches: list[dict[str, Any]] = Field(default_factory=list)
     page_index: int
@@ -81,6 +94,7 @@ class CatalogResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     products: list[CatalogProductResponse] = Field(default_factory=list)
+    warnings: list[AnalyzerWarningSchema] = Field(default_factory=list)
 
 
 class ProcessCatalogResponse(BaseModel):
