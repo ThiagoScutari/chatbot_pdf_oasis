@@ -4,6 +4,11 @@ Zero-vocabulário: seleciona o texto de maior peso tipográfico (`size`)
 da zona Voronoi, agrupa palavras de tamanho próximo ao máximo (dentro de
 `size_tolerance`) e as reordena na ordem de leitura. Requer que cada
 palavra carregue a chave `size` (via `extra_attrs` no orquestrador).
+
+Hotfix FERLA: a seleção exclui linhas que casam padrões de outros eixos
+(preço/SKU/grade/rótulos) ANTES de medir a tipografia, porque no FERLA
+real o preço é impresso em peso maior que o nome. Os cenários abaixo
+cobrem essa exclusão por linha.
 """
 
 from __future__ import annotations
@@ -88,12 +93,74 @@ def test_returns_none_when_no_words() -> None:
 
 
 def test_does_not_return_sku_as_name() -> None:
-    # O SKU é o maior texto da zona — filtro defensivo evita devolvê-lo.
+    # Zona contendo APENAS o SKU (linha de dígitos longos é ruído e é
+    # excluída). Sem sobreviventes → None: o SKU nunca vira nome.
     words = [
         _word("01010012", size=22.0, top=100.0, x0=50.0),
-        _word("detalhe", size=9.0, top=200.0, x0=50.0),
     ]
     result = PositionalTitleName().extract(_zctx(words, sku="01010012"), {})
+
+    assert result is None
+
+
+def test_excludes_price_line_even_if_largest_font() -> None:
+    # Caso FERLA real: o preço (13.0) é maior que o nome (12.0). A linha de
+    # preço é excluída como ruído ANTES de medir a fonte; o nome (menor)
+    # vence. Também guarda contra o bug do hífen órfão: "-" (13.0) não
+    # pode sobreviver solto e virar o "nome".
+    words = [
+        _word("Camisa", size=12.0, top=100.0, x0=50.0),
+        _word("Polo", size=12.0, top=100.0, x0=110.0),
+        _word("Atacado", size=13.0, top=150.0, x0=50.0),
+        _word("-", size=13.0, top=150.0, x0=110.0),
+        _word("299", size=13.0, top=150.0, x0=130.0),
+    ]
+    result = PositionalTitleName().extract(_zctx(words), {})
+
+    assert result is not None
+    assert result.name == "Camisa Polo"
+
+
+def test_excludes_sku_and_grade_lines() -> None:
+    # Linhas de SKU rotulado e de grade são excluídas; sobra só o nome.
+    words = [
+        _word("Bermuda", size=12.0, top=100.0, x0=50.0),
+        _word("Ref:", size=12.0, top=120.0, x0=50.0),
+        _word("02010011", size=12.0, top=120.0, x0=90.0),
+        _word("Grade:", size=12.0, top=140.0, x0=50.0),
+        _word("P", size=12.0, top=140.0, x0=100.0),
+        _word("-", size=12.0, top=140.0, x0=110.0),
+        _word("GG", size=12.0, top=140.0, x0=120.0),
+    ]
+    result = PositionalTitleName().extract(_zctx(words), {})
+
+    assert result is not None
+    assert result.name == "Bermuda"
+
+
+def test_picks_largest_non_noise_line() -> None:
+    # Entre DUAS linhas não-ruído de tamanhos diferentes, vence a maior.
+    words = [
+        _word("Camisa", size=16.0, top=100.0, x0=50.0),
+        _word("Premium", size=16.0, top=100.0, x0=110.0),
+        _word("algodão", size=10.0, top=130.0, x0=50.0),
+        _word("egípcio", size=10.0, top=130.0, x0=100.0),
+    ]
+    result = PositionalTitleName().extract(_zctx(words), {})
+
+    assert result is not None
+    assert result.name == "Camisa Premium"
+
+
+def test_returns_none_when_all_lines_are_noise() -> None:
+    # Zona só com dados estruturados (preço/SKU/grade) → sem nome → None.
+    words = [
+        _word("Ref:", size=12.0, top=100.0, x0=50.0),
+        _word("02010011", size=12.0, top=100.0, x0=90.0),
+        _word("Atacado", size=13.0, top=120.0, x0=50.0),
+        _word("299", size=13.0, top=120.0, x0=110.0),
+    ]
+    result = PositionalTitleName().extract(_zctx(words), {})
 
     assert result is None
 
