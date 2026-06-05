@@ -264,3 +264,43 @@ def test_oasis_default_profile_loads() -> None:
 
     assert profile.id == "oasis_default"
     assert profile.strategies["name"]["id"] == "category_vocabulary"
+
+
+# ──────────────────────────────────────────────
+#  Hardening anti-path-traversal (Fase E)
+# ──────────────────────────────────────────────
+
+
+def test_load_profile_rejects_path_traversal() -> None:
+    load_profile.cache_clear()
+    with pytest.raises(BrandFormatProfileInvalidError) as exc_info:
+        load_profile("../../etc/passwd")
+
+    assert exc_info.value.code == "BRAND_FORMAT_PROFILE_INVALID"
+
+
+def test_load_profile_rejects_absolute_path() -> None:
+    load_profile.cache_clear()
+    with pytest.raises(BrandFormatProfileInvalidError):
+        load_profile("/etc/passwd")
+
+
+def test_load_profile_rejects_uppercase_and_special_chars() -> None:
+    load_profile.cache_clear()
+    for bad in ("Oasis", "has-hyphen", "tem espaco", "dot.name", "back\\slash"):
+        with pytest.raises(BrandFormatProfileInvalidError):
+            load_profile(bad)
+
+
+def test_load_profile_rejects_empty_string() -> None:
+    load_profile.cache_clear()
+    with pytest.raises(BrandFormatProfileInvalidError):
+        load_profile("")
+
+
+def test_load_profile_accepts_valid_ids() -> None:
+    """Os profiles reais (ids válidos) carregam sem erro de validação."""
+    load_profile.cache_clear()
+    for valid_id in ("oasis_default", "ferla_like"):
+        profile = load_profile(valid_id)
+        assert profile.id == valid_id

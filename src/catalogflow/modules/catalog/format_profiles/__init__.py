@@ -13,6 +13,7 @@ A Fase A entrega apenas o loader, o schema e a dataclass. Os JSONs
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
@@ -28,6 +29,11 @@ from catalogflow.shared.errors import (
 
 PROFILES_DIR: Final[Path] = Path(__file__).parent
 SCHEMA_PATH: Final[Path] = PROFILES_DIR / "schema.json"
+
+# id de profile válido: minúsculas, dígitos, underscore; começa com letra.
+# Mesmo padrão do `schema.json` (`^[a-z][a-z0-9_]*$`) — aqui aplicado ao
+# `profile_id` RECEBIDO, antes de tocar o filesystem (anti-path-traversal).
+_PROFILE_ID_RE: Final = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,8 +75,29 @@ def load_profile(profile_id: str) -> BrandFormatProfile:
             (lista do `absolute_path` do erro) e `message` do validator,
             para diagnóstico operacional.
     """
+    # Validação anti-path-traversal: rejeita qualquer id fora do padrão
+    # ANTES de tocar o filesystem. Cobre "../", "/", "\\", "\0", paths
+    # absolutos, maiúsculas, etc. `lru_cache` não armazena chamadas que
+    # levantam exceção, então ids inválidos são revalidados a cada chamada.
+    if not _PROFILE_ID_RE.fullmatch(profile_id):
+        raise BrandFormatProfileInvalidError(
+            f"invalid profile id: {profile_id!r}",
+            code="BRAND_FORMAT_PROFILE_INVALID",
+            details={"profile_id": profile_id},
+        )
+
     path = PROFILES_DIR / f"{profile_id}.json"
-    if not path.is_file():
+    # Defesa em profundidade: confirma que o path resolvido permanece sob
+    # PROFILES_DIR (cinto e suspensório, caso o regex algum dia afrouxe).
+    resolved = path.resolve()
+    if not resolved.is_relative_to(PROFILES_DIR.resolve()):
+        raise BrandFormatProfileInvalidError(
+            f"profile path escapes profiles dir: {profile_id!r}",
+            code="BRAND_FORMAT_PROFILE_INVALID",
+            details={"profile_id": profile_id},
+        )
+
+    if not resolved.is_file():
         raise BrandFormatProfileNotFoundError(
             f"format profile not found: {profile_id!r}",
             code="BRAND_FORMAT_PROFILE_NOT_FOUND",
