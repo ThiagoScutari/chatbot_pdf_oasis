@@ -23,6 +23,11 @@ from typing import Final
 
 import pymupdf
 
+from catalogflow.modules.catalog.domain import (
+    FIELDS_NOT_INJECTED_NO_GRADE,
+    SEVERITY_ERROR,
+    AnalyzerWarning,
+)
 from catalogflow.modules.catalog.pdf_analyzer import (
     CatalogMetadata,
     ProductPageMeta,
@@ -92,8 +97,17 @@ class PanelRect:
 class FieldInjector:
     """Insere campos AcroForm nas páginas de produto detectadas."""
 
-    def inject(self, pdf_bytes: bytes, metadata: CatalogMetadata) -> bytes:
+    def inject(
+        self,
+        pdf_bytes: bytes,
+        metadata: CatalogMetadata,
+    ) -> tuple[bytes, list[AnalyzerWarning]]:
         """Recebe o PDF original + metadados e devolve o PDF anotado.
+
+        Retorna uma tupla `(pdf_bytes_anotado, warnings)`. Os warnings são
+        as degradações detectadas durante a injeção — hoje apenas
+        `FIELDS_NOT_INJECTED_NO_GRADE`, emitido quando um produto chega sem
+        grade/sizes (ADR-011 D2/D4) e portanto não recebe campos AcroForm.
 
         O total de widgets inseridos pode ser inspecionado via
         `count_fields(metadata)` antes da injeção (cálculo determinístico).
@@ -110,6 +124,7 @@ class FieldInjector:
                 details={"reason": str(exc)},
             ) from exc
 
+        extra_warnings: list[AnalyzerWarning] = []
         try:
             if doc.is_encrypted:
                 raise PDFEncryptedError(
@@ -118,6 +133,25 @@ class FieldInjector:
                 )
 
             for product in metadata.product_pages:
+                # Produto sem grade/sizes (ADR-011 D4): não há como montar o
+                # painel de pedido. Em vez de quebrar, registra warning e segue.
+                if product.grade is None or product.sizes is None:
+                    extra_warnings.append(
+                        AnalyzerWarning(
+                            code=FIELDS_NOT_INJECTED_NO_GRADE,
+                            severity=SEVERITY_ERROR,
+                            page_index=product.page_index,
+                            sku=product.sku,
+                            message=(
+                                f"Campos AcroForm não injetados para o SKU "
+                                f"{product.sku} (página {product.page_index + 1}): "
+                                f"grade ou sizes ausentes."
+                            ),
+                            detected_value=None,
+                        ),
+                    )
+                    continue
+
                 page = doc[product.page_index]
                 siblings = [p for p in metadata.product_pages if p.page_index == product.page_index]
                 rect = self._calculate_panel_rect(
@@ -131,7 +165,7 @@ class FieldInjector:
             data: bytes = doc.tobytes(clean=True, garbage=4, deflate=True)
         finally:
             doc.close()
-        return data
+        return data, extra_warnings
 
     # ── Cálculo de geometria ──────────────────
 
@@ -144,6 +178,9 @@ class FieldInjector:
         siblings: list[ProductPageMeta],
     ) -> PanelRect:
         """Replica `calcular_painel_rect` do POC, incluindo compressão à esquerda."""
+        # `inject` só chama este helper para produtos com grade/sizes; o assert
+        # documenta o invariante e estreita o tipo para o mypy (ADR-011 D4).
+        assert product.sizes is not None
         sizes = product.sizes
         n_cores = max(1, product.n_colors)
         n_tam = len(sizes)
@@ -201,6 +238,10 @@ class FieldInjector:
         rect: PanelRect,
     ) -> int:
         """Desenha o painel visual e adiciona widgets. Retorna nº de widgets."""
+        # Invariante garantido por `inject` (ADR-011 D4): só desenha painel
+        # para produtos com grade/sizes presentes.
+        assert product.grade is not None
+        assert product.sizes is not None
         sku = product.sku
         grade = product.grade
         sizes = product.sizes
@@ -384,5 +425,12 @@ def count_fields(metadata: CatalogMetadata) -> int:
 
     Calculado a partir dos metadados, sem abrir o PDF — útil para o service
     persistir `Catalog.n_fields` antes mesmo da injeção.
+
+    Produtos sem grade/sizes (ADR-011 D4) não recebem campos AcroForm e,
+    portanto, não entram na contagem.
     """
-    return sum(max(1, p.n_colors) * len(p.sizes) for p in metadata.product_pages)
+    return sum(
+        max(1, p.n_colors) * len(p.sizes)
+        for p in metadata.product_pages
+        if p.sizes is not None and p.grade is not None
+    )

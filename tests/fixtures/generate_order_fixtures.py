@@ -63,7 +63,8 @@ VALORES_INVALIDOS: tuple[str, ...] = ("abc", "3.5", "-1", "0")
 def _inject_acroform(catalog_bytes: bytes) -> bytes:
     """Aplica PDFAnalyzer + FieldInjector — produz o mesmo PDF da Sprint 01."""
     metadata = PDFAnalyzer().analyze(catalog_bytes)
-    return FieldInjector().inject(catalog_bytes, metadata)
+    output_bytes, _warnings = FieldInjector().inject(catalog_bytes, metadata)
+    return output_bytes
 
 
 def _apply(

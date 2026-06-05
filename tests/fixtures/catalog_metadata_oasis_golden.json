@@ -1,0 +1,1327 @@
+{
+  "n_pages": 70,
+  "n_product_pages": 33,
+  "product_pages": [
+    {
+      "sku": "0322500004-0",
+      "name": "JAQUETA BERENICE",
+      "price": "3488.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.282,
+            0.173,
+            0.169
+          ],
+          "fill_hex": "#482c2b"
+        }
+      ],
+      "page_index": 4,
+      "x_block_start": 33.5,
+      "x_block_end": 238.804,
+      "y_start": 2437.828,
+      "y_end": 2539.028,
+      "side": "left",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "0142500001-0",
+      "name": "CALÇA CAPRI ESTHER",
+      "price": "588.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 653.31201171875,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.282,
+            0.173,
+            0.169
+          ],
+          "fill_hex": "#482c2b"
+        }
+      ],
+      "page_index": 4,
+      "x_block_start": 650.8118,
+      "x_block_end": 878.7076,
+      "y_start": 2437.828,
+      "y_end": 2539.028,
+      "side": "right",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "0442500941-0",
+      "name": "VESTIDO JOANA",
+      "price": "1598.00",
+      "grade": "PP-G",
+      "sizes": [
+        "PP",
+        "P",
+        "M",
+        "G"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.145,
+            0.086,
+            0.106
+          ],
+          "fill_hex": "#25161b"
+        },
+        {
+          "x0": 77.5,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.989,
+            0.987,
+            0.931
+          ],
+          "fill_hex": "#fcfced"
+        }
+      ],
+      "page_index": 7,
+      "x_block_start": 36.0,
+      "x_block_end": 209.66580000000002,
+      "y_start": 2441.3713,
+      "y_end": 2542.5713,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500885-0",
+      "name": "VESTIDO GINA",
+      "price": "1348.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2402.5,
+          "fill_rgb": [
+            0.204,
+            0.129,
+            0.153
+          ],
+          "fill_hex": "#342127"
+        }
+      ],
+      "page_index": 8,
+      "x_block_start": 36.0,
+      "x_block_end": 199.966,
+      "y_start": 2439.828,
+      "y_end": 2541.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500902-0",
+      "name": "VESTIDO PAOLLA",
+      "price": "988.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.75,
+          "fill_rgb": [
+            0.122,
+            0.075,
+            0.09
+          ],
+          "fill_hex": "#1f1317"
+        }
+      ],
+      "page_index": 10,
+      "x_block_start": 36.0,
+      "x_block_end": 219.52179999999998,
+      "y_start": 2441.6154,
+      "y_end": 2542.8154,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500382-0",
+      "name": "CONJUNTO ALINE",
+      "price": "1888.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 43.5,
+          "y0": 2390.0,
+          "fill_rgb": [
+            0.129,
+            0.082,
+            0.098
+          ],
+          "fill_hex": "#211519"
+        }
+      ],
+      "page_index": 11,
+      "x_block_start": 43.5,
+      "x_block_end": 234.25979999999998,
+      "y_start": 2432.5347,
+      "y_end": 2533.7347,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500377-0",
+      "name": "CONJUNTO BODY SAIA MARTA",
+      "price": "2198.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2402.0,
+          "fill_rgb": [
+            0.263,
+            0.075,
+            0.137
+          ],
+          "fill_hex": "#431323"
+        }
+      ],
+      "page_index": 15,
+      "x_block_start": 36.0,
+      "x_block_end": 361.31180000000006,
+      "y_start": 2439.328,
+      "y_end": 2540.528,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500384-0",
+      "name": "CONJUNTO RUBIA",
+      "price": "3588.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2396.296875,
+          "fill_rgb": [
+            0.49,
+            0.373,
+            0.333
+          ],
+          "fill_hex": "#7d5f55"
+        }
+      ],
+      "page_index": 19,
+      "x_block_start": 36.0,
+      "x_block_end": 226.7158,
+      "y_start": 2433.6233,
+      "y_end": 2534.8233,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500921-0",
+      "name": "VESTIDO YASMIN",
+      "price": "1188.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.75,
+          "fill_rgb": [
+            0.431,
+            0.271,
+            0.067
+          ],
+          "fill_hex": "#6e4511"
+        }
+      ],
+      "page_index": 21,
+      "x_block_start": 36.0,
+      "x_block_end": 219.12580000000003,
+      "y_start": 2438.0721,
+      "y_end": 2539.2721,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500912-0",
+      "name": "VESTIDO SAFIRA",
+      "price": "1388.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2399.078125,
+          "fill_rgb": [
+            0.749,
+            0.522,
+            0.129
+          ],
+          "fill_hex": "#bf8521"
+        },
+        {
+          "x0": 72.0,
+          "y0": 2399.078125,
+          "fill_rgb": [
+            0.4,
+            0.067,
+            0.173
+          ],
+          "fill_hex": "#66112c"
+        }
+      ],
+      "page_index": 22,
+      "x_block_start": 36.0,
+      "x_block_end": 210.63600000000002,
+      "y_start": 2436.4107,
+      "y_end": 2537.6107,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500907-0",
+      "name": "VESTIDO MAGDALENA",
+      "price": "1488.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.0,
+          "fill_rgb": [
+            0.694,
+            0.475,
+            0.102
+          ],
+          "fill_hex": "#b1791a"
+        }
+      ],
+      "page_index": 23,
+      "x_block_start": 36.0,
+      "x_block_end": 272.7398,
+      "y_start": 2437.6233,
+      "y_end": 2538.8233,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500376-0",
+      "name": "CONJUNTO PRICILA",
+      "price": "1498.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2398.5,
+          "fill_rgb": [
+            0.643,
+            0.431,
+            0.078
+          ],
+          "fill_hex": "#a46e14"
+        },
+        {
+          "x0": 77.5,
+          "y0": 2398.5,
+          "fill_rgb": [
+            0.933,
+            0.894,
+            0.89
+          ],
+          "fill_hex": "#eee4e3"
+        }
+      ],
+      "page_index": 25,
+      "x_block_start": 36.0,
+      "x_block_end": 245.06380000000001,
+      "y_start": 2435.828,
+      "y_end": 2537.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500901-0",
+      "name": "VESTIDO HELLEN",
+      "price": "2198.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.698,
+            0.475,
+            0.071
+          ],
+          "fill_hex": "#b27912"
+        }
+      ],
+      "page_index": 26,
+      "x_block_start": 36.0,
+      "x_block_end": 218.86399999999998,
+      "y_start": 2440.8241,
+      "y_end": 2542.0241,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "442500908-0",
+      "name": "VESTIDO SALOMÉ",
+      "price": "1288.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2402.546875,
+          "fill_rgb": [
+            0.565,
+            0.31,
+            0.153
+          ],
+          "fill_hex": "#904f27"
+        },
+        {
+          "x0": 72.0,
+          "y0": 2402.546875,
+          "fill_rgb": [
+            0.4,
+            0.067,
+            0.173
+          ],
+          "fill_hex": "#66112c"
+        }
+      ],
+      "page_index": 29,
+      "x_block_start": 36.0,
+      "x_block_end": 225.26379999999997,
+      "y_start": 2439.8713,
+      "y_end": 2541.0713,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500386-0",
+      "name": "CONJUNTO BODY",
+      "price": "2348.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.5,
+          "fill_rgb": [
+            0.361,
+            0.078,
+            0.157
+          ],
+          "fill_hex": "#5c1428"
+        },
+        {
+          "x0": 71.5,
+          "y0": 2404.5,
+          "fill_rgb": [
+            0.675,
+            0.49,
+            0.467
+          ],
+          "fill_hex": "#ac7d77"
+        }
+      ],
+      "page_index": 32,
+      "x_block_start": 36.0,
+      "x_block_end": 377.9878,
+      "y_start": 2441.828,
+      "y_end": 2543.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500906-0",
+      "name": "VESTIDO SURI",
+      "price": "1698.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.625,
+          "fill_rgb": [
+            0.459,
+            0.078,
+            0.2
+          ],
+          "fill_hex": "#751433"
+        }
+      ],
+      "page_index": 34,
+      "x_block_start": 36.0,
+      "x_block_end": 202.21,
+      "y_start": 2437.954,
+      "y_end": 2539.154,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "442500908-0",
+      "name": "VESTIDO SALOMÉ",
+      "price": "1288.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2402.953125,
+          "fill_rgb": [
+            0.565,
+            0.31,
+            0.153
+          ],
+          "fill_hex": "#904f27"
+        },
+        {
+          "x0": 72.0,
+          "y0": 2402.953125,
+          "fill_rgb": [
+            0.4,
+            0.067,
+            0.173
+          ],
+          "fill_hex": "#66112c"
+        }
+      ],
+      "page_index": 35,
+      "x_block_start": 36.0,
+      "x_block_end": 225.26379999999997,
+      "y_start": 2440.2886,
+      "y_end": 2541.4886,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500903-0",
+      "name": "VESTIDO JANINE",
+      "price": "1648.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2396.5,
+          "fill_rgb": [
+            0.435,
+            0.133,
+            0.212
+          ],
+          "fill_hex": "#6f2236"
+        }
+      ],
+      "page_index": 36,
+      "x_block_start": 36.0,
+      "x_block_end": 212.2838,
+      "y_start": 2433.828,
+      "y_end": 2535.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500912-0",
+      "name": "VESTIDO SAFIRA",
+      "price": "1388.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.0,
+          "fill_rgb": [
+            0.749,
+            0.522,
+            0.129
+          ],
+          "fill_hex": "#bf8521"
+        },
+        {
+          "x0": 72.0,
+          "y0": 2400.0,
+          "fill_rgb": [
+            0.4,
+            0.067,
+            0.173
+          ],
+          "fill_hex": "#66112c"
+        }
+      ],
+      "page_index": 37,
+      "x_block_start": 36.0,
+      "x_block_end": 210.63600000000002,
+      "y_start": 2437.328,
+      "y_end": 2538.528,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500905-0",
+      "name": "VESTIDO RUTH",
+      "price": "828.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2398.5,
+          "fill_rgb": [
+            0.439,
+            0.059,
+            0.196
+          ],
+          "fill_hex": "#700f32"
+        }
+      ],
+      "page_index": 38,
+      "x_block_start": 36.0,
+      "x_block_end": 201.17600000000004,
+      "y_start": 2435.828,
+      "y_end": 2537.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500911-0",
+      "name": "VESTIDO MERABE",
+      "price": "1328.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2405.51611328125,
+          "fill_rgb": [
+            0.925,
+            0.847,
+            0.894
+          ],
+          "fill_hex": "#ecd8e4"
+        },
+        {
+          "x0": 76.5,
+          "y0": 2405.51611328125,
+          "fill_rgb": [
+            0.051,
+            0.0,
+            0.0
+          ],
+          "fill_hex": "#0d0000"
+        }
+      ],
+      "page_index": 41,
+      "x_block_start": 36.0,
+      "x_block_end": 222.692,
+      "y_start": 2442.8359,
+      "y_end": 2544.0359,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500383-0",
+      "name": "CONJUNTO BRUNNA",
+      "price": "1548.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.925,
+            0.831,
+            0.882
+          ],
+          "fill_hex": "#ecd4e1"
+        }
+      ],
+      "page_index": 42,
+      "x_block_start": 36.0,
+      "x_block_end": 253.7318,
+      "y_start": 2437.828,
+      "y_end": 2539.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500386-0",
+      "name": "CONJUNTO BODY",
+      "price": "2348.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.0,
+          "fill_rgb": [
+            0.361,
+            0.078,
+            0.157
+          ],
+          "fill_hex": "#5c1428"
+        },
+        {
+          "x0": 71.5,
+          "y0": 2404.0,
+          "fill_rgb": [
+            0.675,
+            0.49,
+            0.467
+          ],
+          "fill_hex": "#ac7d77"
+        }
+      ],
+      "page_index": 44,
+      "x_block_start": 36.0,
+      "x_block_end": 377.9878,
+      "y_start": 2441.328,
+      "y_end": 2542.528,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "2222500380-0",
+      "name": "CONJUNTO BODY",
+      "price": "2288.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.093994140625,
+          "fill_rgb": [
+            0.6,
+            0.576,
+            0.678
+          ],
+          "fill_hex": "#9993ad"
+        },
+        {
+          "x0": 74.66500091552734,
+          "y0": 2404.093994140625,
+          "fill_rgb": [
+            0.957,
+            0.925,
+            0.776
+          ],
+          "fill_hex": "#f4ecc6"
+        }
+      ],
+      "page_index": 48,
+      "x_block_start": 36.0,
+      "x_block_end": 385.4898,
+      "y_start": 2444.9619,
+      "y_end": 2546.1619,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0422500012-0",
+      "name": "BODY REBECA",
+      "price": "1588.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 47.75,
+          "y0": 2402.0,
+          "fill_rgb": [
+            0.922,
+            0.89,
+            0.745
+          ],
+          "fill_hex": "#ebe3be"
+        }
+      ],
+      "page_index": 51,
+      "x_block_start": 47.75,
+      "x_block_end": 206.47780000000003,
+      "y_start": 2440.0367,
+      "y_end": 2541.2367,
+      "side": "left",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "0062500062-0",
+      "name": "SHORT ALFAIATARIA LEIA",
+      "price": "1068.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 650.81201171875,
+          "y0": 2402.0,
+          "fill_rgb": [
+            0.565,
+            0.431,
+            0.427
+          ],
+          "fill_hex": "#906e6d"
+        }
+      ],
+      "page_index": 51,
+      "x_block_start": 650.8118,
+      "x_block_end": 918.4616,
+      "y_start": 2440.0367,
+      "y_end": 2541.2367,
+      "side": "right",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "2222500380-0",
+      "name": "CONJUNTO BODY",
+      "price": "2288.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.0,
+          "fill_rgb": [
+            0.6,
+            0.576,
+            0.678
+          ],
+          "fill_hex": "#9993ad"
+        },
+        {
+          "x0": 76.08300018310547,
+          "y0": 2400.0,
+          "fill_rgb": [
+            0.957,
+            0.929,
+            0.796
+          ],
+          "fill_hex": "#f4edcb"
+        }
+      ],
+      "page_index": 52,
+      "x_block_start": 36.0,
+      "x_block_end": 385.4898,
+      "y_start": 2440.8713,
+      "y_end": 2542.0713,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500904-0",
+      "name": "VESTIDO LIDIA",
+      "price": "1368.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.5,
+          "fill_rgb": [
+            0.949,
+            0.906,
+            0.741
+          ],
+          "fill_hex": "#f2e7bd"
+        }
+      ],
+      "page_index": 53,
+      "x_block_start": 36.0,
+      "x_block_end": 201.90200000000002,
+      "y_start": 2441.828,
+      "y_end": 2543.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0362500185-0",
+      "name": "BLUSA ABIGAIL EM SEDA",
+      "price": "828.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2405.0,
+          "fill_rgb": [
+            0.949,
+            0.988,
+            0.918
+          ],
+          "fill_hex": "#f2fcea"
+        }
+      ],
+      "page_index": 56,
+      "x_block_start": 36.0,
+      "x_block_end": 294.93780000000004,
+      "y_start": 2442.332,
+      "y_end": 2543.532,
+      "side": "left",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "0022500151-0",
+      "name": "CALÇA ANA EM SEDA",
+      "price": "1798.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 637.5,
+          "y0": 2405.0,
+          "fill_rgb": [
+            0.949,
+            0.988,
+            0.918
+          ],
+          "fill_hex": "#f2fcea"
+        }
+      ],
+      "page_index": 56,
+      "x_block_start": 637.5020000000001,
+      "x_block_end": 862.6478000000001,
+      "y_start": 2442.332,
+      "y_end": 2543.532,
+      "side": "right",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "2222500376-0",
+      "name": "CONJUNTO PRICILA",
+      "price": "1498.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2398.0,
+          "fill_rgb": [
+            0.643,
+            0.431,
+            0.078
+          ],
+          "fill_hex": "#a46e14"
+        },
+        {
+          "x0": 75.5,
+          "y0": 2398.0,
+          "fill_rgb": [
+            0.933,
+            0.894,
+            0.89
+          ],
+          "fill_hex": "#eee4e3"
+        }
+      ],
+      "page_index": 58,
+      "x_block_start": 36.0,
+      "x_block_end": 245.06380000000001,
+      "y_start": 2435.328,
+      "y_end": 2536.528,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500941-0",
+      "name": "VESTIDO JOANA",
+      "price": "1598.00",
+      "grade": "PP-G",
+      "sizes": [
+        "PP",
+        "P",
+        "M",
+        "G"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.145,
+            0.086,
+            0.106
+          ],
+          "fill_hex": "#25161b"
+        },
+        {
+          "x0": 80.0,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.949,
+            0.988,
+            0.918
+          ],
+          "fill_hex": "#f2fcea"
+        }
+      ],
+      "page_index": 59,
+      "x_block_start": 36.0,
+      "x_block_end": 209.66580000000002,
+      "y_start": 2441.3713,
+      "y_end": 2542.5713,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0362500186-0",
+      "name": "BLUSA YOANA",
+      "price": "1688.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2395.51611328125,
+          "fill_rgb": [
+            0.569,
+            0.349,
+            0.212
+          ],
+          "fill_hex": "#915936"
+        }
+      ],
+      "page_index": 60,
+      "x_block_start": 36.0,
+      "x_block_end": 195.21400000000003,
+      "y_start": 2432.8446,
+      "y_end": 2534.0446,
+      "side": "left",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "0022500149-0",
+      "name": "CALÇA RAQUEL",
+      "price": "928.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 637.5,
+          "y0": 2401.26611328125,
+          "fill_rgb": [
+            0.922,
+            0.918,
+            0.937
+          ],
+          "fill_hex": "#ebeaef"
+        }
+      ],
+      "page_index": 60,
+      "x_block_start": 637.5,
+      "x_block_end": 800.74,
+      "y_start": 2438.5946,
+      "y_end": 2539.7946,
+      "side": "right",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "0442500915-0",
+      "name": "VESTIDO HANNA",
+      "price": "1988.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2400.5,
+          "fill_rgb": [
+            0.086,
+            0.075,
+            0.102
+          ],
+          "fill_hex": "#16131a"
+        }
+      ],
+      "page_index": 64,
+      "x_block_start": 36.0,
+      "x_block_end": 214.92600000000002,
+      "y_start": 2437.828,
+      "y_end": 2539.028,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0442500911-0",
+      "name": "VESTIDO MERABE",
+      "price": "1328.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 2,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.0,
+          "fill_rgb": [
+            0.925,
+            0.847,
+            0.894
+          ],
+          "fill_hex": "#ecd8e4"
+        },
+        {
+          "x0": 76.5,
+          "y0": 2404.0,
+          "fill_rgb": [
+            0.051,
+            0.0,
+            0.0
+          ],
+          "fill_hex": "#0d0000"
+        }
+      ],
+      "page_index": 65,
+      "x_block_start": 36.0,
+      "x_block_end": 222.692,
+      "y_start": 2441.328,
+      "y_end": 2542.528,
+      "side": "single",
+      "n_products_on_page": 1
+    },
+    {
+      "sku": "0582500025-0",
+      "name": "BLAZER SARAH",
+      "price": "2398.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 36.0,
+          "y0": 2404.5,
+          "fill_rgb": [
+            0.565,
+            0.431,
+            0.427
+          ],
+          "fill_hex": "#906e6d"
+        }
+      ],
+      "page_index": 68,
+      "x_block_start": 36.0,
+      "x_block_end": 198.07180000000002,
+      "y_start": 2442.5367,
+      "y_end": 2543.7367,
+      "side": "left",
+      "n_products_on_page": 2
+    },
+    {
+      "sku": "0062500062-0",
+      "name": "SHORT ALFAIATARIA LEIA",
+      "price": "1068.00",
+      "grade": "PP-M",
+      "sizes": [
+        "PP",
+        "P",
+        "M"
+      ],
+      "n_colors": 1,
+      "swatches": [
+        {
+          "x0": 637.5,
+          "y0": 2404.5,
+          "fill_rgb": [
+            0.565,
+            0.431,
+            0.427
+          ],
+          "fill_hex": "#906e6d"
+        }
+      ],
+      "page_index": 68,
+      "x_block_start": 637.5,
+      "x_block_end": 905.1498,
+      "y_start": 2442.5367,
+      "y_end": 2543.7367,
+      "side": "right",
+      "n_products_on_page": 2
+    }
+  ],
+  "warnings": []
+}

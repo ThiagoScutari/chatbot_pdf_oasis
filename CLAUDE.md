@@ -73,7 +73,7 @@ pre-commit run --all-files    # verificação manual de todos os arquivos
 
 ## Architecture
 
-### Core Design (ADR-001 to ADR-009 — ver `docs/adr/`)
+### Core Design (ADR-001 to ADR-011 — ver `docs/adr/`)
 
 - **Monolito modular** (ADR-001) — no microservices. Modules communicate via direct Python imports, not HTTP. Extract to microservice only when a module's contract is stable and team is larger.
 - **FastAPI + Celery** (ADR-002) — PDF processing is CPU-bound (2–15s). API endpoints return `job_id` immediately; clients poll `GET /api/v1/jobs/{job_id}` or receive webhooks. Never run PDF processing synchronously in an HTTP handler.
@@ -84,32 +84,41 @@ pre-commit run --all-files    # verificação manual de todos os arquivos
 - **Zonas de Voronoi** (ADR-007) — `PDFAnalyzer` calcula zonas de busca por SKU dinamicamente via `_assign_name_zones()`. Nunca hardcodar `page_w / 2`.
 - **Mypy cirúrgico** (ADR-008) — `ignore_missing_imports` só para libs externas; supressão `# type: ignore` no call site, nunca no módulo inteiro do `pyproject.toml`.
 - **`pre-commit` obrigatório** (ADR-009) — `pre-commit install` após clonar, sem exceção. CI exige verde de primeira.
+- **Multi-formato via Strategy Pattern + BrandFormatProfile** (ADR-010) — cada eixo de extração (SKU, grade, preço, swatches, nome) é uma estratégia plugável; um `BrandFormatProfile` (JSON por formato) seleciona uma estratégia por eixo; `brands.format_profile_id` liga marca → formato. Ver seção "Arquitetura multi-formato" abaixo.
+- **Warnings estruturados não-bloqueantes** (ADR-011) — degradação local (grade/nome/preço/swatch não detectado) vira `AnalyzerWarning` em vez de default silencioso ou exceção. Ver seção "AnalyzerWarning" abaixo.
 
 ### Module Structure (`src/catalogflow/`)
 
+> Paths abaixo são root-relative (a partir da raiz do repo). Em comandos,
+> sempre o caminho completo `src/catalogflow/...` (ex.:
+> `pytest src/catalogflow/modules/catalog/tests/`).
+
 ```
-main.py                 # FastAPI app factory (create_app)
-modules/
+src/catalogflow/main.py   # FastAPI app factory (create_app)
+src/catalogflow/modules/
   catalog/              # PDF intake, AcroForm field injection, swatch detection
     models.py           # SQLAlchemy: Catalog, CatalogProduct
     schemas.py          # Pydantic: request/response DTOs
     service.py          # Business logic (orchestrates analyzer + injector + storage)
     router.py           # FastAPI endpoints
     tasks.py            # Celery async tasks
-    pdf_analyzer.py     # PURE: bytes → CatalogMetadata (no I/O)
+    pdf_analyzer.py     # PURE: bytes → CatalogMetadata (no I/O) — orquestra strategies
     field_injector.py   # PURE: bytes + metadata → bytes (no I/O)
+    strategies/         # Estratégias plugáveis por eixo (sku/grade/price/swatches/name)
+    format_profiles/    # BrandFormatProfile JSON (<id>.json) + loader + schema
+    domain.py           # AnalyzerWarning + códigos/severidades
     tests/
   orders/               # AcroForm extraction, field parsing (v1 + v2 format)
   romaneio/             # Invoice PDF generation
   auth/                 # JWT + API keys (SHA-256 hash, `cf_` prefix), multi-tenant
   stock/                # [Phase 2] ERP integration via httpx
   reservation/          # [Phase 3] Stock reservation on order submit
-shared/                 # Sibling of modules/ — NOT inside it
+src/catalogflow/shared/   # Sibling of modules/ — NOT inside it
   errors.py             # Domain exceptions (NotFoundError, PDFEncryptedError, etc.)
   pagination.py         # Page, PageParams
   responses.py          # Standard response envelope
   utils/                # file sanitization, MIME detection
-infra/                  # External dependencies — sibling of modules/
+src/catalogflow/infra/    # External dependencies — sibling of modules/
   database.py           # SQLAlchemy async engine + session factory + get_db()
   storage.py            # boto3/R2 client wrapper
   cache.py              # Redis async client
@@ -126,7 +135,9 @@ infra/                  # External dependencies — sibling of modules/
 ```python
 # CORRECT — pure, testable, no I/O
 class PDFAnalyzer:
-    def analyze(self, pdf_bytes: bytes) -> CatalogMetadata: ...
+    def analyze(
+        self, pdf_bytes: bytes, profile_id: str = "hyphenated_single_price"
+    ) -> CatalogMetadata: ...
 
 class FieldInjector:
     def inject(self, pdf_bytes: bytes, metadata: CatalogMetadata) -> bytes: ...
@@ -138,6 +149,53 @@ class PDFAnalyzer:
 ```
 
 All file I/O happens in `service.py`, which downloads bytes from storage, passes them to the engine, then uploads the result back.
+
+### Arquitetura multi-formato (Strategy Pattern + profiles) — ADR-010
+
+O `PDFAnalyzer` é um **orquestrador**, não um parser monolítico. Cada um dos 5 eixos de extração é uma **estratégia plugável** com interface comum (`strategies/base.py`):
+
+| Eixo | ABC | Estratégias atuais |
+|------|-----|--------------------|
+| `sku` | `SkuStrategy` | `regex_hyphenated` (`\d{9,13}-\d`, Oasis), `regex_prefixed` (`Ref: 01010012`) |
+| `grade` | `GradeStrategy` | `alpha_range` (PP-GG…P-M; param `tolerate_spaces` p/ `P - GG`) |
+| `price` | `PriceStrategy` | `br_currency` (`R$ 3.488,00`), `labeled_dual` (`Atacado`/`Varejo`) |
+| `swatches` | `SwatchesStrategy` | `geometric_bottom` (retângulos vetoriais na zona inferior) |
+| `name` | `NameStrategy` | `positional_title` (maior peso tipográfico — **default novo**), `category_vocabulary` (vocabulário fixo, Oasis) |
+
+Cada estratégia é pura e testável em isolamento (input = região de texto/desenhos + params do profile; output = dataclass do eixo ou `None`). São auto-registradas num registry por eixo (`strategies/<eixo>/__init__.py`).
+
+**`BrandFormatProfile`** = arquivo JSON em `format_profiles/<id>.json`, validado contra `schema.json` (Draft 2020-12), que mapeia cada eixo → `{id, params}`. **Profiles têm nome de FORMATO, não de marca** — isto é um invariante: uma marca nova com o mesmo formato reusa o profile; não se cria `acme_default`. Profiles atuais:
+
+- **`hyphenated_single_price`** — SKU hifenizado + preço único BR + nome por vocabulário (ex.: catálogo Oasis MOTION). É o **default** (`server_default` de `brands.format_profile_id`, default do param `analyze()`, e fallback do `service`).
+- **`prefixed_dual_price`** — SKU `Ref:` prefixado + preço dual Atacado/Varejo + grade com espaços + nome por tipografia (ex.: catálogo FERLA que motivou a ADR-010).
+
+`brands.format_profile_id` (VARCHAR, ADR-010 D2) liga cada marca ao seu formato. `service.process_catalog` resolve o profile da brand e passa a `analyzer.analyze(pdf_bytes, profile_id=...)`. N marcas → 1 formato.
+
+**Como adicionar um profile novo:**
+1. Se o formato exige lógica nova de algum eixo, crie a estratégia em `strategies/<eixo>/<id>.py` (espelhe uma existente), registre-a via `register_<eixo>_strategy(...)` e importe-a no `strategies/<eixo>/__init__.py` (auto-discovery).
+2. Crie `format_profiles/<formato>.json` (id = filename, nome de formato) selecionando uma estratégia por eixo. O `id` deve casar `^[a-z][a-z0-9_]*$` (validado no schema **e** no `load_profile`, anti-path-traversal).
+3. Aponte a brand: `UPDATE brands SET format_profile_id='<formato>'` (ou via seed/admin).
+4. Adicione fixture sintética (pymupdf) + teste de integração. Rode o golden Oasis — diff-zero é o portão de não-regressão.
+
+> **Não-regressão Oasis:** `test_pdf_analyzer_regression.py` congela o `CatalogMetadata` do catálogo real sob `hyphenated_single_price` num golden file. Qualquer diff é portão de merge fechado até decisão do PMO. Nunca "ajuste" o golden para passar — investigue a regressão.
+
+### AnalyzerWarning (observabilidade não-bloqueante) — ADR-011
+
+Degradação local **não** levanta exceção nem aplica default silencioso. O orquestrador emite um `AnalyzerWarning` estruturado (`domain.py`) e persiste o campo correspondente como `None`. Só falhas globais bloqueiam.
+
+| Código | Severidade | Quando |
+|--------|-----------|--------|
+| `GRADE_NOT_DETECTED` | error | grade do produto não casou nenhuma estratégia |
+| `NAME_NOT_DETECTED` | warning | nome não extraído da zona |
+| `PRICE_NOT_DETECTED` | warning | preço não casou |
+| `SWATCHES_NOT_DETECTED` | info | nenhum swatch para o SKU |
+| `FIELDS_NOT_INJECTED_NO_GRADE` | warning | injector pulou o produto por falta de grade |
+
+**Bloqueiam (exceção, não warning):** `PDFNoProductsError`, `PDFCorruptError`, `PDFEncryptedError`. São falhas globais do documento, não degradação de um produto.
+
+Persistência (ADR-011 D5): a lista vai para `catalogs.warnings` (JSONB, migration `0008`) e é exposta no `GET /api/v1/catalogs/{id}`. `service.process_catalog` agrega warnings do analyzer + injector antes de persistir.
+
+> **Dívida técnica registrada (Fase E):** `bot_threshold_frac` (limiar da zona inferior usado p/ `bot_words` no orquestrador) ainda está acoplado ao `GeometricBottomSwatches.DEFAULT_THRESHOLD_FRAC` em vez de ser um parâmetro do profile. Decoupling para `params` do profile fica para sprint futura.
 
 ### AcroForm Field Naming Convention
 
@@ -184,7 +242,7 @@ Every API response follows this shape:
 
 - **Coverage minimum: 80%** (enforced in CI via `--cov-fail-under=80`).
 - **No SQLite in tests** — use `testcontainers` for real PostgreSQL. Mock only external services (S3 via moto, ERP via respx/httpx mock).
-- **Tests live inside each module** (`modules/catalog/tests/`, not `tests/unit/catalog/`), except integration and E2E tests which live at the root `tests/` level.
+- **Tests live inside each module** (`src/catalogflow/modules/catalog/tests/`, not `tests/unit/catalog/`), except integration and E2E tests which live at the root `tests/` level.
 - **Required test fixtures** — generate programmatically via `tests/fixtures/generate_fixtures.py` (committed as actual PDFs). Never commit real client PDFs (Oasis catalog) to the repo.
 - Test pyramid: unit (service + engine logic) → integration (full pipeline, real DB, mocked S3) → E2E (HTTP via httpx AsyncClient).
 - **Every bug fix gets a regression test.** No exceptions.
@@ -219,9 +277,13 @@ Every API response follows this shape:
 
 7. **PDF flattening detection.** When a filled PDF arrives without `/AcroForm` in the catalog dictionary, it's been flattened (printed-to-PDF). Return `error.code = "PDF_FLATTENED"`, not a generic 500.
 
-8. **SKU regex deve aceitar 9–13 dígitos antes do hífen.**
-   O catálogo Oasis MOTION contém SKUs com 9 dígitos (ex: `442500908-0`).
-   O padrão correto é `r"\b(\d{9,13}-\d)\b"` — não `\d{10}` ou `\d{10,13}`.
+8. **O formato de SKU é selecionado por profile, não é regra única.**
+   O regex `r"\b(\d{9,13}-\d)\b"` agora vive na estratégia `regex_hyphenated`
+   (profile `hyphenated_single_price`, Oasis) — 9 dígitos como `442500908-0`
+   exigem `\d{9,13}`, nunca `\d{10}`. Outros formatos usam outras estratégias
+   (ex.: `regex_prefixed` p/ `Ref: 01010012`). Para mudar a detecção de SKU
+   de uma marca, troque/ajuste a estratégia no profile dela — não hardcode um
+   regex no orquestrador.
 
 9. **Nunca hardcodar divisão de página para páginas multi-produto.**
    Usar `_assign_name_zones()` (ADR-007) para calcular zonas dinamicamente.

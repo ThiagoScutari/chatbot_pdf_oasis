@@ -1,0 +1,12 @@
+{
+  "id": "prefixed_dual_price",
+  "name": "Prefixed SKU + dual price (Ref: prefix, Atacado/Varejo, range grade)",
+  "version": "1.0.0",
+  "strategies": {
+    "sku":      { "id": "regex_prefixed",   "params": {} },
+    "grade":    { "id": "alpha_range",      "params": {"tolerate_spaces": true} },
+    "price":    { "id": "labeled_dual",     "params": {} },
+    "swatches": { "id": "geometric_bottom", "params": {} },
+    "name":     { "id": "positional_title", "params": {} }
+  }
+}

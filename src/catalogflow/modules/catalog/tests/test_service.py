@@ -1,3 +1,6 @@
+# mypy: disable-error-code="no-untyped-call"
+# ↑ pymupdf/fitz sem stubs; o helper que monta PDFs sintéticos usa
+# Document/Rect/tobytes, todos vistos como untyped pelo mypy.
 """Testes do `CatalogService` — com FakeStorage e dispatch_task mockado."""
 
 from __future__ import annotations
@@ -12,6 +15,10 @@ from tests.fakes import FakeStorage
 
 from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
+from catalogflow.modules.catalog.pdf_analyzer import (
+    CatalogMetadata,
+    ProductPageMeta,
+)
 from catalogflow.modules.catalog.service import (
     CatalogService,
     output_key_for,
@@ -403,6 +410,234 @@ class TestProcessCatalog:
 # ──────────────────────────────────────────────
 #  Helpers de chave
 # ──────────────────────────────────────────────
+
+
+# ──────────────────────────────────────────────
+#  ADR-011 — persistência de warnings + coerção de sizes
+# ──────────────────────────────────────────────
+
+
+def _make_product_pdf(*, include_grade: bool = True) -> bytes:
+    """Produto único sintético; grade ligável para forçar degradação."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((50, 800), "0442500941-0", fontsize=9)
+    page.insert_text((50, 810), "JAQUETA BERENICE", fontsize=9)
+    page.insert_text((50, 820), "R$ 100,00", fontsize=9)
+    if include_grade:
+        page.insert_text((50, 830), "PP-G", fontsize=9)
+    page.draw_rect(
+        pymupdf.Rect(300, 815, 320, 835),
+        color=(0.0, 0.0, 0.0),
+        fill=(0.3, 0.4, 0.5),
+    )
+    data: bytes = doc.tobytes()
+    doc.close()
+    return data
+
+
+async def _process_inline_pdf(
+    service: CatalogService,
+    db_session: AsyncSession,
+    brand: Brand,
+    pdf_bytes: bytes,
+) -> Catalog:
+    catalog, job = await service.create_catalog(
+        brand_id=brand.id,
+        name="x",
+        collection=None,
+        pdf_bytes=pdf_bytes,
+    )
+    await db_session.commit()
+    await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
+    await db_session.commit()
+    await db_session.refresh(catalog)
+    return catalog
+
+
+class TestProcessCatalogWarnings:
+    async def test_service_persists_empty_list_when_no_warnings(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _make_product_pdf(include_grade=True)
+        )
+        assert catalog.status == "ready"
+        assert catalog.warnings == []
+
+    async def test_service_persists_warnings_in_catalog_row(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        # Fixture sem preço → PRICE_NOT_DETECTED (warning do analyzer).
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _load("catalogo_1_produto_1_cor.pdf")
+        )
+        codes = {w["code"] for w in catalog.warnings}
+        assert "PRICE_NOT_DETECTED" in codes
+        # Shape serializado completo (6 chaves do AnalyzerWarning).
+        price_w = next(w for w in catalog.warnings if w["code"] == "PRICE_NOT_DETECTED")
+        assert set(price_w) == {
+            "code",
+            "severity",
+            "page_index",
+            "sku",
+            "message",
+            "detected_value",
+        }
+        assert price_w["severity"] == "warning"
+
+    async def test_service_combines_analyzer_and_injector_warnings(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        # Sem grade → GRADE_NOT_DETECTED (analyzer) + FIELDS_NOT_INJECTED_NO_GRADE (injector).
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _make_product_pdf(include_grade=False)
+        )
+        codes = {w["code"] for w in catalog.warnings}
+        assert "GRADE_NOT_DETECTED" in codes
+        assert "FIELDS_NOT_INJECTED_NO_GRADE" in codes
+
+    async def test_persist_products_coerces_none_sizes_to_empty_list(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        service = _build_service(db_session, fake_storage, dispatch)
+        catalog = await _process_inline_pdf(
+            service, db_session, brand, _make_product_pdf(include_grade=False)
+        )
+        stmt = select(CatalogProduct).where(CatalogProduct.catalog_id == catalog.id)
+        product = (await db_session.execute(stmt)).scalar_one()
+        # grade ausente persiste como NULL; sizes coage None -> [] (coluna NOT NULL).
+        assert product.grade is None
+        assert product.sizes == []
+
+
+# ──────────────────────────────────────────────
+#  ADR-010 D2 — wiring do format_profile_id da brand
+# ──────────────────────────────────────────────
+
+
+class _RecordingAnalyzer:
+    """Analyzer stub que registra o `profile_id` recebido.
+
+    Devolve um `CatalogMetadata` canônico (1 produto, grade ausente) para
+    que o pipeline complete independentemente do profile — o foco do teste
+    é apenas QUAL profile chega ao analyzer.
+    """
+
+    def __init__(self) -> None:
+        self.received_profile_id: str | None = None
+
+    def analyze(
+        self,
+        pdf_bytes: bytes,
+        profile_id: str = "hyphenated_single_price",
+    ) -> CatalogMetadata:
+        self.received_profile_id = profile_id
+        return CatalogMetadata(
+            n_pages=1,
+            n_product_pages=1,
+            product_pages=[
+                ProductPageMeta(
+                    sku="01010012",
+                    name="Camisa Polo",
+                    price=None,
+                    grade=None,
+                    sizes=None,
+                    n_colors=1,
+                    swatches=[],
+                    page_index=0,
+                    x_block_start=0.0,
+                    x_block_end=10.0,
+                    y_start=0.0,
+                    y_end=10.0,
+                    side="single",
+                    n_products_on_page=1,
+                ),
+            ],
+            warnings=[],
+        )
+
+
+class TestProcessCatalogProfileWiring:
+    async def test_process_catalog_uses_brand_format_profile(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        # Marca a brand com o profile do formato prefixado.
+        brand.format_profile_id = "prefixed_dual_price"
+        db_session.add(brand)
+        await db_session.commit()
+
+        recording = _RecordingAnalyzer()
+        service = CatalogService(
+            db_session,
+            storage=fake_storage,  # type: ignore[arg-type]
+            analyzer=recording,  # type: ignore[arg-type]
+            dispatch_task=dispatch,
+        )
+        catalog, job = await _seed_pending_catalog(
+            service, db_session, brand, "catalogo_1_produto_1_cor.pdf"
+        )
+
+        await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
+        await db_session.commit()
+
+        assert recording.received_profile_id == "prefixed_dual_price"
+
+    async def test_process_catalog_falls_back_to_default_profile_when_null(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        recording = _RecordingAnalyzer()
+        service = CatalogService(
+            db_session,
+            storage=fake_storage,  # type: ignore[arg-type]
+            analyzer=recording,  # type: ignore[arg-type]
+            dispatch_task=dispatch,
+        )
+        catalog, job = await _seed_pending_catalog(
+            service, db_session, brand, "catalogo_1_produto_1_cor.pdf"
+        )
+
+        # Simula o caso defensivo de scalar retornando None (brand sem
+        # profile resolvível). `db.scalar` só é usado pelo lookup do profile.
+        async def _none_scalar(*args: object, **kwargs: object) -> None:
+            return None
+
+        monkeypatch.setattr(db_session, "scalar", _none_scalar)
+
+        await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
+        await db_session.commit()
+
+        assert recording.received_profile_id == "hyphenated_single_price"
 
 
 class TestKeyHelpers:

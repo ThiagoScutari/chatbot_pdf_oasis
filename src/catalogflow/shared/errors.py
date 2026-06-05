@@ -126,3 +126,30 @@ class JobNotReadyError(DomainError):
 
     code = "NOT_READY"
     http_status = 409
+
+
+# ──────────────────────────────────────────────
+#  Erros de BrandFormatProfile (Sprint 08 / ADR-010)
+# ──────────────────────────────────────────────
+
+
+class BrandFormatProfileNotFoundError(DomainError):
+    """Profile referenciado não existe em `format_profiles/`.
+
+    Levantada em runtime quando `brand.format_profile_id` aponta para um
+    arquivo `<id>.json` ausente do diretório versionado em código.
+    """
+
+    code = "BRAND_FORMAT_PROFILE_NOT_FOUND"
+    http_status = 404
+
+
+class BrandFormatProfileInvalidError(DomainError):
+    """Profile existe mas é inválido (JSON malformado ou não conforme ao schema).
+
+    `details` carrega `profile_id` e — quando aplicável — `path` do erro de
+    schema e `message` original do validator, para diagnóstico operacional.
+    """
+
+    code = "BRAND_FORMAT_PROFILE_INVALID"
+    http_status = 400

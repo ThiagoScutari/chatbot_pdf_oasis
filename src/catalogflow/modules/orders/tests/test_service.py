@@ -115,7 +115,7 @@ async def _seed_catalog(
                 name=product.name,
                 price=Decimal("1388.00"),  # preço sintético — alimenta valor_total
                 grade=product.grade,
-                sizes=list(product.sizes),
+                sizes=list(product.sizes) if product.sizes is not None else [],
                 n_colors=product.n_colors,
                 swatches=[s.to_dict() for s in product.swatches],
                 page_index=product.page_index,

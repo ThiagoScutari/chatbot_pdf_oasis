@@ -1,0 +1,12 @@
+{
+  "id": "hyphenated_single_price",
+  "name": "Hyphenated SKU + single BR price (ex.: Oasis Resortwear)",
+  "version": "1.0.0",
+  "strategies": {
+    "sku":      { "id": "regex_hyphenated",    "params": {} },
+    "grade":    { "id": "alpha_range",         "params": {} },
+    "price":    { "id": "br_currency",         "params": {} },
+    "swatches": { "id": "geometric_bottom",    "params": {} },
+    "name":     { "id": "category_vocabulary", "params": {} }
+  }
+}

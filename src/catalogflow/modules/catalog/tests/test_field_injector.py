@@ -12,12 +12,20 @@ from pathlib import Path
 import pymupdf
 import pytest
 
+from catalogflow.modules.catalog.domain import (
+    FIELDS_NOT_INJECTED_NO_GRADE,
+    SEVERITY_ERROR,
+)
 from catalogflow.modules.catalog.field_injector import (
     FieldInjector,
     count_fields,
     field_name_for,
 )
-from catalogflow.modules.catalog.pdf_analyzer import PDFAnalyzer
+from catalogflow.modules.catalog.pdf_analyzer import (
+    CatalogMetadata,
+    PDFAnalyzer,
+    ProductPageMeta,
+)
 from catalogflow.shared.errors import PDFCorruptError, PDFEncryptedError
 
 FIXTURES_DIR = Path(__file__).resolve().parents[5] / "tests" / "fixtures"
@@ -91,7 +99,7 @@ class TestInjectOneProductOneColor:
     ) -> None:
         data = _load("catalogo_1_produto_1_cor.pdf")
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         widgets = _widgets(out)
         assert len(widgets) == 4
         names = {w.field_name for w in widgets}
@@ -111,7 +119,7 @@ class TestInjectOneProductTwoColors:
     ) -> None:
         data = _load("catalogo_1_produto_2_cores.pdf")
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         widgets = _widgets(out)
         assert len(widgets) == 8
         # Para cada tamanho, há 2 cores.
@@ -127,7 +135,7 @@ class TestInjectOneProductTwoColors:
     ) -> None:
         data = _load("catalogo_1_produto_2_cores.pdf")
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         widgets = _widgets(out)
         # Widgets numa mesma linha (cor) têm y interno aproximadamente igual; widgets de cores
         # diferentes têm faixas Y disjuntas. Validamos não-sobreposição entre faixas.
@@ -150,7 +158,7 @@ class TestInjectTwoProductsPerPage:
     ) -> None:
         data = _load("catalogo_2_produtos_pagina.pdf")
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         widgets = _widgets(out)
         names = {w.field_name for w in widgets}
         # Esquerdo PP-M: 3 widgets
@@ -177,7 +185,7 @@ class TestInjectTwoProductsPerPage:
 
         data = _load("catalogo_2_produtos_pagina.pdf")
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         widgets = _widgets(out)
 
         # Largura efetiva ≈ diferença entre x0 de cells adjacentes na mesma linha.
@@ -223,7 +231,7 @@ class TestFieldNamingConvention:
     ) -> None:
         data = _load(fixture)
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         widgets = _widgets(out)
         assert widgets, f"sem widgets em {fixture}"
         for w in widgets:
@@ -239,7 +247,7 @@ class TestFieldNamingConvention:
     ) -> None:
         data = _load(fixture)
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         widgets = _widgets(out)
         for w in widgets:
             assert w.field_type == pymupdf.PDF_WIDGET_TYPE_TEXT
@@ -252,7 +260,7 @@ class TestFieldNamingConvention:
     ) -> None:
         data = _load(fixture)
         meta = analyzer.analyze(data)
-        out = injector.inject(data, meta)
+        out, _ = injector.inject(data, meta)
         doc = pymupdf.open(stream=out, filetype="pdf")
         try:
             # `is_form_pdf` é True quando o catálogo /AcroForm tem campos.
@@ -306,3 +314,117 @@ class TestInvalidInput:
         meta = analyzer.analyze(_load("catalogo_1_produto_1_cor.pdf"))
         with pytest.raises(PDFEncryptedError):
             injector.inject(_load("pdf_criptografado.pdf"), meta)
+
+
+# ──────────────────────────────────────────────
+#  ADR-011 — resiliência a produtos sem grade/sizes
+# ──────────────────────────────────────────────
+
+
+def _blank_pdf(n_pages: int = 1) -> bytes:
+    """PDF mínimo válido (sem campos) só para alimentar `inject`."""
+    doc = pymupdf.open()
+    for _ in range(n_pages):
+        doc.new_page(width=595, height=842)
+    data: bytes = doc.tobytes()
+    doc.close()
+    return data
+
+
+def _product(
+    *,
+    sku: str,
+    grade: str | None,
+    sizes: list[str] | None,
+    page_index: int = 0,
+    n_colors: int = 1,
+) -> ProductPageMeta:
+    """`ProductPageMeta` sintético com geometria plausível para 1 produto."""
+    return ProductPageMeta(
+        sku=sku,
+        name="PRODUTO TESTE",
+        price=None,
+        grade=grade,
+        sizes=sizes,
+        n_colors=n_colors,
+        swatches=[],
+        page_index=page_index,
+        x_block_start=50.0,
+        x_block_end=200.0,
+        y_start=700.0,
+        y_end=760.0,
+        side="single",
+        n_products_on_page=1,
+    )
+
+
+def _meta(products: list[ProductPageMeta]) -> CatalogMetadata:
+    pages = len({p.page_index for p in products}) or 1
+    return CatalogMetadata(
+        n_pages=pages,
+        n_product_pages=pages,
+        product_pages=products,
+    )
+
+
+class TestInjectResilientToMissingGrade:
+    def test_inject_returns_tuple_with_bytes_and_warnings(self, injector: FieldInjector) -> None:
+        meta = _meta([_product(sku="0442500941-0", grade="PP-G", sizes=["PP", "P", "M", "G"])])
+        result = injector.inject(_blank_pdf(), meta)
+        assert isinstance(result, tuple)
+        out, warnings = result
+        assert isinstance(out, bytes)
+        assert isinstance(warnings, list)
+
+    def test_product_without_grade_emits_fields_not_injected_warning(
+        self, injector: FieldInjector
+    ) -> None:
+        meta = _meta([_product(sku="0442500941-0", grade=None, sizes=None)])
+        _out, warnings = injector.inject(_blank_pdf(), meta)
+        assert len(warnings) == 1
+        w = warnings[0]
+        assert w.code == FIELDS_NOT_INJECTED_NO_GRADE
+        assert w.severity == SEVERITY_ERROR
+        assert w.sku == "0442500941-0"
+        assert w.page_index == 0
+
+    def test_product_without_grade_is_skipped_in_injection(self, injector: FieldInjector) -> None:
+        meta = _meta([_product(sku="0442500941-0", grade=None, sizes=["PP", "P"])])
+        out, _warnings = injector.inject(_blank_pdf(), meta)
+        assert _widgets(out) == []
+
+    def test_product_without_sizes_is_also_skipped(self, injector: FieldInjector) -> None:
+        meta = _meta([_product(sku="0442500941-0", grade="PP-G", sizes=None)])
+        out, warnings = injector.inject(_blank_pdf(), meta)
+        assert _widgets(out) == []
+        assert warnings[0].code == FIELDS_NOT_INJECTED_NO_GRADE
+
+    def test_products_with_grade_are_processed_normally(self, injector: FieldInjector) -> None:
+        meta = _meta([_product(sku="0442500941-0", grade="PP-G", sizes=["PP", "P", "M", "G"])])
+        out, warnings = injector.inject(_blank_pdf(), meta)
+        assert warnings == []
+        assert len(_widgets(out)) == 4
+
+    def test_multiple_products_without_grade_emit_one_warning_each(
+        self, injector: FieldInjector
+    ) -> None:
+        meta = _meta(
+            [
+                _product(sku="0442500941-0", grade=None, sizes=None, page_index=0),
+                _product(sku="0322500004-0", grade=None, sizes=None, page_index=1),
+            ],
+        )
+        _out, warnings = injector.inject(_blank_pdf(n_pages=2), meta)
+        assert len(warnings) == 2
+        assert {w.sku for w in warnings} == {"0442500941-0", "0322500004-0"}
+        assert all(w.code == FIELDS_NOT_INJECTED_NO_GRADE for w in warnings)
+
+    def test_count_fields_skips_products_without_grade_or_sizes(self) -> None:
+        meta = _meta(
+            [
+                _product(sku="A-0", grade="PP-G", sizes=["PP", "P", "M", "G"]),  # 4
+                _product(sku="B-0", grade=None, sizes=None, page_index=1),  # 0
+                _product(sku="C-0", grade="PP-G", sizes=None, page_index=2),  # 0
+            ],
+        )
+        assert count_fields(meta) == 4
