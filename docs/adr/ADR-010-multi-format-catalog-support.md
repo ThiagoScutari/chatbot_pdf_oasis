@@ -1,6 +1,6 @@
 # ADR-010 — Suporte a catálogos multi-formato via Strategy Pattern e BrandFormatProfile
 
-**Status:** Proposed (revisão 2 — D3 movida para ADR-011)
+**Status:** Accepted (revisão 2 — D3 movida para ADR-011; implementada na Sprint 08, Fases A–E)
 **Data:** 2026-06-01
 **Sprint alvo:** a definir no PRD da sprint correspondente
 **Relacionada:** ADR-011 (warnings estruturados — pressuposta por esta ADR)
@@ -101,7 +101,7 @@ JSON em `catalogflow/modules/catalog/format_profiles/<id>.json`, validado contra
 
 ```json
 {
-  "id": "oasis_default",
+  "id": "hyphenated_single_price",
   "name": "Oasis Resortwear (default)",
   "version": "1.0.0",
   "strategies": {
@@ -123,8 +123,8 @@ JSON em `catalogflow/modules/catalog/format_profiles/<id>.json`, validado contra
 
 **Profiles iniciais:**
 
-- `oasis_default` — porta direta do comportamento atual sobre o catálogo Oasis MOTION, comportamento idêntico
-- `ferla_like` — suporte a SKU prefixado, grade com espaços, preço dual
+- `hyphenated_single_price` — porta direta do comportamento atual sobre o catálogo Oasis MOTION, comportamento idêntico
+- `prefixed_dual_price` — suporte a SKU prefixado, grade com espaços, preço dual
 
 ### D3 — Nome extraído por posição e tipografia (não vocabulário)
 
@@ -164,15 +164,15 @@ restringir o nome a categorias conhecidas — opt-in via profile.
 ### Operacionais (banco e CI)
 
 - **Migration Alembic:** `ALTER TABLE brands ADD COLUMN format_profile_id
-  VARCHAR(64) NOT NULL DEFAULT 'oasis_default';`. Todas as brands existentes
+  VARCHAR(64) NOT NULL DEFAULT 'hyphenated_single_price';`. Todas as brands existentes
   herdam o profile Oasis automaticamente — comportamento de processamento
   preservado bit-a-bit.
 - **Suite de regressão obrigatória no CI:** fixture `catalogo_real_oasis.pdf`
-  processado com profile `oasis_motion` deve produzir `CatalogMetadata`
+  processado com profile `hyphenated_single_price` deve produzir `CatalogMetadata`
   byte-a-byte idêntico ao comportamento de `main`. Diff = portão de merge.
-- **Nova fixture:** `catalogo_ferla_like_sintetico.pdf` (gerado a partir do PDF
+- **Nova fixture:** `catalogo_prefixed_dual_price.pdf` (gerado a partir do PDF
   FERLA exploratório, ou sinteticamente). Suite de teste do profile
-  `ferla_like`.
+  `prefixed_dual_price`.
 
 ---
 
@@ -220,10 +220,10 @@ A implementação desta ADR está completa quando:
 
 - [ ] `PDFAnalyzer.analyze(pdf_bytes, profile_id: str)` aceita o parâmetro de
       profile (default vindo da brand do contexto)
-- [ ] O profile `oasis_default` produz `CatalogMetadata` byte-a-byte idêntico ao
+- [ ] O profile `hyphenated_single_price` produz `CatalogMetadata` byte-a-byte idêntico ao
       comportamento atual sobre `catalogo_real_oasis.pdf` (presumindo ADR-011
       implementada — emitir warnings de degradação não conta como diff)
-- [ ] O profile `ferla_like` processa o catálogo FERLA exploratório com ≥ 5 dos
+- [ ] O profile `prefixed_dual_price` processa o catálogo FERLA exploratório com ≥ 5 dos
       7 produtos detectados, todos com SKU e grade corretos
 - [ ] Cobertura de teste por estratégia ≥ 90% (testes puros sem PDF)
 - [ ] Cobertura de teste integrada do pipeline ≥ 80% (com fixture PDF)

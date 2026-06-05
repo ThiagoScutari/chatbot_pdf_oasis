@@ -66,7 +66,7 @@ A Sprint 08 implementa as 4 decisões coordenadas da ADR-010:
 - **Exposição API:** campo `warnings` adicionado ao response existente de
   `GET /api/v1/catalogs/{id}` (sem novo endpoint)
 - **Suite de regressão** byte-a-byte sobre fixture Oasis
-- **Fixture FERLA sintética via ReportLab**
+- **Fixture FERLA sintética via pymupdf** (revisto Fase D/E — não ReportLab)
 - **Documentação:** atualização de `CLAUDE.md`, `README.md`, entrada em
   `CHANGELOG.md`
 
@@ -130,8 +130,8 @@ catalogflow/modules/catalog/
     │   └── test_name_strategies.py
     └── fixtures/
         ├── catalogo_real_oasis.pdf       # .gitignore, baseline regressão
-        ├── catalogo_ferla_like.pdf       # fixture sintética FERLA-like (gerada por ReportLab)
-        ├── _ferla_fixture_builder.py     # script de geração da fixture
+        ├── catalogo_prefixed_dual_price.pdf  # fixture sintética (gerada por pymupdf)
+        ├── generate_prefixed_catalog_fixtures.py  # script de geração da fixture
         └── catalog_metadata_oasis_golden.json  # golden file para regressão
 ```
 
@@ -141,11 +141,11 @@ Duas migrations sequenciais. **Ambas reversíveis** (`alembic downgrade -1`
 testado no CI).
 
 ```sql
--- migration 08-01: brand format profile reference
+-- migration 0009: brand format profile reference
 ALTER TABLE brands
     ADD COLUMN format_profile_id VARCHAR(64) NOT NULL DEFAULT 'oasis_default';
 
--- migration 08-02: catalog warnings
+-- migration 0008: catalog warnings
 ALTER TABLE catalogs
     ADD COLUMN warnings JSONB DEFAULT '[]';
 ```
@@ -275,7 +275,7 @@ serializado entre `main` e o branch.
   - `price=None` agora gera warning
 - Tratamento downstream em `field_injector.py`: produto sem grade → não injeta
   campos + warning `FIELDS_NOT_INJECTED_NO_GRADE`
-- Migration Alembic 08-02 (`catalogs.warnings JSONB`)
+- Migration Alembic 0008 (`catalogs.warnings JSONB`)
 - `catalog/service.py` persiste warnings em `catalogs.warnings`
 - `catalog/schemas.py` adiciona `warnings` no response de `GET /catalogs/{id}`
 - Testes unitários para cada código de warning
@@ -292,11 +292,12 @@ testes cobrem cenários com fallback.
 - `name/positional_title.py` (extração por `font_size` + bold)
 - Opção `tolerate_spaces` em `grade/alpha_range.py`
 - Profile `format_profiles/ferla_like.json`
-- Migration Alembic 08-01 (`brands.format_profile_id`)
-- Adicionar `reportlab` como dependência de desenvolvimento em `pyproject.toml`
-  (group `dev`)
-- Script `tests/fixtures/_ferla_fixture_builder.py` gera
-  `catalogo_ferla_like.pdf` no setup do teste
+- Migration Alembic 0009 (`brands.format_profile_id`)
+- (Revisto na Fase D/E: a fixture é gerada via **pymupdf** — já dependência
+  core do projeto — não ReportLab; nenhuma dependência nova é adicionada ao
+  `pyproject.toml`.)
+- Script `tests/fixtures/generate_prefixed_catalog_fixtures.py` gera
+  `catalogo_prefixed_dual_price.pdf` (commitado como fixture fixa)
 - Testes unitários das novas estratégias
 - Teste integrado: profile `ferla_like` processa fixture FERLA com ≥ 5 dos 7
   produtos detectados, todos com SKU e grade corretos
@@ -344,7 +345,7 @@ estiverem verdes:
 - [ ] `mypy --strict` verde
 - [ ] `pip-audit` sem vulnerabilidades novas
 - [ ] `pre-commit run --all-files` verde
-- [ ] Migration `08-01` e `08-02` aplicadas e revertidas com sucesso em
+- [ ] Migration `0009` e `0008` aplicadas e revertidas com sucesso em
       ambiente local
 - [ ] CI no GitHub Actions verde no último push
 - [ ] CLAUDE.md, README.md, spec.md, CHANGELOG.md atualizados
@@ -360,7 +361,7 @@ As três pendências da versão Draft foram aprovadas pelo PMO em 2026-06-01:
 | # | Pergunta | Decisão |
 |---|---|---|
 | 7.1 | Exposição de warnings via API | **A — adicionar campo `warnings` ao response existente** de `GET /api/v1/catalogs/{id}`. Campo opcional, default `[]`, sem breaking change. Sem endpoint dedicado. |
-| 7.2 | Fixture FERLA — sintética ou real | **A — fixture sintética via ReportLab.** `reportlab` entra como dependência de desenvolvimento. Script `_ferla_fixture_builder.py` gera o PDF reproduzindo os padrões textuais e tipográficos do FERLA real. |
+| 7.2 | Fixture FERLA — sintética ou real | **A — fixture sintética.** (Revisto Fase D/E: gerada via **pymupdf** — já dependência core — não ReportLab; sem dependência nova.) Script `generate_prefixed_catalog_fixtures.py` gera o PDF reproduzindo os padrões textuais e tipográficos do formato prefixado (observado no catálogo FERLA real). |
 | 7.3 | Nome do profile default da Oasis | **`oasis_default`** (id no profile JSON, valor em `brand.format_profile_id`). Nome legível no JSON: `"Oasis Resortwear (default)"`. Profile é por marca, não por coleção — uma futura coleção que mude o formato ganha profile próprio. |
 
 ---
@@ -383,8 +384,8 @@ As três pendências da versão Draft foram aprovadas pelo PMO em 2026-06-01:
   Disponibilizado via secret no CI.
 - `catalog_metadata_oasis_golden.json` — **commitado**. Atualizado apenas via
   PR explícito com aprovação do PMO.
-- `catalogo_ferla_like.pdf` — **gerado via ReportLab** pelo script
-  `_ferla_fixture_builder.py` em `tests/fixtures/`. O script é commitado; o
+- `catalogo_prefixed_dual_price.pdf` — **gerado via pymupdf** pelo script
+  `generate_prefixed_catalog_fixtures.py` em `tests/fixtures/`. O script é commitado; o
   PDF gerado pode ser commitado (estável) ou regerado em CI (decisão técnica
   na Fase D — preferência por commitar para evitar não-determinismo).
 
@@ -400,8 +401,8 @@ As três pendências da versão Draft foram aprovadas pelo PMO em 2026-06-01:
 
 **Em ambiente local / staging:**
 ```bash
-alembic downgrade -1   # reverte migration 08-02
-alembic downgrade -1   # reverte migration 08-01
+alembic downgrade -1   # reverte migration 0008
+alembic downgrade -1   # reverte migration 0009
 git checkout main
 ```
 
@@ -433,7 +434,7 @@ O job marca como `failed` com código claro. Operador é notificado.
 | Performance degrada com múltiplas estratégias | Baixa | Médio | Benchmark antes/depois (script em `scripts/`) |
 | Fixture FERLA sintética não reflete catálogo real | Média | Médio | Validação manual com PDF original durante Fase D |
 | `field_injector.py` quebra com `grade=None` | Alta | Alto | Cobertura específica na Fase C com produto sem grade |
-| ReportLab gera PDF não-determinístico entre execuções | Média | Médio | Definir seed/timestamp fixo no `_ferla_fixture_builder.py`; commit do PDF gerado |
+| pymupdf gera PDF não-determinístico entre execuções (timestamp) | Baixa | Baixo | Fixture commitada como arquivo fixo; testes checam conteúdo extraído, não bytes do PDF (resolvido na Fase D) |
 | Path traversal acidental via `profile_id` controlado por admin | Baixa | Médio | Hardening na Fase E: validar `profile_id` contra `^[a-z][a-z0-9_]*$` antes de construir path |
 
 ---

@@ -1,6 +1,6 @@
 # ADR-011 — `AnalyzerWarning` como observabilidade não-bloqueante para degradações do pipeline de catálogo
 
-**Status:** Proposed
+**Status:** Accepted (implementada na Sprint 08, Fases C–E)
 **Data:** 2026-06-01
 **Sprint alvo:** 08 (Fase C)
 **Substitui:** —
@@ -131,7 +131,7 @@ sem mudança neles. Constantes `DEFAULT_GRADE` e `DEFAULT_SIZES` no
 ### D5 — Persistência e exposição
 
 **Banco:** coluna nova `catalogs.warnings JSONB DEFAULT '[]'` (migration
-Alembic 08-02, planejada na ADR-010). Persiste a lista serializada de
+Alembic 0008, planejada na ADR-010). Persiste a lista serializada de
 warnings por catálogo processado.
 
 **API:** o response existente de `GET /api/v1/catalogs/{id}` ganha campo
@@ -196,7 +196,7 @@ breaking change para clientes existentes.
 
 ### Operacionais (banco, CI, downstream)
 
-- **Migration Alembic 08-02:** `ALTER TABLE catalogs ADD COLUMN warnings
+- **Migration Alembic 0008:** `ALTER TABLE catalogs ADD COLUMN warnings
   JSONB DEFAULT '[]';`. Reversível via `alembic downgrade`. Catálogos
   existentes herdam `[]` automaticamente.
 - **Re-geração do golden file** ao incluir `warnings: []` na serialização.
@@ -265,7 +265,7 @@ A implementação desta ADR está completa quando:
       adequados, com `severity`, `page_index` e `sku` corretos
 - [ ] `field_injector.py` tolera `grade=None` / `sizes=None`, não injeta
       campos quando ausentes, e emite `FIELDS_NOT_INJECTED_NO_GRADE`
-- [ ] Migration Alembic `08-02` aplica `catalogs.warnings JSONB DEFAULT '[]'`
+- [ ] Migration Alembic `0008` aplica `catalogs.warnings JSONB DEFAULT '[]'`
       e é reversível (`alembic downgrade -1` funciona)
 - [ ] `catalog/service.py` persiste a lista de warnings em
       `catalogs.warnings`
