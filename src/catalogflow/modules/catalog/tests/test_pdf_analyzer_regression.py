@@ -88,10 +88,10 @@ def _serialize_metadata(m: CatalogMetadata) -> dict[str, Any]:
     not PDF_PATH.is_file(),
     reason=f"Oasis fixture indisponível em {PDF_PATH}; rodar localmente requer o PDF do cliente.",
 )
-def test_oasis_default_profile_matches_golden() -> None:
+def test_hyphenated_single_price_profile_matches_golden() -> None:
     pdf_bytes = PDF_PATH.read_bytes()
 
-    metadata = PDFAnalyzer().analyze(pdf_bytes, profile_id="oasis_default")
+    metadata = PDFAnalyzer().analyze(pdf_bytes, profile_id="hyphenated_single_price")
 
     actual = _serialize_metadata(metadata)
     expected = json.loads(GOLDEN_PATH.read_text(encoding="utf-8"))

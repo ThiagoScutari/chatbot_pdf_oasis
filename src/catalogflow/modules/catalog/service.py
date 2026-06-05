@@ -229,12 +229,13 @@ class CatalogService:
 
             # ── Resolve o `format_profile_id` da brand (ADR-010 D2). Query
             # enxuta: só a coluna, não a Brand inteira. Fallback defensivo
-            # para `oasis_default` (não deveria ocorrer — coluna NOT NULL
-            # com server_default — mas cobre brand ausente/null teórico).
+            # para `hyphenated_single_price` (não deveria ocorrer — coluna
+            # NOT NULL com server_default — mas cobre brand ausente/null
+            # teórico).
             profile_id = await self.db.scalar(
                 select(Brand.format_profile_id).where(Brand.id == catalog.brand_id),
             )
-            profile_id = profile_id or "oasis_default"
+            profile_id = profile_id or "hyphenated_single_price"
 
             # ── Análise: SKUs, preços, swatches, nome — via profile da brand.
             metadata = self.analyzer.analyze(pdf_bytes, profile_id=profile_id)

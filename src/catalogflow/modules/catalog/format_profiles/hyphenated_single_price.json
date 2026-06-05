@@ -1,6 +1,6 @@
 {
-  "id": "oasis_default",
-  "name": "Oasis Resortwear (default)",
+  "id": "hyphenated_single_price",
+  "name": "Hyphenated SKU + single BR price (ex.: Oasis Resortwear)",
   "version": "1.0.0",
   "strategies": {
     "sku":      { "id": "regex_hyphenated",    "params": {} },

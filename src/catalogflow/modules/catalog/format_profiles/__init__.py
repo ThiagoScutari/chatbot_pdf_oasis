@@ -7,8 +7,8 @@ cacheado por id durante o lifetime do processo — profiles são imutáveis
 em runtime; mudanças exigem deploy.
 
 A Fase A entrega apenas o loader, o schema e a dataclass. Os JSONs
-`oasis_default.json` e `prefixed_dual_price.json` chegam na Fase B e na
-Fase D.
+`hyphenated_single_price.json` e `prefixed_dual_price.json` chegam na
+Fase B e na Fase D.
 """
 
 from __future__ import annotations

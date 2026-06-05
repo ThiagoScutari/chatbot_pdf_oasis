@@ -257,12 +257,15 @@ def test_prefixed_dual_price_selects_expected_strategies() -> None:
     assert profile.strategies["name"]["id"] == "positional_title"
 
 
-def test_oasis_default_profile_loads() -> None:
-    """Regressão: o `oasis_default.json` real continua válido."""
-    load_profile.cache_clear()
-    profile = load_profile("oasis_default")
+def test_hyphenated_single_price_profile_loads() -> None:
+    """Regressão: o `hyphenated_single_price.json` real continua válido.
 
-    assert profile.id == "oasis_default"
+    Este é o profile default da Oasis (SKU hifenizado + preço único BR).
+    """
+    load_profile.cache_clear()
+    profile = load_profile("hyphenated_single_price")
+
+    assert profile.id == "hyphenated_single_price"
     assert profile.strategies["name"]["id"] == "category_vocabulary"
 
 
@@ -301,6 +304,6 @@ def test_load_profile_rejects_empty_string() -> None:
 def test_load_profile_accepts_valid_ids() -> None:
     """Os profiles reais (ids válidos) carregam sem erro de validação."""
     load_profile.cache_clear()
-    for valid_id in ("oasis_default", "prefixed_dual_price"):
+    for valid_id in ("hyphenated_single_price", "prefixed_dual_price"):
         profile = load_profile(valid_id)
         assert profile.id == valid_id

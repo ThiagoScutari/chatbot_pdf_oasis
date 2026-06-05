@@ -140,11 +140,11 @@ class TestWarningsBaseline:
         meta = CatalogMetadata(n_pages=1, n_product_pages=1)
         assert meta.warnings == []
 
-    def test_analyze_default_profile_id_is_oasis_default(self) -> None:
+    def test_analyze_default_profile_id_is_hyphenated_single_price(self) -> None:
         import inspect
 
         sig = inspect.signature(PDFAnalyzer.analyze)
-        assert sig.parameters["profile_id"].default == "oasis_default"
+        assert sig.parameters["profile_id"].default == "hyphenated_single_price"
 
 
 class TestNoProducts:

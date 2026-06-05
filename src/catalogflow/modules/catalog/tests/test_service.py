@@ -551,7 +551,7 @@ class _RecordingAnalyzer:
     def analyze(
         self,
         pdf_bytes: bytes,
-        profile_id: str = "oasis_default",
+        profile_id: str = "hyphenated_single_price",
     ) -> CatalogMetadata:
         self.received_profile_id = profile_id
         return CatalogMetadata(
@@ -608,7 +608,7 @@ class TestProcessCatalogProfileWiring:
 
         assert recording.received_profile_id == "prefixed_dual_price"
 
-    async def test_process_catalog_falls_back_to_oasis_default_when_null(
+    async def test_process_catalog_falls_back_to_default_profile_when_null(
         self,
         db_session: AsyncSession,
         fake_storage: FakeStorage,
@@ -637,7 +637,7 @@ class TestProcessCatalogProfileWiring:
         await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
         await db_session.commit()
 
-        assert recording.received_profile_id == "oasis_default"
+        assert recording.received_profile_id == "hyphenated_single_price"
 
 
 class TestKeyHelpers:

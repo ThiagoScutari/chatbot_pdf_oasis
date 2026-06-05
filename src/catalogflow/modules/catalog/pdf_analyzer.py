@@ -9,8 +9,8 @@ que delega cada eixo de extração (SKU, grade, preço, swatches, nome)
 para uma estratégia plugável selecionada por `BrandFormatProfile`.
 
 Comportamento preservado bit-a-bit sobre o catálogo Oasis MOTION em
-modo `profile_id="oasis_default"` — coberto pela suite de regressão
-golden file `tests/test_pdf_analyzer_regression.py`.
+modo `profile_id="hyphenated_single_price"` — coberto pela suite de
+regressão golden file `tests/test_pdf_analyzer_regression.py`.
 
 Helpers ainda no analyzer:
     - `_open_pymupdf`: instancia `pymupdf.Document` a partir de bytes.
@@ -150,7 +150,7 @@ class PDFAnalyzer:
     def analyze(
         self,
         pdf_bytes: bytes,
-        profile_id: str = "oasis_default",
+        profile_id: str = "hyphenated_single_price",
     ) -> CatalogMetadata:
         """Analisa o PDF e retorna o metadado completo do catálogo.
 

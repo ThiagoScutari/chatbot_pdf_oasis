@@ -3,7 +3,8 @@
 
 Estratégia de teste (decisão da Fase C): em vez de registrar estratégias
 fake, construímos PDFs sintéticos que disparam as degradações reais sob
-o profile `oasis_default`. Assim exercitamos o caminho `None` das
+o profile default (`hyphenated_single_price`). Assim exercitamos o
+caminho `None` das
 estratégias reais (grade/name/price/swatches) **junto** com a emissão de
 warning do orquestrador — mais fiel que mockar os registries.
 

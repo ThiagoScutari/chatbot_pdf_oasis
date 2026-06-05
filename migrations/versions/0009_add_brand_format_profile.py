@@ -5,10 +5,14 @@ Revises: 0008_catalogs_warnings
 Create Date: 2026-06-01 00:00:00.000000
 
 Adiciona `format_profile_id` (VARCHAR(64), NOT NULL, default
-`'oasis_default'`) em `brands`. Cada brand passa a referenciar o
-`BrandFormatProfile` usado pelo `PDFAnalyzer`. Brands existentes (incl.
-Oasis em produção) herdam `oasis_default` automaticamente — processamento
-preservado bit-a-bit.
+`'hyphenated_single_price'`) em `brands`. Cada brand passa a referenciar
+o `BrandFormatProfile` usado pelo `PDFAnalyzer`. Brands existentes (incl.
+Oasis em produção) herdam `hyphenated_single_price` automaticamente —
+processamento preservado bit-a-bit.
+
+Nota (Fase E): esta migration foi editada in-place para o novo nome de
+profile. Seguro porque a `0009` nunca foi aplicada a nenhum banco real
+(não está em `main`); não é uma migration de dados.
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ def upgrade() -> None:
             "format_profile_id",
             sa.String(length=64),
             nullable=False,
-            server_default=sa.text("'oasis_default'"),
+            server_default=sa.text("'hyphenated_single_price'"),
         ),
     )
 

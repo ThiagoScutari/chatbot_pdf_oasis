@@ -43,12 +43,13 @@ class Brand(Base):
         server_default=text("'starter'"),
     )
     # Aponta para o `BrandFormatProfile` (JSON versionado em código) usado
-    # pelo `PDFAnalyzer` (ADR-010 D2). Brands existentes herdam
-    # `oasis_default` via server_default — comportamento Oasis preservado.
+    # pelo `PDFAnalyzer` (ADR-010 D2). Profiles têm nome de FORMATO, não de
+    # marca. Brands existentes herdam `hyphenated_single_price` via
+    # server_default — comportamento Oasis preservado.
     format_profile_id: Mapped[str] = mapped_column(
         String(64),
         nullable=False,
-        server_default=text("'oasis_default'"),
+        server_default=text("'hyphenated_single_price'"),
     )
     logo_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
