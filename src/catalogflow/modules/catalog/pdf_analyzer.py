@@ -231,8 +231,14 @@ class PDFAnalyzer:
                     words = page_p.extract_words(extra_attrs=["size", "fontname"])
                     threshold = ctx.page_height * bot_threshold_frac
                     bot_words = [w for w in words if float(w["top"]) > threshold]
-                    if not bot_words:
-                        continue
+                    # NÃO descartar a página por causa de `bot_words` vazio. O
+                    # gatekeeper de página-de-produto é o SKU (já detectado
+                    # acima). `bot_words` serve apenas ao bounding box do painel
+                    # de pedido; quando vazio (layouts sem texto no rodapé, ex.:
+                    # FERLA), as coordenadas vêm da zona Voronoi do SKU (ver
+                    # fallback abaixo). Antes, um `continue` aqui descartava a
+                    # página inteira sob a premissa de layout Oasis (legenda de
+                    # swatch no rodapé), causando PDF_NO_PRODUCTS no FERLA.
 
                     sorted_skus = sorted(sku_rects, key=lambda item: item[1].x0)
                     n = len(sorted_skus)
@@ -327,13 +333,22 @@ class PDFAnalyzer:
                             for w in bot_words
                             if float(w["x0"]) >= zone.x0 and float(w["x1"]) <= zone.x1
                         ]
-                        if not subset:
-                            continue
-
-                        xs = [float(w["x0"]) for w in subset]
-                        xe = [float(w["x1"]) for w in subset]
-                        ys = [float(w["top"]) for w in subset]
-                        ye = [float(w["bottom"]) for w in subset]
+                        if subset:
+                            xs = [float(w["x0"]) for w in subset]
+                            xe = [float(w["x1"]) for w in subset]
+                            ys = [float(w["top"]) for w in subset]
+                            ye = [float(w["bottom"]) for w in subset]
+                            x_block_start, x_block_end = min(xs), max(xe)
+                            y_start, y_end = min(ys), max(ye)
+                        else:
+                            # Fallback (layouts sem texto no rodapé, ex.: FERLA):
+                            # usa a zona Voronoi do SKU como referência do painel
+                            # de pedido. O produto NÃO é descartado — o SKU já
+                            # provou que a página é de produto. Para o Oasis
+                            # `subset` nunca é vazio (texto no rodapé), então
+                            # este branch não roda e o golden mantém diff-zero.
+                            x_block_start, x_block_end = float(zone.x0), float(zone.x1)
+                            y_start, y_end = float(zone.y0), float(zone.y1)
 
                         if n == 1:
                             side = "single"
@@ -365,10 +380,10 @@ class PDFAnalyzer:
                                 n_colors=n_colors,
                                 swatches=swatches_legacy,
                                 page_index=idx,
-                                x_block_start=min(xs),
-                                x_block_end=max(xe),
-                                y_start=min(ys),
-                                y_end=max(ye),
+                                x_block_start=x_block_start,
+                                x_block_end=x_block_end,
+                                y_start=y_start,
+                                y_end=y_end,
                                 side=side,
                                 n_products_on_page=n,
                             ),
