@@ -118,5 +118,59 @@ def test_returns_none_when_pattern_matches_but_size_map_does_not() -> None:
     assert result is None
 
 
+# ──────────────────────────────────────────────
+#  Fase D — tolerate_spaces (FERLA: "P - GG")
+# ──────────────────────────────────────────────
+
+
+def test_tolerate_spaces_detects_spaced_grade() -> None:
+    result = AlphaRangeGrade().extract(
+        _zctx("Grade: P - GG"),
+        {"tolerate_spaces": True},
+    )
+
+    assert result is not None
+    assert result.sizes == ("P", "M", "G", "GG")
+
+
+def test_tolerate_spaces_normalizes_label() -> None:
+    """O label devolvido é normalizado para `P-GG` (sem espaços)."""
+    result = AlphaRangeGrade().extract(
+        _zctx("Grade: P - GG"),
+        {"tolerate_spaces": True},
+    )
+
+    assert result is not None
+    assert result.grade == "P-GG"
+
+
+def test_tolerate_spaces_also_matches_compact_grade() -> None:
+    """Com `tolerate_spaces=True`, a forma sem espaços continua casando."""
+    result = AlphaRangeGrade().extract(
+        _zctx("BLUSA PP-GG"),
+        {"tolerate_spaces": True},
+    )
+
+    assert result is not None
+    assert result.grade == "PP-GG"
+    assert result.sizes == ("PP", "P", "M", "G", "GG")
+
+
+def test_default_false_rejects_spaced_grade() -> None:
+    """Sem o param (default False), `P - GG` com espaços não casa."""
+    result = AlphaRangeGrade().extract(_zctx("Grade: P - GG"), {})
+
+    assert result is None
+
+
+def test_default_false_behavior_unchanged() -> None:
+    """Regressão: caminho default (False) é idêntico ao histórico Oasis."""
+    result = AlphaRangeGrade().extract(_zctx("VESTIDO MIA PP-GG R$ 299,00"), {})
+
+    assert result is not None
+    assert result.grade == "PP-GG"
+    assert result.sizes == ("PP", "P", "M", "G", "GG")
+
+
 def _unused_marker(_: Any) -> None:
     """Marcador para suprimir ruff F811 do parâmetro Any importado."""

@@ -32,4 +32,7 @@ def get_price_strategy(name: str) -> type[PriceStrategy]:
 
 
 # Auto-discovery das estratégias concretas (ver nota em sku/__init__.py).
-from catalogflow.modules.catalog.strategies.price import br_currency  # noqa: E402, F401
+from catalogflow.modules.catalog.strategies.price import (  # noqa: E402, F401
+    br_currency,
+    labeled_dual,
+)

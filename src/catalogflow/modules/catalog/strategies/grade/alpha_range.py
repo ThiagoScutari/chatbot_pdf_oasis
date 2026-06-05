@@ -4,9 +4,10 @@ Porta do `GRADE_RE` + `SIZE_MAP` históricos do `PDFAnalyzer` (ADR-010,
 Sprint 08 Fase B). Mesmas faixas suportadas, mesmas expansões de
 tamanhos.
 
-Observação: o parâmetro `tolerate_spaces` (para casar `P - GG` com
-espaços ao redor do hífen, padrão FERLA) **não** entra nesta fase.
-Será adicionado na Fase D conforme PRD.
+Parâmetro `tolerate_spaces` (Fase D): quando `True`, o regex aceita
+espaços ao redor do hífen (`P - GG`, padrão FERLA) e o label detectado é
+normalizado para a forma sem espaços (`P-GG`) antes do lookup no
+`SIZE_MAP`. Default `False` preserva o comportamento Oasis bit-a-bit.
 """
 
 from __future__ import annotations
@@ -55,12 +56,25 @@ class AlphaRangeGrade(GradeStrategy):
         params: dict[str, Any],
     ) -> GradeMatch | None:
         patterns: tuple[str, ...] = tuple(params.get("patterns", self.DEFAULT_PATTERNS))
-        regex = re.compile(r"\b(" + "|".join(re.escape(p) for p in patterns) + r")\b")
+        tolerate_spaces = bool(params.get("tolerate_spaces", False))
+
+        if tolerate_spaces:
+            # "P-GG" → "P\s*-\s*GG" para casar "P - GG" (padrão FERLA).
+            alts = "|".join(re.escape(p).replace(r"\-", r"\s*-\s*") for p in patterns)
+        else:
+            alts = "|".join(re.escape(p) for p in patterns)
+        regex = re.compile(r"\b(" + alts + r")\b")
 
         match = regex.search(zctx.zone_text)
         if match is None:
             return None
-        grade = match.group(1)
+        # Normaliza o label removendo espaços ao redor do hífen para o
+        # lookup no SIZE_MAP e consistência com o Oasis (`P-GG`, não
+        # `P - GG`). Com `tolerate_spaces=False` o `grade_raw` já vem sem
+        # espaços, então a normalização é no-op — comportamento idêntico
+        # ao anterior (golden diff-zero).
+        grade_raw = match.group(1)
+        grade = re.sub(r"\s*-\s*", "-", grade_raw)
         sizes = self.DEFAULT_SIZE_MAP.get(grade)
         if sizes is None:
             return None

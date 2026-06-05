@@ -223,7 +223,12 @@ class PDFAnalyzer:
                     sku_rects = [(m.sku, m.rect) for m in sku_matches]
                     zones = self._assign_name_zones(sku_rects, ctx.page_width, ctx.page_height)
 
-                    words = page_p.extract_words()
+                    # `extra_attrs` enriquece cada palavra com `size` e
+                    # `fontname` (consumidos por `positional_title`). Apenas
+                    # ADICIONA chaves: `text`, `x0`, `top`, etc. permanecem
+                    # idênticos, então `zone_text` e o `category_vocabulary`
+                    # do Oasis não mudam de comportamento (golden diff-zero).
+                    words = page_p.extract_words(extra_attrs=["size", "fontname"])
                     threshold = ctx.page_height * bot_threshold_frac
                     bot_words = [w for w in words if float(w["top"]) > threshold]
                     if not bot_words:

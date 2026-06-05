@@ -32,4 +32,7 @@ def get_name_strategy(name: str) -> type[NameStrategy]:
 
 
 # Auto-discovery das estratégias concretas (ver nota em sku/__init__.py).
-from catalogflow.modules.catalog.strategies.name import category_vocabulary  # noqa: E402, F401
+from catalogflow.modules.catalog.strategies.name import (  # noqa: E402, F401
+    category_vocabulary,
+    positional_title,
+)
