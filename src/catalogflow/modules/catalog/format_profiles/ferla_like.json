@@ -1,0 +1,12 @@
+{
+  "id": "ferla_like",
+  "name": "FERLA-style (Ref prefix, dual price, range grade)",
+  "version": "1.0.0",
+  "strategies": {
+    "sku":      { "id": "regex_prefixed",   "params": {} },
+    "grade":    { "id": "alpha_range",      "params": {"tolerate_spaces": true} },
+    "price":    { "id": "labeled_dual",     "params": {} },
+    "swatches": { "id": "geometric_bottom", "params": {} },
+    "name":     { "id": "positional_title", "params": {} }
+  }
+}

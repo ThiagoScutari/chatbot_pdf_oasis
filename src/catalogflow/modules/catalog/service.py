@@ -23,6 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from catalogflow.infra.settings import Settings, get_settings
 from catalogflow.infra.storage import StorageClient, get_storage_client
+from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.domain import AnalyzerWarning
 from catalogflow.modules.catalog.field_injector import FieldInjector, count_fields
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
@@ -226,8 +227,17 @@ class CatalogService:
         try:
             pdf_bytes = await self.storage.download(catalog.source_key)
 
-            # ── Análise: SKUs, preços, swatches.
-            metadata = self.analyzer.analyze(pdf_bytes)
+            # ── Resolve o `format_profile_id` da brand (ADR-010 D2). Query
+            # enxuta: só a coluna, não a Brand inteira. Fallback defensivo
+            # para `oasis_default` (não deveria ocorrer — coluna NOT NULL
+            # com server_default — mas cobre brand ausente/null teórico).
+            profile_id = await self.db.scalar(
+                select(Brand.format_profile_id).where(Brand.id == catalog.brand_id),
+            )
+            profile_id = profile_id or "oasis_default"
+
+            # ── Análise: SKUs, preços, swatches, nome — via profile da brand.
+            metadata = self.analyzer.analyze(pdf_bytes, profile_id=profile_id)
             await self._update_progress(job_id, 40)
 
             # ── Persistência dos produtos detectados.

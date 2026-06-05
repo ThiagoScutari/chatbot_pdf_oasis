@@ -227,3 +227,40 @@ def test_schema_itself_is_valid_against_draft_2020_12() -> None:
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
     Draft202012Validator.check_schema(schema)
+
+
+# ──────────────────────────────────────────────
+#  Profiles versionados em código (Fase B/D)
+# ──────────────────────────────────────────────
+
+
+def test_ferla_like_profile_loads() -> None:
+    """O `ferla_like.json` real carrega e valida contra o schema."""
+    load_profile.cache_clear()
+    profile = load_profile("ferla_like")
+
+    assert isinstance(profile, BrandFormatProfile)
+    assert profile.id == "ferla_like"
+    assert profile.version == "1.0.0"
+
+
+def test_ferla_like_selects_expected_strategies() -> None:
+    """O profile aponta para as estratégias FERLA esperadas."""
+    load_profile.cache_clear()
+    profile = load_profile("ferla_like")
+
+    assert profile.strategies["sku"]["id"] == "regex_prefixed"
+    assert profile.strategies["grade"]["id"] == "alpha_range"
+    assert profile.strategies["grade"]["params"] == {"tolerate_spaces": True}
+    assert profile.strategies["price"]["id"] == "labeled_dual"
+    assert profile.strategies["swatches"]["id"] == "geometric_bottom"
+    assert profile.strategies["name"]["id"] == "positional_title"
+
+
+def test_oasis_default_profile_loads() -> None:
+    """Regressão: o `oasis_default.json` real continua válido."""
+    load_profile.cache_clear()
+    profile = load_profile("oasis_default")
+
+    assert profile.id == "oasis_default"
+    assert profile.strategies["name"]["id"] == "category_vocabulary"

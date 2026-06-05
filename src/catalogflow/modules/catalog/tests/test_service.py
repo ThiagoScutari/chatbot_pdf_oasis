@@ -15,6 +15,10 @@ from tests.fakes import FakeStorage
 
 from catalogflow.modules.auth.models import Brand
 from catalogflow.modules.catalog.models import Catalog, CatalogProduct, Job
+from catalogflow.modules.catalog.pdf_analyzer import (
+    CatalogMetadata,
+    ProductPageMeta,
+)
 from catalogflow.modules.catalog.service import (
     CatalogService,
     output_key_for,
@@ -526,6 +530,114 @@ class TestProcessCatalogWarnings:
         # grade ausente persiste como NULL; sizes coage None -> [] (coluna NOT NULL).
         assert product.grade is None
         assert product.sizes == []
+
+
+# ──────────────────────────────────────────────
+#  ADR-010 D2 — wiring do format_profile_id da brand
+# ──────────────────────────────────────────────
+
+
+class _RecordingAnalyzer:
+    """Analyzer stub que registra o `profile_id` recebido.
+
+    Devolve um `CatalogMetadata` canônico (1 produto, grade ausente) para
+    que o pipeline complete independentemente do profile — o foco do teste
+    é apenas QUAL profile chega ao analyzer.
+    """
+
+    def __init__(self) -> None:
+        self.received_profile_id: str | None = None
+
+    def analyze(
+        self,
+        pdf_bytes: bytes,
+        profile_id: str = "oasis_default",
+    ) -> CatalogMetadata:
+        self.received_profile_id = profile_id
+        return CatalogMetadata(
+            n_pages=1,
+            n_product_pages=1,
+            product_pages=[
+                ProductPageMeta(
+                    sku="01010012",
+                    name="Camisa Polo",
+                    price=None,
+                    grade=None,
+                    sizes=None,
+                    n_colors=1,
+                    swatches=[],
+                    page_index=0,
+                    x_block_start=0.0,
+                    x_block_end=10.0,
+                    y_start=0.0,
+                    y_end=10.0,
+                    side="single",
+                    n_products_on_page=1,
+                ),
+            ],
+            warnings=[],
+        )
+
+
+class TestProcessCatalogProfileWiring:
+    async def test_process_catalog_uses_brand_format_profile(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+    ) -> None:
+        # Marca a brand com o profile FERLA.
+        brand.format_profile_id = "ferla_like"
+        db_session.add(brand)
+        await db_session.commit()
+
+        recording = _RecordingAnalyzer()
+        service = CatalogService(
+            db_session,
+            storage=fake_storage,  # type: ignore[arg-type]
+            analyzer=recording,  # type: ignore[arg-type]
+            dispatch_task=dispatch,
+        )
+        catalog, job = await _seed_pending_catalog(
+            service, db_session, brand, "catalogo_1_produto_1_cor.pdf"
+        )
+
+        await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
+        await db_session.commit()
+
+        assert recording.received_profile_id == "ferla_like"
+
+    async def test_process_catalog_falls_back_to_oasis_default_when_null(
+        self,
+        db_session: AsyncSession,
+        fake_storage: FakeStorage,
+        dispatch: _SpyDispatch,
+        brand: Brand,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        recording = _RecordingAnalyzer()
+        service = CatalogService(
+            db_session,
+            storage=fake_storage,  # type: ignore[arg-type]
+            analyzer=recording,  # type: ignore[arg-type]
+            dispatch_task=dispatch,
+        )
+        catalog, job = await _seed_pending_catalog(
+            service, db_session, brand, "catalogo_1_produto_1_cor.pdf"
+        )
+
+        # Simula o caso defensivo de scalar retornando None (brand sem
+        # profile resolvível). `db.scalar` só é usado pelo lookup do profile.
+        async def _none_scalar(*args: object, **kwargs: object) -> None:
+            return None
+
+        monkeypatch.setattr(db_session, "scalar", _none_scalar)
+
+        await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
+        await db_session.commit()
+
+        assert recording.received_profile_id == "oasis_default"
 
 
 class TestKeyHelpers:
