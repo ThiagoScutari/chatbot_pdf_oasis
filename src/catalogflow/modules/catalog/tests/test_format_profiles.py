@@ -234,20 +234,20 @@ def test_schema_itself_is_valid_against_draft_2020_12() -> None:
 # ──────────────────────────────────────────────
 
 
-def test_ferla_like_profile_loads() -> None:
-    """O `ferla_like.json` real carrega e valida contra o schema."""
+def test_prefixed_dual_price_profile_loads() -> None:
+    """O `prefixed_dual_price.json` real carrega e valida contra o schema."""
     load_profile.cache_clear()
-    profile = load_profile("ferla_like")
+    profile = load_profile("prefixed_dual_price")
 
     assert isinstance(profile, BrandFormatProfile)
-    assert profile.id == "ferla_like"
+    assert profile.id == "prefixed_dual_price"
     assert profile.version == "1.0.0"
 
 
-def test_ferla_like_selects_expected_strategies() -> None:
-    """O profile aponta para as estratégias FERLA esperadas."""
+def test_prefixed_dual_price_selects_expected_strategies() -> None:
+    """O profile aponta para as estratégias do formato prefixado esperadas."""
     load_profile.cache_clear()
-    profile = load_profile("ferla_like")
+    profile = load_profile("prefixed_dual_price")
 
     assert profile.strategies["sku"]["id"] == "regex_prefixed"
     assert profile.strategies["grade"]["id"] == "alpha_range"
@@ -301,6 +301,6 @@ def test_load_profile_rejects_empty_string() -> None:
 def test_load_profile_accepts_valid_ids() -> None:
     """Os profiles reais (ids válidos) carregam sem erro de validação."""
     load_profile.cache_clear()
-    for valid_id in ("oasis_default", "ferla_like"):
+    for valid_id in ("oasis_default", "prefixed_dual_price"):
         profile = load_profile(valid_id)
         assert profile.id == valid_id

@@ -1,8 +1,9 @@
-"""Gerador da fixture sintética FERLA-like para testes do `catalog`.
+"""Gerador da fixture sintética do formato `prefixed_dual_price`.
 
 Espelha o estilo de `generate_fixtures.py` (pymupdf, **não** ReportLab):
-constrói um catálogo que reproduz os padrões do catálogo FERLA (moda
-masculina premium) que motivaram a ADR-010:
+constrói um catálogo que reproduz os padrões do formato de SKU prefixado
++ preço dual — observado em catálogos de moda masculina premium (ex.: o
+catálogo FERLA que motivou a ADR-010):
 
 - SKU prefixado por rótulo: `Ref: 01010012` (8 dígitos, sem hífen).
 - Grade alfabética com espaços ao redor do hífen: `Grade: P - GG`.
@@ -15,15 +16,15 @@ masculina premium) que motivaram a ADR-010:
 O PDF gerado tem 2 páginas:
 
     página 0 → 1 produto (mínimo viável, `side="single"`).
-    página 1 → 2 produtos lado a lado (exercita Voronoi no formato FERLA).
+    página 1 → 2 produtos lado a lado (exercita Voronoi neste formato).
 
-Saída: `tests/fixtures/catalogo_ferla_like.pdf` (commitada — fixture
-sintética, sem dado de cliente).
+Saída: `tests/fixtures/catalogo_prefixed_dual_price.pdf` (commitada —
+fixture sintética, sem dado de cliente).
 
 Determinismo: `tobytes()` pode variar entre execuções por metadados de
-timestamp, mas os testes da Fase D checam o conteúdo EXTRAÍDO (SKU,
-grade, preço, nome), não os bytes do PDF — então a variação é
-irrelevante. Commite a versão gerada e use-a como fixture fixa.
+timestamp, mas os testes checam o conteúdo EXTRAÍDO (SKU, grade, preço,
+nome), não os bytes do PDF — então a variação é irrelevante. Commite a
+versão gerada e use-a como fixture fixa.
 """
 
 from __future__ import annotations
@@ -52,7 +53,7 @@ def _add_product(
     varejo: str,
     swatch_fill: tuple[float, float, float],
 ) -> None:
-    """Imprime um produto FERLA-like a partir da coluna `x`.
+    """Imprime um produto no formato prefixado a partir da coluna `x`.
 
     O nome vai em `NAME_FONTSIZE` (maior peso tipográfico da zona); os
     demais campos em `DETAIL_FONTSIZE`, todos na zona inferior da página
@@ -72,8 +73,8 @@ def _add_product(
     )
 
 
-def build_ferla_like() -> bytes:
-    """Catálogo FERLA sintético: página 0 (1 produto) + página 1 (2 produtos)."""
+def build_prefixed_dual_price() -> bytes:
+    """Catálogo prefixado sintético: página 0 (1 produto) + página 1 (2 produtos)."""
     doc = pymupdf.open()
 
     # ── Página 0 — produto único (A4 retrato).
@@ -118,12 +119,12 @@ def build_ferla_like() -> bytes:
 
 
 FIXTURES: dict[str, object] = {
-    "catalogo_ferla_like.pdf": build_ferla_like,
+    "catalogo_prefixed_dual_price.pdf": build_prefixed_dual_price,
 }
 
 
 def main() -> None:
-    print(f"Gerando fixtures FERLA em {FIXTURES_DIR}/")
+    print(f"Gerando fixtures do formato prefixado em {FIXTURES_DIR}/")
     for name, builder in FIXTURES.items():
         data = builder()  # type: ignore[operator]
         target = FIXTURES_DIR / name

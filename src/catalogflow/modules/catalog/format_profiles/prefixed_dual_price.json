@@ -1,6 +1,6 @@
 {
-  "id": "ferla_like",
-  "name": "FERLA-style (Ref prefix, dual price, range grade)",
+  "id": "prefixed_dual_price",
+  "name": "Prefixed SKU + dual price (Ref: prefix, Atacado/Varejo, range grade)",
   "version": "1.0.0",
   "strategies": {
     "sku":      { "id": "regex_prefixed",   "params": {} },

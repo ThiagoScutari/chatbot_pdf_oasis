@@ -587,8 +587,8 @@ class TestProcessCatalogProfileWiring:
         dispatch: _SpyDispatch,
         brand: Brand,
     ) -> None:
-        # Marca a brand com o profile FERLA.
-        brand.format_profile_id = "ferla_like"
+        # Marca a brand com o profile do formato prefixado.
+        brand.format_profile_id = "prefixed_dual_price"
         db_session.add(brand)
         await db_session.commit()
 
@@ -606,7 +606,7 @@ class TestProcessCatalogProfileWiring:
         await service.process_catalog(catalog_id=catalog.id, job_id=job.id)
         await db_session.commit()
 
-        assert recording.received_profile_id == "ferla_like"
+        assert recording.received_profile_id == "prefixed_dual_price"
 
     async def test_process_catalog_falls_back_to_oasis_default_when_null(
         self,
