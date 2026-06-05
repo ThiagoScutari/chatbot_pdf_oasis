@@ -9,6 +9,14 @@
 **ADR de referência:** [ADR-010](../adr/ADR-010-multi-format-catalog-support.md)
 **Aprovado por:** Thiago Scutari (PMO) — _pendente_
 
+> **Nota (Fase E):** os nomes de profile foram renomeados de marca para
+> formato na Fase E — `oasis_default` → `hyphenated_single_price`,
+> `ferla_like` → `prefixed_dual_price`. Este PRD preserva os nomes
+> originais nas seções de **registro de planejamento** (árvore de arquivos
+> §4.1, SQL de exemplo §4.2, descrições de fase) como o registro do que
+> foi planejado à época. **A fonte de verdade dos nomes correntes é a
+> [ADR-010](../adr/ADR-010-multi-format-catalog-support.md) (Accepted).**
+
 ---
 
 ## 1. Objetivo (one-liner)
@@ -362,7 +370,7 @@ As três pendências da versão Draft foram aprovadas pelo PMO em 2026-06-01:
 |---|---|---|
 | 7.1 | Exposição de warnings via API | **A — adicionar campo `warnings` ao response existente** de `GET /api/v1/catalogs/{id}`. Campo opcional, default `[]`, sem breaking change. Sem endpoint dedicado. |
 | 7.2 | Fixture FERLA — sintética ou real | **A — fixture sintética.** (Revisto Fase D/E: gerada via **pymupdf** — já dependência core — não ReportLab; sem dependência nova.) Script `generate_prefixed_catalog_fixtures.py` gera o PDF reproduzindo os padrões textuais e tipográficos do formato prefixado (observado no catálogo FERLA real). |
-| 7.3 | Nome do profile default da Oasis | **`oasis_default`** (id no profile JSON, valor em `brand.format_profile_id`). Nome legível no JSON: `"Oasis Resortwear (default)"`. Profile é por marca, não por coleção — uma futura coleção que mude o formato ganha profile próprio. |
+| 7.3 | Nome do profile default da Oasis | **`hyphenated_single_price`** (id no profile JSON, valor default em `brand.format_profile_id`). Nome legível no JSON: `"Hyphenated SKU + single BR price (ex.: Oasis Resortwear)"`. **Profile é por FORMATO, não por marca** (N marcas → 1 formato): qualquer marca cujo catálogo siga o mesmo padrão de SKU/preço/grade reusa o mesmo profile. _Evolução: originalmente concebido como `oasis_default` "por marca" na versão Draft; refinado na Fase E para nome de formato e semântica por-formato — ver [ADR-010](../adr/ADR-010-multi-format-catalog-support.md) (Accepted)._ |
 
 ---
 
